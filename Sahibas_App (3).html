@@ -1005,6 +1005,10 @@ function rCS(){
     if(r[4]==='delivered'){
       p.delivered++;p.rev+=r[9];p.pat+=r[15];
       var sz=r[3];if(sz==='S')p.szS++;else if(sz==='M')p.szM++;else if(sz==='L')p.szL++;else if(sz==='XL')p.szXL++;
+    }
+    // Velocity (10d/20d/30d): use status filter if set, else delivered only
+    var velStats=f.stats.length>0?f.stats:['delivered'];
+    if(velStats.includes(r[4])){
       var isI=r[6]==='INTERNATIONAL',isL=r[6]==='LOCAL',isM=r[5]==='MARKETPLACE',isO=r[5]==='OCTANE';
       if(r[0]>=s10){if(isM&&isI)p.v10i++;else if(isM&&isL)p.v10l++;else if(isO)p.v10o++;}
       if(r[0]>=s20){if(isM&&isI)p.v20i++;else if(isM&&isL)p.v20l++;else if(isO)p.v20o++;}
@@ -1702,6 +1706,10 @@ function bizStats(){
     if(r[4]==='cancelled')p.can++;
     if(r[4]==='delivered'){
       p.del++;p.rev+=r[9];p.pat+=r[15];p.taxSum+=r[13];p.xa+=(r[17]||0);
+    }
+    // Velocity (10d/20d/30d): use status filter if set, else delivered only
+    var velStats=f.stats.length>0?f.stats:['delivered'];
+    if(velStats.includes(r[4])){
       var isI=r[6]==='INTERNATIONAL',isM=r[5]==='MARKETPLACE',isO=r[5]==='OCTANE';
       if(r[0]>=s10){if(isM&&isI)p.v10i++;else if(isM)p.v10l++;else if(isO)p.v10o++;}
       if(r[0]>=s20){if(isM&&isI)p.v20i++;else if(isM)p.v20l++;else if(isO)p.v20o++;}
