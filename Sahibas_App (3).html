@@ -1181,8 +1181,8 @@ function rCS(){
   // Row 1: Group label row — no per-cell top sticky; <thead> handles vertical freeze
   var gRow='<tr style="font-size:9px;font-weight:700">';
   gRow+='<th colspan="4" style="background:#f0ede8;padding:3px 9px;position:sticky;left:0;z-index:7;border-bottom:1px solid #e0dcd4;text-align:left;color:var(--gold2);font-size:10px">Summary Sheet</th>';
-  if(hasStock&&G.pricing){gRow+='<th colspan="3" style="background:#fdf3e8;color:#c8a96e;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8;position:sticky;left:313px;z-index:7">Gross Price &amp; Disc%</th>';}
-  if(hasStock){gRow+='<th colspan="3" style="background:#fdf3e8;color:#2980b9;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8;position:sticky;left:'+retLeft+'px;z-index:7;border-right:2px solid #c8a96e">Retail Price</th>';}
+  if(hasStock&&G.pricing){gRow+='<th colspan="3" style="background:#fdf3e8;color:#c8a96e;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8">Gross Price &amp; Disc%</th>';}
+  if(hasStock){gRow+='<th colspan="3" style="background:#fdf3e8;color:#2980b9;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8;border-right:2px solid #c8a96e">Retail Price</th>';}
   gRow+='<th colspan="3" style="background:#ecfaec;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #c3e6cb">Gross Profit</th>';
   gRow+='<th colspan="3" style="background:#f0fff4;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #b8e8d0">Net P&amp;L</th>';
   gRow+='<th colspan="'+(G.s_sales?5:1)+'" style="background:#e8f8f5;color:#16a085;text-align:center;padding:3px;border-bottom:2px solid #16a085">📊 Sales Qty</th>';
@@ -1202,20 +1202,18 @@ function rCS(){
 
   // Row 2: Column headers
   function fmtCDate(d){if(!d)return '—';var dt=new Date(d);if(isNaN(dt.getTime()))return d.split(' ')[0]||'—';var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];return dt.getDate()+' '+m+"'"+(dt.getFullYear()%100).toString().padStart(2,'0');}
-  var retLeft=313;
-  if(hasStock&&G.pricing)retLeft+=80+75+65;
   var cRow='<tr>';
   cRow+='<th style="padding:6px 8px;background:'+hbg+';border-bottom:2px solid #e8e4dc;min-width:30px;position:sticky;left:0;z-index:6"><input type="checkbox" onclick="csSelAll()" style="cursor:pointer;accent-color:var(--gold)"></th>';
   cRow+=mkTH('Created','createdAtTs',hbg,'center',75,undefined,'position:sticky;left:34px;z-index:6');
   cRow+=mkTH('Product','name',hbg,'left',140);
   cRow+='<th style="padding:6px 6px;background:'+hbg+';border-bottom:2px solid #e8e4dc;width:64px;min-width:64px;position:sticky;left:249px;z-index:6">IMG</th>';
   if(hasStock&&G.pricing){
-    cRow+=mkTH('Gross Price','grossPrice','#fdf8f0','right',80,undefined,'position:sticky;left:313px;z-index:6');
-    cRow+=mkTH('Discount','discountAmt','#fdf8f0','right',75,undefined,'position:sticky;left:393px;z-index:6');
-    cRow+=mkTH('Disc%','discountPct','#fdf8f0','right',65,undefined,'position:sticky;left:468px;z-index:6');
+    cRow+=mkTH('Gross Price','grossPrice','#fdf8f0','right',80);
+    cRow+=mkTH('Discount','discountAmt','#fdf8f0','right',75);
+    cRow+=mkTH('Disc%','discountPct','#fdf8f0','right',65);
   }
   if(hasStock){
-    cRow+=mkTH('Laam','retailPrice','#fdf8f0','right',75,undefined,'position:sticky;left:'+retLeft+'px;z-index:6');
+    cRow+=mkTH('Laam','retailPrice','#fdf8f0','right',75);
     cRow+=mkTH('Shopify','shopPrice','#dce8f8','right',75);
     cRow+=mkTH('Diff','priceDiff','#fff0f0','right',55,undefined,'border-right:2px solid #c8a96e');
   }
@@ -1248,9 +1246,10 @@ function rCS(){
   cRow+=mkTH('10d','v10o','#fffdf0','right',55);
   if(G.vel20){cRow+=mkTH('20d','v20o','#fffdf0','right',55);cRow+=mkTH('30d','v30o','#fffdf0','right',55);}
   cRow+=mkTH('Total 10d','total10','#e8f8ee','right',65);
-  cRow+='<th data-c="stockStatus" onclick="csSort(this)" style="padding:6px 8px;background:#e8f8ee;border-bottom:2px solid #e8e4dc;min-width:70px;text-align:center;white-space:nowrap;position:sticky;right:110px;z-index:6;cursor:pointer;user-select:none;border-left:2px solid #c8d8f0">LAAM'+((_csSortCol==='stockStatus'&&_csSortAsc)?' ↑':(_csSortCol==='stockStatus'&&!_csSortAsc)?' ↓':'')+'</th>';
-  cRow+='<th data-c="statusDiff" onclick="csSort(this)" style="padding:6px 8px;background:#fff0f0;border-bottom:2px solid #e8e4dc;min-width:40px;text-align:center;white-space:nowrap;position:sticky;right:70px;z-index:6;cursor:pointer;user-select:none;font-size:9px">≠'+((_csSortCol==='statusDiff'&&_csSortAsc)?' ↑':(_csSortCol==='statusDiff'&&!_csSortAsc)?' ↓':'')+'</th>';
-  cRow+='<th data-c="shopStatus" onclick="csSort(this)" style="padding:6px 8px;background:#e8f0fb;border-bottom:2px solid #e8e4dc;min-width:70px;text-align:center;white-space:nowrap;position:sticky;right:0;z-index:6;cursor:pointer;user-select:none">SHOPIFY'+((_csSortCol==='shopStatus'&&_csSortAsc)?' ↑':(_csSortCol==='shopStatus'&&!_csSortAsc)?' ↓':'')+'</th>';
+  var stW=72,sdW=55;
+  cRow+='<th data-c="stockStatus" onclick="csSort(this)" style="padding:6px 4px;background:#e8f8ee;border-bottom:2px solid #e8e4dc;width:'+stW+'px;min-width:'+stW+'px;max-width:'+stW+'px;text-align:center;white-space:nowrap;position:sticky;right:'+(sdW+stW)+'px;z-index:6;cursor:pointer;user-select:none;border-left:2px solid #c8d8f0">LAAM'+((_csSortCol==='stockStatus'&&_csSortAsc)?' ↑':(_csSortCol==='stockStatus'&&!_csSortAsc)?' ↓':'')+'</th>';
+  cRow+='<th data-c="statusDiff" onclick="csSort(this)" style="padding:6px 4px;background:#fff0f0;border-bottom:2px solid #e8e4dc;width:'+sdW+'px;min-width:'+sdW+'px;max-width:'+sdW+'px;text-align:center;white-space:nowrap;position:sticky;right:'+stW+'px;z-index:6;cursor:pointer;user-select:none;font-size:9px">≠'+((_csSortCol==='statusDiff'&&_csSortAsc)?' ↑':(_csSortCol==='statusDiff'&&!_csSortAsc)?' ↓':'')+'</th>';
+  cRow+='<th data-c="shopStatus" onclick="csSort(this)" style="padding:6px 4px;background:#e8f0fb;border-bottom:2px solid #e8e4dc;width:'+stW+'px;min-width:'+stW+'px;max-width:'+stW+'px;text-align:center;white-space:nowrap;position:sticky;right:0;z-index:6;cursor:pointer;user-select:none">SHOPIFY'+((_csSortCol==='shopStatus'&&_csSortAsc)?' ↑':(_csSortCol==='shopStatus'&&!_csSortAsc)?' ↓':'')+'</th>';
   cRow+='</tr>';
 
   // Row 3: Totals (frozen as 3rd thead row)
@@ -1260,8 +1259,8 @@ function rCS(){
    +'<td style="padding:4px 6px;background:'+totBg+';position:sticky;left:34px;z-index:6;text-align:center;font-size:9px;font-style:italic;color:var(--gold2)">TOT</td>'
    +'<td style="padding:5px 8px;background:'+totBg+';position:sticky;left:109px;z-index:6;font-weight:800;white-space:nowrap;color:var(--gold2)">SUBTOTAL — '+arr.length+' products</td>'
    +'<td style="padding:5px 8px;background:'+totBg+';position:sticky;left:249px;z-index:6"></td>'
-   +(hasStock&&G.pricing?tdc('—','background:#fdf8f0;color:#bbb;position:sticky;left:313px;z-index:6')+tdc('—','background:#fdf8f0;color:#bbb;position:sticky;left:393px;z-index:6')+tdc('—','background:#fdf8f0;color:#bbb;position:sticky;left:468px;z-index:6'):'')
-   +(hasStock?tdc('—','background:#fdf8f0;color:#bbb;position:sticky;left:'+retLeft+'px;z-index:6')+tdc('—','background:#dce8f8;color:#bbb')+tdc('—','background:#fff0f0;color:#bbb;border-right:2px solid #c8a96e'):'')
+   +(hasStock&&G.pricing?tdc('—','background:#fdf8f0;color:#bbb')+tdc('—','background:#fdf8f0;color:#bbb')+tdc('—','background:#fdf8f0;color:#bbb'):'')
+   +(hasStock?tdc('—','background:#fdf8f0;color:#bbb')+tdc('—','background:#dce8f8;color:#bbb')+tdc('—','background:#fff0f0;color:#bbb;border-right:2px solid #c8a96e'):'')
    +tdc('—','color:#bbb')
    +tdc('—','background:#ecfaec;color:#bbb')
    +tdc('—','background:#ecfaec;color:#bbb')
@@ -1279,9 +1278,9 @@ function rCS(){
    +tdc(NF(tot10l),'background:#fffdf0')+(G.vel20?tdc(NF(tot20l),'background:#fffdf0')+tdc(NF(tot30l),'background:#fffdf0'):'')
    +tdc(NF(tot10o),'background:#fffdf0')+(G.vel20?tdc(NF(tot20o),'background:#fffdf0')+tdc(NF(tot30o),'background:#fffdf0'):'')
    +tdc(NF(tot10),'background:#e8f8ee;color:#27ae60')
-   +'<td style="padding:5px 8px;background:'+totBg+';position:sticky;right:110px;z-index:6;text-align:center;color:#bbb;border-left:2px solid #c8d8f0">—</td>'
-   +'<td style="padding:5px 8px;background:'+totBg+';position:sticky;right:70px;z-index:6;text-align:center;color:#bbb">—</td>'
-   +'<td style="padding:5px 8px;background:'+totBg+';position:sticky;right:0;z-index:6;text-align:center;color:#bbb">—</td>'
+   +'<td style="padding:5px 4px;background:'+totBg+';position:sticky;right:'+(sdW+stW)+'px;z-index:6;text-align:center;color:#bbb;border-left:2px solid #c8d8f0;width:'+stW+'px;min-width:'+stW+'px;max-width:'+stW+'px">—</td>'
+   +'<td style="padding:5px 4px;background:'+totBg+';position:sticky;right:'+stW+'px;z-index:6;text-align:center;color:#bbb;width:'+sdW+'px;min-width:'+sdW+'px;max-width:'+sdW+'px">—</td>'
+   +'<td style="padding:5px 4px;background:'+totBg+';position:sticky;right:0;z-index:6;text-align:center;color:#bbb;width:'+stW+'px;min-width:'+stW+'px;max-width:'+stW+'px">—</td>'
    +'</tr>';
 
   var thead='<thead>'+gRow+cRow+trow+'</thead>';
@@ -1308,10 +1307,10 @@ function rCS(){
      +'<td style="padding:4px 6px;position:sticky;left:34px;background:'+bg+';z-index:3;width:75px;min-width:75px;text-align:center;font-size:10px;color:#888;white-space:nowrap">'+fmtCDate(p.createdAt)+'</td>'
      +'<td style="padding:6px 8px;position:sticky;left:109px;background:'+bg+';z-index:3;font-weight:700;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">'+nameCell+'</td>'
      +'<td style="padding:4px 6px;position:sticky;left:249px;background:'+bg+';z-index:3;width:64px;min-width:64px;max-width:64px">'+imgHtml+'</td>'
-     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:#c8a96e;font-weight:600;position:sticky;left:313px;z-index:3">'+(p.grossPrice>0?NF(p.grossPrice):'-')+'</td>':'')
-     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:'+(p.discountAmt>0?'#e74c3c':'#bbb')+';font-weight:600;position:sticky;left:393px;z-index:3">'+(p.discountAmt>0?NF(p.discountAmt):'-')+'</td>':'')
-     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:'+(p.discountPct>0?'#e74c3c':'#bbb')+';font-weight:600;position:sticky;left:468px;z-index:3">'+(p.discountPct>0?p.discountPct+'%':'-')+'</td>':'')
-     +(hasStock?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:#2980b9;font-weight:600;position:sticky;left:'+retLeft+'px;z-index:3">'+(p.retailPrice>0?NF(p.retailPrice):'-')+'</td>'
+     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:#c8a96e;font-weight:600">'+(p.grossPrice>0?NF(p.grossPrice):'-')+'</td>':'')
+     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:'+(p.discountAmt>0?'#e74c3c':'#bbb')+';font-weight:600">'+(p.discountAmt>0?NF(p.discountAmt):'-')+'</td>':'')
+     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:'+(p.discountPct>0?'#e74c3c':'#bbb')+';font-weight:600">'+(p.discountPct>0?p.discountPct+'%':'-')+'</td>':'')
+     +(hasStock?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:#2980b9;font-weight:600">'+(p.retailPrice>0?NF(p.retailPrice):'-')+'</td>'
      +'<td style="padding:6px 8px;text-align:right;background:#dce8f8;color:#2471a3;font-weight:600">'+(p.shopPrice>0?NF(p.shopPrice):'-')+'</td>'
      +'<td style="padding:6px 8px;text-align:right;background:#fff0f0;border-right:2px solid #c8a96e;'+(p.priceDiff!=null?(p.priceDiff!==0?'color:#c0392b;font-weight:700':'color:#27ae60;font-weight:600'):'color:#bbb')+'">'+(p.priceDiff!=null?(p.priceDiff===0?'✓':NF(p.priceDiff)):'-')+'</td>':'')
      +'<td style="padding:6px 8px;text-align:right;color:#888">'+NF(p.cost)+'</td>'
@@ -1337,14 +1336,14 @@ function rCS(){
      +'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v10o||'-')+'</td>'
      +(G.vel20?'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v20o||'-')+'</td>'+'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v30o||'-')+'</td>':'')
      +'<td style="padding:6px 8px;text-align:right;background:#e8f8ee;'+vc+'">'+(p.total10||'-')+'</td>'
-     +'<td style="padding:4px 6px;text-align:center;background:'+bg+';position:sticky;right:110px;z-index:3;border-left:2px solid #c8d8f0"><span style="'+laamBg+';padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700">'+p.stockStatus+'</span></td>'
-     +'<td style="padding:4px 6px;text-align:center;background:'+(p.statusDiff&&p.statusDiff!=='SAME'?'#fff0f0':bg)+';position:sticky;right:70px;z-index:3;font-size:8px;font-weight:700;'+(p.statusDiff==='SAME'?'color:#27ae60':'color:#c0392b')+'">'+(p.statusDiff?(p.statusDiff==='SAME'?'✓':p.statusDiff):'-')+'</td>'
-     +'<td style="padding:4px 6px;text-align:center;background:'+bg+';position:sticky;right:0;z-index:3">'+(p.shopStatus?'<span style="'+shopBg+';padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700">'+p.shopStatus+'</span>':'-')+'</td>'
+     +'<td style="padding:4px 4px;text-align:center;background:'+bg+';position:sticky;right:'+(sdW+stW)+'px;z-index:3;border-left:2px solid #c8d8f0;width:'+stW+'px;min-width:'+stW+'px;max-width:'+stW+'px"><span style="'+laamBg+';padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700">'+p.stockStatus+'</span></td>'
+     +'<td style="padding:4px 4px;text-align:center;background:'+(p.statusDiff&&p.statusDiff!=='SAME'?'#fff0f0':bg)+';position:sticky;right:'+stW+'px;z-index:3;font-size:8px;font-weight:700;width:'+sdW+'px;min-width:'+sdW+'px;max-width:'+sdW+'px;'+(p.statusDiff==='SAME'?'color:#27ae60':'color:#c0392b')+'">'+(p.statusDiff?(p.statusDiff==='SAME'?'✓':p.statusDiff):'-')+'</td>'
+     +'<td style="padding:4px 4px;text-align:center;background:'+bg+';position:sticky;right:0;z-index:3;width:'+stW+'px;min-width:'+stW+'px;max-width:'+stW+'px">'+(p.shopStatus?'<span style="'+shopBg+';padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700">'+p.shopStatus+'</span>':'-')+'</td>'
      +'</tr>';
   });
   tbody+='</tbody>';
 
-  el.innerHTML=kh+fh+'<div id="cs-scroll" style="overflow:auto;border:1px solid #e8e4dc;border-radius:6px;height:calc(100vh - 290px);min-height:300px"><table style="border-collapse:collapse;font-size:11px;background:#fff;min-width:1400px">'+thead+tbody+'</table></div>';
+  el.innerHTML=kh+fh+'<div id="cs-scroll" style="overflow:auto;border:1px solid #e8e4dc;border-radius:6px;height:calc(100vh - 290px);min-height:300px"><table style="border-collapse:separate;border-spacing:0;font-size:11px;background:#fff;min-width:1400px">'+thead+tbody+'</table></div>';
   if(_csFilters.search){var _si=el.querySelector('[data-k="search"]');if(_si){var _sv=_si.value.length;_si.focus();_si.setSelectionRange(_sv,_sv);}}
   if(_csActiveRow>=0){var _tb=document.getElementById('pcs-tbody');if(_tb){var _rs=_tb.querySelectorAll('tr');if(_rs[_csActiveRow])_rs[_csActiveRow].classList.add('cs-kr');}}
 }
