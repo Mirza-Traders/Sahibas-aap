@@ -1366,9 +1366,17 @@ function csFixFreeze(){
       var cell=cells[ci];
       var span=parseInt(cell.getAttribute('colspan'))||1;
       if(ri===0){
-        var anyFrozen=false;
-        for(var s=0;s<span;s++){if(flCols.hasOwnProperty(cIdx+s))anyFrozen=true;}
-        if(cIdx===0&&anyFrozen){cell.style.position='sticky';cell.style.left='0px';cell.style.zIndex='9';}
+        var allFrozen=true;
+        for(var s=0;s<span;s++){if(!flCols.hasOwnProperty(cIdx+s))allFrozen=false;}
+        if(allFrozen&&span>0){
+          cell.style.position='sticky';
+          cell.style.left=(flCols[cIdx]||0)+'px';
+          cell.style.zIndex='9';
+          var lastColInSpan=cIdx+span-1;
+          if(flCols.hasOwnProperty(lastColInSpan)&&flCols[lastColInSpan]===lastFrozenLeft){
+            cell.style.borderRight='2px solid #c8a96e';
+          }
+        }
         cIdx+=span;continue;
       }
       if(flCols.hasOwnProperty(cIdx)){
