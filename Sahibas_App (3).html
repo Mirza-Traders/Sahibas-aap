@@ -1214,8 +1214,8 @@ function rCS(){
   }
   if(hasStock){
     cRow+='<th data-fl="1" data-c="retailPrice" onclick="csSort(this)" style="padding:6px 8px;background:#fdf8f0;border-bottom:2px solid #e8e4dc;text-align:right;min-width:75px;white-space:nowrap;cursor:pointer;user-select:none">Laam'+((_csSortCol==='retailPrice'&&_csSortAsc)?' ↑':(_csSortCol==='retailPrice'&&!_csSortAsc)?' ↓':'')+'</th>';
-    cRow+=mkTH('Shopify','shopPrice','#dce8f8','right',75);
-    cRow+=mkTH('Diff','priceDiff','#fff0f0','right',55,undefined,'border-right:2px solid #c8a96e');
+    cRow+='<th data-fl="1" data-c="shopPrice" onclick="csSort(this)" style="padding:6px 8px;background:#dce8f8;border-bottom:2px solid #e8e4dc;text-align:right;min-width:75px;white-space:nowrap;cursor:pointer;user-select:none">Shopify'+((_csSortCol==='shopPrice'&&_csSortAsc)?' ↑':(_csSortCol==='shopPrice'&&!_csSortAsc)?' ↓':'')+'</th>';
+    cRow+='<th data-fl="1" data-c="priceDiff" onclick="csSort(this)" style="padding:6px 8px;background:#fff0f0;border-bottom:2px solid #e8e4dc;text-align:right;min-width:55px;white-space:nowrap;cursor:pointer;user-select:none">Diff'+((_csSortCol==='priceDiff'&&_csSortAsc)?' ↑':(_csSortCol==='priceDiff'&&!_csSortAsc)?' ↓':'')+'</th>';
   }
   cRow+=mkTH('Cost','cost',hbg,'right',65);
   cRow+=mkTH('GP','gpUnit','#ecfaec','right',70);
@@ -1260,7 +1260,7 @@ function rCS(){
    +'<td data-fl="1" style="padding:5px 8px;background:'+totBg+';font-weight:800;white-space:nowrap;color:var(--gold2)">SUBTOTAL — '+arr.length+' products</td>'
    +'<td data-fl="1" style="padding:5px 8px;background:'+totBg+'"></td>'
    +(hasStock&&G.pricing?tdc('—','background:#fdf8f0;color:#bbb')+tdc('—','background:#fdf8f0;color:#bbb')+tdc('—','background:#fdf8f0;color:#bbb'):'')
-   +(hasStock?'<td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td>'+tdc('—','background:#dce8f8;color:#bbb')+tdc('—','background:#fff0f0;color:#bbb;border-right:2px solid #c8a96e'):'')
+   +(hasStock?'<td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td>':'')
    +tdc('—','color:#bbb')
    +tdc('—','background:#ecfaec;color:#bbb')
    +tdc('—','background:#ecfaec;color:#bbb')
@@ -1311,8 +1311,8 @@ function rCS(){
      +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:'+(p.discountAmt>0?'#e74c3c':'#bbb')+';font-weight:600">'+(p.discountAmt>0?NF(p.discountAmt):'-')+'</td>':'')
      +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:'+(p.discountPct>0?'#e74c3c':'#bbb')+';font-weight:600">'+(p.discountPct>0?p.discountPct+'%':'-')+'</td>':'')
      +(hasStock?'<td data-fl="1" style="padding:6px 8px;text-align:right;background:#fdf8f0;color:#2980b9;font-weight:600">'+(p.retailPrice>0?NF(p.retailPrice):'-')+'</td>'
-     +'<td style="padding:6px 8px;text-align:right;background:#dce8f8;color:#2471a3;font-weight:600">'+(p.shopPrice>0?NF(p.shopPrice):'-')+'</td>'
-     +'<td style="padding:6px 8px;text-align:right;background:#fff0f0;border-right:2px solid #c8a96e;'+(p.priceDiff!=null?(p.priceDiff!==0?'color:#c0392b;font-weight:700':'color:#27ae60;font-weight:600'):'color:#bbb')+'">'+(p.priceDiff!=null?(p.priceDiff===0?'✓':NF(p.priceDiff)):'-')+'</td>':'')
+     +'<td data-fl="1" style="padding:6px 8px;text-align:right;background:#dce8f8;color:#2471a3;font-weight:600">'+(p.shopPrice>0?NF(p.shopPrice):'-')+'</td>'
+     +'<td data-fl="1" style="padding:6px 8px;text-align:right;background:#fff0f0;'+(p.priceDiff!=null?(p.priceDiff!==0?'color:#c0392b;font-weight:700':'color:#27ae60;font-weight:600'):'color:#bbb')+'">'+(p.priceDiff!=null?(p.priceDiff===0?'✓':NF(p.priceDiff)):'-')+'</td>':'')
      +'<td style="padding:6px 8px;text-align:right;color:#888">'+NF(p.cost)+'</td>'
      +'<td style="padding:6px 8px;text-align:right;background:#ecfaec;color:'+(p.gpUnit>0?'#27ae60':'#bbb')+';font-weight:700">'+(p.gpUnit>0?NF(p.gpUnit):'-')+'</td>'
      +'<td style="padding:6px 8px;text-align:right;background:#ecfaec;color:'+(p.gpPct>=20?'#27ae60':p.gpPct>=10?'#d4944a':'#c0392b')+';font-weight:700">'+(p.gpPct>0?p.gpPct+'%':'-')+'</td>'
