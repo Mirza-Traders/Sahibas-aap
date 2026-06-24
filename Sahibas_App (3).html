@@ -986,7 +986,7 @@ function rST(){
 
 // ── PRODUCT SUMMARY — built from sales data ──
 var _csSortCol='total10',_csSortAsc=false,_csSelProds=new Set(),_csActiveRow=-1;
-var _csFilters={search:'',status:'',min10d:0,minStk:0,minRate:0};
+var _csFilters={search:'',status:'',shopSt:'',min10d:0,minStk:0,minRate:0};
 var _csGroups={pricing:false,gp:false,s_sales:false,totals:false,orders:false,s_stock:false,vel20:false};
 function csToggleGroup(g){_csGroups[g]=!_csGroups[g];rendered.cs=false;doR('cs');}
 function csToggleAll(){var allOn=Object.values(_csGroups).every(Boolean);Object.keys(_csGroups).forEach(function(k){_csGroups[k]=!allOn;});rendered.cs=false;doR('cs');}
@@ -1085,6 +1085,7 @@ function rCS(){
     var cf=_csFilters;
     if(cf.search&&p.name.toLowerCase().indexOf(cf.search.toLowerCase())<0)return false;
     if(cf.status&&p.stockStatus!==cf.status)return false;
+    if(cf.shopSt&&p.shopStatus!==cf.shopSt)return false;
     if(cf.min10d&&p.total10<cf.min10d)return false;
     if(cf.minStk&&(p.laamTotal===null||p.laamTotal<cf.minStk))return false;
     if(cf.minRate&&p.daily<cf.minRate)return false;
@@ -1149,7 +1150,8 @@ function rCS(){
   // ── Filter bar ──
   var fh='<div style="background:#fff;border:1px solid #e8e4dc;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">'
    +'<input data-k="search" value="'+(_csFilters.search||'')+'" placeholder="Search product..." oninput="csApplyFilter(this)" style="border:1px solid #e0dcd4;border-radius:4px;padding:5px 9px;font-size:11px;outline:none;width:160px">'
-   +(hasStock?sel('status',[['ACTIVE','Active'],['ARCHIVED','Archived'],['DRAFT','Draft']],'All Status'):'')
+   +(hasStock?sel('status',[['ACTIVE','Active'],['ARCHIVED','Archived'],['DRAFT','Draft']],'Laam Status: All'):'')
+   +sel('shopSt',[['ACTIVE','Active'],['DRAFT','Draft'],['UNLISTED','Unlisted']],'Shopify Status: All')
    +sel('min10d',[['1','>1'],['5','>5'],['10','>10'],['20','>20'],['30','>30']],'10d Sales: All')
    +(hasStock?sel('minStk',[['1','In Stock'],['10','>10'],['20','>20'],['50','>50']],'Laam Stock: All'):'')
    +sel('minRate',[['0.5','>0.5/d'],['1','>1/d'],['2','>2/d'],['5','>5/d']],'Daily Rate: All')
@@ -1173,8 +1175,8 @@ function rCS(){
   // Row 1: Group label row — no per-cell top sticky; <thead> handles vertical freeze
   var gRow='<tr style="font-size:9px;font-weight:700">';
   gRow+='<th colspan="4" style="background:#f0ede8;padding:3px 9px;position:sticky;left:0;z-index:7;border-bottom:1px solid #e0dcd4;text-align:left;color:var(--gold2);font-size:10px">Summary Sheet</th>';
-  if(hasStock&&G.pricing){gRow+='<th colspan="3" style="background:#fdf3e8;color:#c8a96e;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8">Gross Price &amp; Disc%</th>';}
-  if(hasStock){gRow+='<th style="background:#fdf3e8;color:#2980b9;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8">Retail Price</th>';}
+  if(hasStock&&G.pricing){gRow+='<th colspan="3" style="background:#fdf3e8;color:#c8a96e;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8;position:sticky;left:313px;z-index:7">Gross Price &amp; Disc%</th>';}
+  if(hasStock){gRow+='<th style="background:#fdf3e8;color:#2980b9;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8;position:sticky;left:'+retLeft+'px;z-index:7;border-right:2px solid #c8a96e">Retail Price</th>';}
   gRow+='<th colspan="3" style="background:#ecfaec;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #c3e6cb">Gross Profit</th>';
   gRow+='<th colspan="3" style="background:#f0fff4;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #b8e8d0">Net P&amp;L</th>';
   gRow+='<th colspan="'+(G.s_sales?5:1)+'" style="background:#e8f8f5;color:#16a085;text-align:center;padding:3px;border-bottom:2px solid #16a085">📊 Sales Qty</th>';
@@ -1189,22 +1191,24 @@ function rCS(){
   gRow+='<th colspan="'+(G.vel20?3:1)+'" style="background:#fffdf0;color:#8a6800;text-align:center;padding:3px;border-bottom:1px solid #e8e0b0">MP-LCL</th>';
   gRow+='<th colspan="'+(G.vel20?3:1)+'" style="background:#fffdf0;color:#8a6800;text-align:center;padding:3px;border-bottom:1px solid #e8e0b0">OCT</th>';
   gRow+='<th style="background:#e8f8ee;border-bottom:1px solid #e0dcd4"></th>';
-  gRow+='<th colspan="2" style="background:#f0f5ff;color:#555;text-align:center;padding:3px;position:sticky;right:0;z-index:7;border-bottom:1px solid #c8d8f0;border-left:2px solid #c8d8f0">Status</th>';
+  gRow+='<th colspan="2" style="background:#f0f5ff;color:#555;text-align:center;padding:3px;position:sticky;right:0;z-index:8;border-bottom:1px solid #c8d8f0;border-left:2px solid #c8d8f0">Status</th>';
   gRow+='</tr>';
 
   // Row 2: Column headers
   function fmtCDate(d){if(!d)return '—';var dt=new Date(d);if(isNaN(dt.getTime()))return d.split(' ')[0]||'—';var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];return dt.getDate()+' '+m+"'"+(dt.getFullYear()%100).toString().padStart(2,'0');}
+  var retLeft=313;
+  if(hasStock&&G.pricing)retLeft+=80+75+65;
   var cRow='<tr>';
   cRow+='<th style="padding:6px 8px;background:'+hbg+';border-bottom:2px solid #e8e4dc;min-width:30px;position:sticky;left:0;z-index:6"><input type="checkbox" onclick="csSelAll()" style="cursor:pointer;accent-color:var(--gold)"></th>';
   cRow+=mkTH('Created','createdAtTs',hbg,'center',75,undefined,'position:sticky;left:34px;z-index:6');
   cRow+=mkTH('Product','name',hbg,'left',140);
   cRow+='<th style="padding:6px 6px;background:'+hbg+';border-bottom:2px solid #e8e4dc;width:64px;min-width:64px;position:sticky;left:249px;z-index:6">IMG</th>';
   if(hasStock&&G.pricing){
-    cRow+=mkTH('Gross Price','grossPrice','#fdf8f0','right',80);
-    cRow+=mkTH('Discount','discountAmt','#fdf8f0','right',75);
-    cRow+=mkTH('Disc%','discountPct','#fdf8f0','right',65);
+    cRow+=mkTH('Gross Price','grossPrice','#fdf8f0','right',80,undefined,'position:sticky;left:313px;z-index:6');
+    cRow+=mkTH('Discount','discountAmt','#fdf8f0','right',75,undefined,'position:sticky;left:393px;z-index:6');
+    cRow+=mkTH('Disc%','discountPct','#fdf8f0','right',65,undefined,'position:sticky;left:468px;z-index:6');
   }
-  if(hasStock){cRow+=mkTH('Retail Price','retailPrice','#fdf8f0','right',80);}
+  if(hasStock){cRow+=mkTH('Retail Price','retailPrice','#fdf8f0','right',80,undefined,'position:sticky;left:'+retLeft+'px;z-index:6;border-right:2px solid #c8a96e');}
   cRow+=mkTH('Cost','cost',hbg,'right',65);
   cRow+=mkTH('GP','gpUnit','#ecfaec','right',70);
   cRow+=mkTH('GP%','gpPct','#ecfaec','right',55);
@@ -1234,7 +1238,7 @@ function rCS(){
   cRow+=mkTH('10d','v10o','#fffdf0','right',55);
   if(G.vel20){cRow+=mkTH('20d','v20o','#fffdf0','right',55);cRow+=mkTH('30d','v30o','#fffdf0','right',55);}
   cRow+=mkTH('Total 10d','total10','#e8f8ee','right',65);
-  cRow+='<th data-c="stockStatus" onclick="csSort(this)" style="padding:6px 8px;background:#e8f8ee;border-bottom:2px solid #e8e4dc;min-width:70px;text-align:center;white-space:nowrap;z-index:6;cursor:pointer;user-select:none;border-left:2px solid #c8d8f0">LAAM'+((_csSortCol==='stockStatus'&&_csSortAsc)?' ↑':(_csSortCol==='stockStatus'&&!_csSortAsc)?' ↓':'')+'</th>';
+  cRow+='<th data-c="stockStatus" onclick="csSort(this)" style="padding:6px 8px;background:#e8f8ee;border-bottom:2px solid #e8e4dc;min-width:70px;text-align:center;white-space:nowrap;position:sticky;right:70px;z-index:6;cursor:pointer;user-select:none;border-left:2px solid #c8d8f0">LAAM'+((_csSortCol==='stockStatus'&&_csSortAsc)?' ↑':(_csSortCol==='stockStatus'&&!_csSortAsc)?' ↓':'')+'</th>';
   cRow+='<th data-c="shopStatus" onclick="csSort(this)" style="padding:6px 8px;background:#e8f0fb;border-bottom:2px solid #e8e4dc;min-width:70px;text-align:center;white-space:nowrap;position:sticky;right:0;z-index:6;cursor:pointer;user-select:none">SHOPIFY'+((_csSortCol==='shopStatus'&&_csSortAsc)?' ↑':(_csSortCol==='shopStatus'&&!_csSortAsc)?' ↓':'')+'</th>';
   cRow+='</tr>';
 
@@ -1245,8 +1249,8 @@ function rCS(){
    +'<td style="padding:4px 6px;background:'+totBg+';position:sticky;left:34px;z-index:6;text-align:center;font-size:9px;font-style:italic;color:var(--gold2)">TOT</td>'
    +'<td style="padding:5px 8px;background:'+totBg+';position:sticky;left:109px;z-index:6;font-weight:800;white-space:nowrap;color:var(--gold2)">SUBTOTAL — '+arr.length+' products</td>'
    +'<td style="padding:5px 8px;background:'+totBg+';position:sticky;left:249px;z-index:6"></td>'
-   +(hasStock&&G.pricing?tdc('—','background:#fdf8f0;color:#bbb')+tdc('—','background:#fdf8f0;color:#bbb')+tdc('—','background:#fdf8f0;color:#bbb'):'')
-   +(hasStock?tdc('—','background:#fdf8f0;color:#bbb'):'')
+   +(hasStock&&G.pricing?tdc('—','background:#fdf8f0;color:#bbb;position:sticky;left:313px;z-index:6')+tdc('—','background:#fdf8f0;color:#bbb;position:sticky;left:393px;z-index:6')+tdc('—','background:#fdf8f0;color:#bbb;position:sticky;left:468px;z-index:6'):'')
+   +(hasStock?tdc('—','background:#fdf8f0;color:#bbb;position:sticky;left:'+retLeft+'px;z-index:6;border-right:2px solid #c8a96e'):'')
    +tdc('—','color:#bbb')
    +tdc('—','background:#ecfaec;color:#bbb')
    +tdc('—','background:#ecfaec;color:#bbb')
@@ -1264,7 +1268,7 @@ function rCS(){
    +tdc(NF(tot10l),'background:#fffdf0')+(G.vel20?tdc(NF(tot20l),'background:#fffdf0')+tdc(NF(tot30l),'background:#fffdf0'):'')
    +tdc(NF(tot10o),'background:#fffdf0')+(G.vel20?tdc(NF(tot20o),'background:#fffdf0')+tdc(NF(tot30o),'background:#fffdf0'):'')
    +tdc(NF(tot10),'background:#e8f8ee;color:#27ae60')
-   +'<td style="padding:5px 8px;background:'+totBg+';text-align:center;color:#bbb;border-left:2px solid #c8d8f0">—</td>'
+   +'<td style="padding:5px 8px;background:'+totBg+';position:sticky;right:70px;z-index:6;text-align:center;color:#bbb;border-left:2px solid #c8d8f0">—</td>'
    +'<td style="padding:5px 8px;background:'+totBg+';position:sticky;right:0;z-index:6;text-align:center;color:#bbb">—</td>'
    +'</tr>';
 
@@ -1292,10 +1296,10 @@ function rCS(){
      +'<td style="padding:4px 6px;position:sticky;left:34px;background:'+bg+';z-index:3;width:75px;min-width:75px;text-align:center;font-size:10px;color:#888;white-space:nowrap">'+fmtCDate(p.createdAt)+'</td>'
      +'<td style="padding:6px 8px;position:sticky;left:109px;background:'+bg+';z-index:3;font-weight:700;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">'+nameCell+'</td>'
      +'<td style="padding:4px 6px;position:sticky;left:249px;background:'+bg+';z-index:3;width:64px;min-width:64px;max-width:64px">'+imgHtml+'</td>'
-     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:#c8a96e;font-weight:600">'+(p.grossPrice>0?NF(p.grossPrice):'-')+'</td>':'')
-     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:'+(p.discountAmt>0?'#e74c3c':'#bbb')+';font-weight:600">'+(p.discountAmt>0?NF(p.discountAmt):'-')+'</td>':'')
-     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:'+(p.discountPct>0?'#e74c3c':'#bbb')+';font-weight:600">'+(p.discountPct>0?p.discountPct+'%':'-')+'</td>':'')
-     +(hasStock?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:#2980b9;font-weight:600">'+(p.retailPrice>0?NF(p.retailPrice):'-')+'</td>':'')
+     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:#c8a96e;font-weight:600;position:sticky;left:313px;z-index:3">'+(p.grossPrice>0?NF(p.grossPrice):'-')+'</td>':'')
+     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:'+(p.discountAmt>0?'#e74c3c':'#bbb')+';font-weight:600;position:sticky;left:393px;z-index:3">'+(p.discountAmt>0?NF(p.discountAmt):'-')+'</td>':'')
+     +(hasStock&&G.pricing?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:'+(p.discountPct>0?'#e74c3c':'#bbb')+';font-weight:600;position:sticky;left:468px;z-index:3">'+(p.discountPct>0?p.discountPct+'%':'-')+'</td>':'')
+     +(hasStock?'<td style="padding:6px 8px;text-align:right;background:#fdf8f0;color:#2980b9;font-weight:600;position:sticky;left:'+retLeft+'px;z-index:3;border-right:2px solid #c8a96e">'+(p.retailPrice>0?NF(p.retailPrice):'-')+'</td>':'')
      +'<td style="padding:6px 8px;text-align:right;color:#888">'+NF(p.cost)+'</td>'
      +'<td style="padding:6px 8px;text-align:right;background:#ecfaec;color:'+(p.gpUnit>0?'#27ae60':'#bbb')+';font-weight:700">'+(p.gpUnit>0?NF(p.gpUnit):'-')+'</td>'
      +'<td style="padding:6px 8px;text-align:right;background:#ecfaec;color:'+(p.gpPct>=20?'#27ae60':p.gpPct>=10?'#d4944a':'#c0392b')+';font-weight:700">'+(p.gpPct>0?p.gpPct+'%':'-')+'</td>'
@@ -1319,7 +1323,7 @@ function rCS(){
      +'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v10o||'-')+'</td>'
      +(G.vel20?'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v20o||'-')+'</td>'+'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v30o||'-')+'</td>':'')
      +'<td style="padding:6px 8px;text-align:right;background:#e8f8ee;'+vc+'">'+(p.total10||'-')+'</td>'
-     +'<td style="padding:4px 6px;text-align:center;background:'+bg+';border-left:2px solid #c8d8f0"><span style="'+laamBg+';padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700">'+p.stockStatus+'</span></td>'
+     +'<td style="padding:4px 6px;text-align:center;background:'+bg+';position:sticky;right:70px;z-index:3;border-left:2px solid #c8d8f0"><span style="'+laamBg+';padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700">'+p.stockStatus+'</span></td>'
      +'<td style="padding:4px 6px;text-align:center;background:'+bg+';position:sticky;right:0;z-index:3">'+(p.shopStatus?'<span style="'+shopBg+';padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700">'+p.shopStatus+'</span>':'-')+'</td>'
      +'</tr>';
   });
