@@ -1018,7 +1018,7 @@ function csSelAll(){var allC=document.querySelectorAll('#pcs-tbody input[type=ch
 function csSort(el){var c=el.getAttribute('data-c');if(_csSortCol===c)_csSortAsc=!_csSortAsc;else{_csSortCol=c;_csSortAsc=false;}rendered.cs=false;doR('cs');}
 function csRender(){rendered.cs=false;doR('cs');}
 function csApplyFilter(el){var k=el.getAttribute('data-k'),v=el.value;if(k==='min10d'||k==='minStk')_csFilters[k]=parseInt(v)||0;else if(k==='minRate')_csFilters[k]=parseFloat(v)||0;else _csFilters[k]=v;csRender();}
-function csExpRows(rows,fname){csvDL(rows.map(function(p){return[p.name,p.sellingPrice||'',p.discount!=null?p.discount+'%':'',p.avgRet,p.shopPrice||'',p.priceDiff!=null?p.priceDiff:'',p.cost,p.gpUnit||'',p.gpPct!=null?p.gpPct+'%':'',p.rev,p.pat,p.marPct+'%',p.orders,p.delivered,p.pending,p.cr+'%',p.szS,p.szM,p.szL,p.szXL,p.laamTotal||'',p.shopStock!=null?p.shopStock:'',p.stockStatus,p.statusDiff||'',p.shopStatus||'',p.v10i,p.v10l,p.v10o,p.total10,p.total30,p.daily];}),['Product','GrossPrice','Discount%','RetailPrice(Laam)','RetailPrice(Shopify)','PriceDiff','Cost','Profit/Unit','Profit%','Revenue','NetPAT','NetMargin%','Orders','Delivered','Pending','Cancel%','SoldS','SoldM','SoldL','SoldXL','LaamStock','ShopifyStock','LaamStatus','StatusDiff','ShopifyStatus','10dINT','10dLCL','10dOCT','Total10d','30d','Daily'],fname);}
+function csExpRows(rows,fname){csvDL(rows.map(function(p){return[p.name,p.sellingPrice||'',p.discount!=null?p.discount+'%':'',p.avgRet,p.shopPrice||'',p.priceDiff!=null?p.priceDiff:'',p.cost,p.gpUnit||'',p.gpPct!=null?p.gpPct+'%':'',p.rev,p.pat,p.marPct+'%',p.orders,p.delivered,p.open,p.cancelled,p.refunded,p.szS,p.szM,p.szL,p.szXL,p.laamTotal||'',p.shopStock!=null?p.shopStock:'',p.stockStatus,p.statusDiff||'',p.shopStatus||'',p.v10i,p.v10l,p.v10o,p.total10,p.total30,p.daily];}),['Product','GrossPrice','Discount%','RetailPrice(Laam)','RetailPrice(Shopify)','PriceDiff','Cost','Profit/Unit','Profit%','Revenue','NetPAT','NetMargin%','AllOrders','Delivered','Open','Cancelled','Refunded','SoldS','SoldM','SoldL','SoldXL','LaamStock','ShopifyStock','LaamStatus','StatusDiff','ShopifyStatus','10dINT','10dLCL','10dOCT','Total10d','30d','Daily'],fname);}
 function csExpSel(){csExpRows((window._csArr||[]).filter(function(p){return _csSelProds.has(p.name);}),'selected.csv');}
 function csExpAll(){csExpRows(window._csArr||[],'all_products.csv');}
 
@@ -1030,12 +1030,14 @@ function rCS(){
   DETAIL.forEach(function(r){
     if(f.from&&r[0]<f.from)return;if(f.to&&r[0]>f.to)return;
     if(f.pf&&r[5]!==f.pf)return;if(f.dst&&r[6]!==f.dst)return;
-    var n=r[1];if(!pm[n])pm[n]={name:n,cost:0,orders:0,delivered:0,cancelled:0,pending:0,rev:0,pat:0,szS:0,szM:0,szL:0,szXL:0,v10i:0,v10l:0,v10o:0,v20i:0,v20l:0,v20o:0,v30i:0,v30l:0,v30o:0};
+    var n=r[1];if(!pm[n])pm[n]={name:n,cost:0,orders:0,delivered:0,cancelled:0,open:0,refunded:0,pending:0,rev:0,pat:0,szS:0,szM:0,szL:0,szXL:0,v10i:0,v10l:0,v10o:0,v20i:0,v20l:0,v20o:0,v30i:0,v30l:0,v30o:0};
     var p=pm[n];p.orders++;
     if(r[10]>0)p.cost=r[10];
     if(['allocated','pending','delayed','undelivered'].indexOf(r[4])>=0)p.pending++;
     if(r[4]==='cancelled')p.cancelled++;
     if(r[4]==='delivered')p.delivered++;
+    if(r[4]==='open'||r[4]==='allocated'||r[4]==='pending'||r[4]==='delayed'||r[4]==='undelivered')p.open++;
+    if(r[4]==='refunded')p.refunded++;
     if(f.stats.length===0||f.stats.includes(r[4])){
       p.rev+=r[9];p.pat+=r[15];
       var sz=r[3];if(sz==='S')p.szS++;else if(sz==='M')p.szM++;else if(sz==='L')p.szL++;else if(sz==='XL')p.szXL++;
@@ -1056,7 +1058,7 @@ function rCS(){
       if(!pmLower.has(k)){
         var sp=STOCK_PRODS[k];
         if((sp.total||0)>0||(sp.saTotal||0)>0){
-          pm[sp.title]={name:sp.title,cost:0,orders:0,delivered:0,cancelled:0,pending:0,rev:0,pat:0,szS:0,szM:0,szL:0,szXL:0,v10i:0,v10l:0,v10o:0,v20i:0,v20l:0,v20o:0,v30i:0,v30l:0,v30o:0};
+          pm[sp.title]={name:sp.title,cost:0,orders:0,delivered:0,cancelled:0,open:0,refunded:0,pending:0,rev:0,pat:0,szS:0,szM:0,szL:0,szXL:0,v10i:0,v10l:0,v10o:0,v20i:0,v20l:0,v20o:0,v30i:0,v30l:0,v30o:0};
         }
       }
     });
@@ -1110,6 +1112,8 @@ function rCS(){
   var totOrders=arr.reduce(function(a,r){return a+r.orders;},0);
   var totDel=arr.reduce(function(a,r){return a+r.delivered;},0);
   var totCancelled=arr.reduce(function(a,r){return a+(r.cancelled||0);},0);
+  var totOpen=arr.reduce(function(a,r){return a+(r.open||0);},0);
+  var totRefunded=arr.reduce(function(a,r){return a+(r.refunded||0);},0);
   var totSzS=arr.reduce(function(a,r){return a+r.szS;},0),totSzM=arr.reduce(function(a,r){return a+r.szM;},0),totSzL=arr.reduce(function(a,r){return a+r.szL;},0),totSzXL=arr.reduce(function(a,r){return a+r.szXL;},0);
   var totLaamS=arr.reduce(function(a,r){return a+(r.laamS||0);},0),totLaamM=arr.reduce(function(a,r){return a+(r.laamM||0);},0),totLaamL=arr.reduce(function(a,r){return a+(r.laamL||0);},0),totLaamXL=arr.reduce(function(a,r){return a+(r.laamXL||0);},0);
   var totSaS=arr.reduce(function(a,r){return a+(r.saS||0);},0),totSaM=arr.reduce(function(a,r){return a+(r.saM||0);},0),totSaL=arr.reduce(function(a,r){return a+(r.saL||0);},0),totSaXL=arr.reduce(function(a,r){return a+(r.saXL||0);},0),totSa=arr.reduce(function(a,r){return a+(r.saTotal||0);},0);
@@ -1186,7 +1190,7 @@ function rCS(){
   gRow+='<th colspan="3" style="background:#f0fff4;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #b8e8d0">Net P&amp;L</th>';
   gRow+='<th colspan="'+(G.s_sales?5:1)+'" style="background:#e8f8f5;color:#16a085;text-align:center;padding:3px;border-bottom:2px solid #16a085">📊 Sales Qty</th>';
   if(G.totals){gRow+='<th colspan="2" style="background:#fff5e8;color:#e67e22;text-align:center;padding:3px;border-bottom:1px solid #f0c080">Revenue Detail</th>';}
-  gRow+='<th colspan="'+(G.orders?4:1)+'" style="background:#f0ede8;border-bottom:1px solid #e0dcd4"></th>';
+  gRow+='<th colspan="5" style="background:#f0ede8;border-bottom:1px solid #e0dcd4"></th>';
   if(hasStock){
     gRow+='<th colspan="'+(G.s_stock?5:1)+'" style="background:#eeeaff;color:#5050b0;text-align:center;padding:3px;border-bottom:2px solid #8080d0">⏩ Sell Ahead</th>';
     gRow+='<th colspan="'+(G.s_stock?5:1)+'" style="background:#e4eef8;color:#2980b9;text-align:center;padding:3px;border-bottom:2px solid #2980b9">📦 Stock Qty</th>';
@@ -1230,9 +1234,11 @@ function rCS(){
     cRow+=mkTH('Total Revenue','rev','#fff5e8','right',85);
     cRow+=mkTH('Total Net PAT','pat','#fff5e8','right',85);
   }
-  if(G.orders)cRow+=mkTH('Orders','orders',hbg,'right',65);
+  cRow+=mkTH('All Orders','orders',hbg,'right',75);
   cRow+=mkTH('Delivered','delivered',hbg,'right',70);
-  if(G.orders){cRow+=mkTH('Pending','pending',hbg,'right',60)+mkTH('Cancel%','cr',hbg,'right',60);}
+  cRow+=mkTH('Open','open',hbg,'right',55);
+  cRow+=mkTH('Cancelled','cancelled',hbg,'right',70);
+  cRow+=mkTH('Refunded','refunded',hbg,'right',65);
   if(hasStock){
     if(G.s_stock){cRow+=mkTH('S','saS','#f2f0ff','right',38)+mkTH('M','saM','#f2f0ff','right',38)+mkTH('L','saL','#f2f0ff','right',38)+mkTH('XL','saXL','#f2f0ff','right',38);}
     cRow+=mkTH('Sell Ahead','saTotal','#f2f0ff','right',85);
@@ -1272,7 +1278,7 @@ function rCS(){
    +(G.s_sales?tdc(NF(totSzS),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzM),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzL),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzXL),'background:#e8f8f5;color:#16a085'):'')
    +tdc(NF(totSzS+totSzM+totSzL+totSzXL),'background:#e8f8f5;color:#16a085;font-weight:800')
    +(G.totals?tdc(N(totRev),'color:#c8a96e;background:#fff5e8')+tdc(N(totPat),'color:#27ae60;background:#fff5e8'):'')
-   +(G.orders?tdc(NF(totOrders),''):'')+tdc(NF(totDel),'')+( G.orders?tdc(totPend>0?NF(totPend):'—',totPend>0?'color:#d4944a':'')+tdc(totCr+'%',''):'')
+   +tdc(NF(totOrders),'font-weight:800')+tdc(NF(totDel),'color:#27ae60')+tdc(totOpen>0?NF(totOpen):'—',totOpen>0?'color:#d4944a':'')+tdc(NF(totCancelled),'color:#c0392b')+tdc(NF(totRefunded),'color:#8e44ad')
    +(hasStock?((G.s_stock?tdc(NF(totSaS),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaM),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaL),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaXL),'background:#f2f0ff;color:#5050b0'):'')+tdc(NF(totSa),'background:#f2f0ff;color:#5050b0;font-weight:800')):'')
    +(hasStock?((G.s_stock?tdc(NF(totLaamS),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamM),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamL),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamXL),'background:#e4eef8;color:#2980b9'):'')+tdc(NF(totLaam),'background:#e4eef8;color:var(--gold2);font-weight:800')):'')
    +tdc(totShopStock>0?NF(totShopStock):'—','background:#dce8f8;color:#2471a3;font-weight:800')
@@ -1326,9 +1332,11 @@ function rCS(){
      +'<td style="padding:6px 8px;text-align:right;background:#e8f8f5;font-weight:700;color:#16a085">'+(p.szTotal||'-')+'</td>'
      +(G.totals?'<td style="padding:6px 8px;text-align:right;background:#fff5e8;color:#c8a96e;font-weight:600">'+NF(p.rev)+'</td>':'')
      +(G.totals?'<td style="padding:6px 8px;text-align:right;background:#fff5e8;color:#27ae60">'+NF(p.pat)+'</td>':'')
-     +(G.orders?'<td style="padding:6px 8px;text-align:right">'+NF(p.orders)+'</td>':'')
-     +'<td style="padding:6px 8px;text-align:right;font-weight:600">'+NF(p.delivered)+'</td>'
-     +(G.orders?'<td style="padding:6px 8px;text-align:right;'+(p.pending>0?'color:#d4944a;font-weight:700':'color:#bbb')+'">'+(p.pending||'-')+'</td>'+'<td style="padding:6px 8px;text-align:right;'+cc+'">'+p.cr+'%</td>':'')
+     +'<td style="padding:6px 8px;text-align:right;font-weight:700">'+NF(p.orders)+'</td>'
+     +'<td style="padding:6px 8px;text-align:right;color:#27ae60;font-weight:600">'+NF(p.delivered)+'</td>'
+     +'<td style="padding:6px 8px;text-align:right;'+(p.open>0?'color:#d4944a;font-weight:700':'color:#bbb')+'">'+(p.open||'-')+'</td>'
+     +'<td style="padding:6px 8px;text-align:right;'+(p.cancelled>0?'color:#c0392b;font-weight:700':'color:#bbb')+'">'+(p.cancelled||'-')+'</td>'
+     +'<td style="padding:6px 8px;text-align:right;'+(p.refunded>0?'color:#8e44ad;font-weight:700':'color:#bbb')+'">'+(p.refunded||'-')+'</td>'
      +(hasStock?((G.s_stock?'<td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saS||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saM||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saL||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saXL||'-')+'</td>':'')+'<td style="padding:6px 8px;text-align:right;background:#f2f0ff;'+saSt+'">'+(p.saTotal!==null?NF(p.saTotal):'-')+'</td>'):'')
      +(hasStock?((G.s_stock?'<td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamS||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamM||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamL||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamXL||'-')+'</td>':'')+'<td style="padding:6px 8px;text-align:right;background:#e4eef8;'+lSt+'">'+(p.laamTotal!==null?NF(p.laamTotal):'-')+'</td>'):'')
      +'<td style="padding:6px 8px;text-align:right;background:#dce8f8;'+(p.shopStock!=null?(p.shopStock>=10?'color:#2471a3;font-weight:700':p.shopStock>0?'color:#d4944a;font-weight:700':'color:#c0392b;font-weight:700'):'color:#bbb')+'">'+(p.shopStock!=null?NF(p.shopStock):'-')+'</td>'
