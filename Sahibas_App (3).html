@@ -635,23 +635,34 @@ function parseD(v){
   try{var d=new Date(s);if(!isNaN(d.getTime()))return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}catch(e){}
   return null;
 }
+function colV(row,names){
+  for(var i=0;i<names.length;i++){var v=row[names[i]];if(v!==undefined&&v!==null&&v!=='')return v;}
+  var keys=Object.keys(row);
+  for(var i=0;i<names.length;i++){var nl=names[i].toLowerCase();
+    for(var j=0;j<keys.length;j++){if(keys[j].toLowerCase()===nl){var v=row[keys[j]];if(v!==undefined&&v!==null&&v!=='')return v;}}}
+  return '';
+}
+var STAT_MAP={fulfilled:'delivered',shipped:'delivered',deliver:'delivered',
+  open:'open',pending:'pending',processing:'pending'};
 function parseSales(txt,cm){
   var data=Array.isArray(txt)?txt:Papa.parse(txt,{header:true,skipEmptyLines:true}).data;
   var rows=[];
   data.forEach(function(row){
-    var prd=(row['Product Name']||'').trim();
+    var prd=String(colV(row,['Product Name','product_name','ProductName'])).trim();
     if(!prd||prd.toLowerCase()==='product name')return;
-    var ret=parseFloat(row['Retail Price']||0)||0;
-    var cpct=parseFloat(row['Commission Percentage']||0)||0;
-    var stat=(row['Item Status']||'').toLowerCase().replace(/ /g,'_').replace(/-/g,'_');
-    var pf=(row['Platform']||'MARKETPLACE').toUpperCase();
-    var dst=(row['Destination']||'LOCAL').toUpperCase();
-    var sz=row['Variant']||'';
-    var sku=row['SKU']||'';
-    var dp=parseInt(row['Days Pending']||0)||0;
-    var onum=String(row['Order ID']||'');
-    var pay=(row['Payment Status']||'').toUpperCase();
-    var dt=parseD(row['Creation Date']);
+    var ret=parseFloat(colV(row,['Retail Price','retail_price','RetailPrice'])||0)||0;
+    var cpct=parseFloat(colV(row,['Commission Percentage','commission_percentage','Commission'])||0)||0;
+    if(cpct>0&&cpct<1)cpct=cpct*100;
+    var stat=String(colV(row,['Item Status','item_status','ItemStatus'])).toLowerCase().replace(/ /g,'_').replace(/-/g,'_');
+    stat=STAT_MAP[stat]||stat;
+    var pf=String(colV(row,['Platform','platform'])||'MARKETPLACE').toUpperCase();
+    var dst=String(colV(row,['Destination','destination'])||'LOCAL').toUpperCase();
+    var sz=String(colV(row,['Variant','variant','Size','size']));
+    var sku=String(colV(row,['SKU','sku','Sku']));
+    var dp=parseInt(colV(row,['Days Pending','days_pending','DaysPending'])||0)||0;
+    var onum=String(colV(row,['Order ID','order_id','OrderID','Order Number']));
+    var pay=String(colV(row,['Payment Status','payment_status','PaymentStatus'])).toUpperCase();
+    var dt=parseD(colV(row,['Creation Date','creation_date','CreationDate','Order Date']));
     var mk=dt?dt.substring(0,7):'?';
     var cost=getCost(prd,cm);
     var comm=ret*cpct/100;
@@ -662,9 +673,9 @@ function parseSales(txt,cm){
     var cc=ret*cr/100;
     var isX=comm>cc+1;
     var xa=Math.max(0,comm-cc);
-    var ov=parseFloat(String(row['Original Value']||row['Original Price']||'').replace(/,/g,''))||0;
-    var av=parseFloat(String(row['Actual Price']||row['Updated Value']||'').replace(/,/g,''))||0;
-    var rfd=(row['Refund Date']||row['Refund date']||row['Refunded Date']||'').trim();
+    var ov=parseFloat(String(colV(row,['Original Value','Original Price','original_value','Actual Price'])).replace(/,/g,''))||0;
+    var av=parseFloat(String(colV(row,['Actual Price','Updated Value','actual_price'])).replace(/,/g,''))||0;
+    var rfd=String(colV(row,['Refund Date','Refund date','Refunded Date','refund_date'])).trim();
     // [0]date [1]prd [2]sku [3]sz [4]stat [5]pf [6]dst [7]pay [8]dp
     // [9]ret [10]cost [11]cpct [12]comm [13]tax [14]gp [15]pat
     // [16]isX [17]xa [18]onum [19]mk [20]gross(orig) [21]actualPrice [22]isRefunded
@@ -3318,7 +3329,7 @@ function rcGetSales(){
   // .aS/.aM/.aL/.aXL = adds back to Laam stock (cancelled,refunded)
   var map={};
   var f=filters;
-  var RED=['delivered','undelivered','in_transit','intransit','in transit','allocated'];
+  var RED=['delivered','undelivered','in_transit','intransit','in transit','allocated','open','pending'];
   var ADD=['cancelled','canceled','refunded'];
   DETAIL.forEach(function(r){
     var dt=r[0];
