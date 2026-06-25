@@ -1035,8 +1035,9 @@ function rCS(){
     if(r[10]>0)p.cost=r[10];
     if(['allocated','pending','delayed','undelivered'].indexOf(r[4])>=0)p.pending++;
     if(r[4]==='cancelled')p.cancelled++;
-    if(r[4]==='delivered'){
-      p.delivered++;p.rev+=r[9];p.pat+=r[15];
+    if(r[4]==='delivered')p.delivered++;
+    if(f.stats.length===0||f.stats.includes(r[4])){
+      p.rev+=r[9];p.pat+=r[15];
       var sz=r[3];if(sz==='S')p.szS++;else if(sz==='M')p.szM++;else if(sz==='L')p.szL++;else if(sz==='XL')p.szXL++;
     }
     // Velocity (10d/20d/30d): use status filter if set, else count all statuses
