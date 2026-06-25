@@ -549,6 +549,7 @@ function parseSales(txt,cm){
     if(!prd||prd.toLowerCase()==='product name')return;
     var ret=parseFloat(row['Retail Price']||0)||0;
     var cpct=parseFloat(row['Commission Percentage']||0)||0;
+    if(cpct>0&&cpct<1)cpct=cpct*100;
     var stat=(row['Item Status']||'').toLowerCase().replace(/ /g,'_').replace(/-/g,'_');
     if(stat==='fulfilled')stat='delivered';
     var pf=(row['Platform']||'MARKETPLACE').toUpperCase();
@@ -556,13 +557,15 @@ function parseSales(txt,cm){
     var sz=row['Variant']||'';
     var sku=row['SKU']||'';
     var dp=parseInt(row['Days Pending']||0)||0;
-    var onum=String(row['Order ID']||'');
+    var onum=String(row['Order ID']||row['Item Id']||'');
+    var conum=String(row['Channel Order Number']||row['channel_order_number']||'');
     var pay=(row['Payment Status']||'').toUpperCase();
     var dt=parseD(row['Creation Date']);
     var mk=dt?dt.substring(0,7):'?';
     var cost=getCost(prd,cm);
     var comm=ret*cpct/100;
-    var tax=ret*(dst==='INTERNATIONAL'?0.02:0.06);
+    var taxpct=dst==='INTERNATIONAL'?2:6;
+    var tax=ret*taxpct/100;
     var gp=ret-cost-comm;
     var pat=gp-tax;
     var cr=RATES[pf+'|'+dst]||15;
@@ -575,10 +578,12 @@ function parseSales(txt,cm){
     // [0]date [1]prd [2]sku [3]sz [4]stat [5]pf [6]dst [7]pay [8]dp
     // [9]ret [10]cost [11]cpct [12]comm [13]tax [14]gp [15]pat
     // [16]isX [17]xa [18]onum [19]mk [20]gross(orig) [21]actualPrice [22]isRefunded
+    // [23]conum(channel order#) [24]taxpct
     rows.push([dt||'',prd,sku,sz,stat,pf,dst,pay,dp,
       Math.round(ret),Math.round(cost),Math.round(cpct*10)/10,
       Math.round(comm),Math.round(tax),Math.round(gp),Math.round(pat),
-      isX,Math.round(xa),onum,mk,Math.round(ov),Math.round(av),rfd?1:0]);
+      isX,Math.round(xa),onum,mk,Math.round(ov),Math.round(av),rfd?1:0,
+      conum,taxpct]);
   });
   return rows;
 }
@@ -1529,7 +1534,7 @@ var _drRows=[], _drFiltered=[], _drRH=34, _drVis=0;
 var _drSel=new Set(), _drSelProds=new Set();
 var _drSortAsc=true; // date sort direction
 var _drFilters={stat:'',pf:'',dst:'',pay:'',sz:'',cpct:''};
-var DR_W={chk:34,onum:88,date:95,prd:160,sku:108,sz:46,stat:86,pf:96,dst:86,pay:115,days:50,ret:66,cost:78,cpct:60,comm:66,tax:56,gp:64,pat:64,exc:72};
+var DR_W={chk:34,conum:100,onum:88,date:95,prd:160,sz:46,stat:86,pf:96,dst:86,pay:115,days:50,ret:70,cost:78,cpct:60,comm:70,taxpct:48,tax:60,gp:68,pat:68,exc:72};
 var DR_TOT=Object.values(DR_W).reduce(function(a,b){return a+b;},0);
 
 // Date format helper: YYYY-MM-DD → DD-MM-YYYY
@@ -1553,8 +1558,16 @@ function applyDrFilters(){
   drSortRows();
   _drSel.clear(); updDrSelBtn();
   renderDrVirtual();
+  updDrSubtotals();
   var cnt=document.getElementById('dr-cnt');
   if(cnt)cnt.textContent=_drFiltered.length.toLocaleString()+' rows shown';
+}
+
+function updDrSubtotals(){
+  var sRet=0,sCost=0,sComm=0,sTax=0,sGp=0,sPat=0;
+  _drFiltered.forEach(function(r){sRet+=r[9];sCost+=r[10];sComm+=r[12];sTax+=r[13];sGp+=r[14];sPat+=r[15];});
+  var u=function(id,v){var el=document.getElementById(id);if(el)el.textContent=NF(v);};
+  u('dr-st-ret',sRet);u('dr-st-cost',sCost);u('dr-st-comm',sComm);u('dr-st-tax',sTax);u('dr-st-gp',sGp);u('dr-st-pat',sPat);
 }
 
 function drSortRows(){
@@ -1587,10 +1600,10 @@ function renderDrVirtual(){
     var pc=r[7]==='PAID'?'color:#27ae60;font-weight:600':r[7]==='PENDING'?'color:#d4944a;font-weight:600':r[7]==='PARTIALLY_PAID'?'color:#e67e22;font-weight:600':'color:#888';
     h+='<tr style="height:'+_drRH+'px;background:'+bg+';'+lb+';cursor:pointer" onclick="drToggle('+i+')">';
     h+=drCell(DR_W.chk,'text-align:center','<input type="checkbox" '+(sel?'checked':'')+' onclick="event.stopPropagation();drToggle('+i+')" style="cursor:pointer;accent-color:var(--gold)">');
+    h+=drCell(DR_W.conum,'font-family:monospace;font-size:9px;color:#888',r[23]||'-');
     h+=drCell(DR_W.onum,'font-family:monospace;font-size:9px;color:#bbb',r[18]);
     h+=drCell(DR_W.date,'color:#555;font-weight:500',fmtD(r[0]));
     h+=drCell(DR_W.prd,'font-weight:700',r[1]);
-    h+=drCell(DR_W.sku,'font-family:monospace;font-size:9px;color:#aaa',r[2]);
     h+=drCell(DR_W.sz,'text-align:center;font-weight:600',r[3]);
     h+=drCell(DR_W.stat,'text-align:center',sBadge(r[4]));
     h+=drCell(DR_W.pf,'text-align:center',pBadge(r[5]));
@@ -1602,6 +1615,7 @@ function renderDrVirtual(){
          :drCell(DR_W.cost,'text-align:right;color:#c0392b',NF(r[10]));
     h+=drCell(DR_W.cpct,'text-align:right;color:#888',r[11]+'%');
     h+=drCell(DR_W.comm,'text-align:right;color:#d4944a',NF(r[12]));
+    h+=drCell(DR_W.taxpct,'text-align:right;color:#888',r[24]+'%');
     h+=drCell(DR_W.tax,'text-align:right;color:#888',NF(r[13]));
     h+=drCell(DR_W.gp,'text-align:right;color:#27ae60;font-weight:600',NF(r[14]));
     h+=drCell(DR_W.pat,'text-align:right;color:#c8a96e;font-weight:700',NF(r[15]));
@@ -1672,25 +1686,39 @@ function rDR(){
   // Fix open/close toggle
   prdDropdown = prdDropdown.replace("display:none;position", "display:none").replace("display:none", "position:absolute").replace("position:absolute", "display:none;position:absolute");
 
+  // Subtotals
+  function stc(w,id,val,clr){return '<td id="'+id+'" style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:5px 6px;text-align:right;background:#f0ede8;font-weight:800;font-size:11px;border-bottom:2px solid var(--gold);color:'+(clr||'#1a1a1a')+'">'+NF(val)+'</td>';}
+  function ste(w){return '<td style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:5px 6px;background:#f0ede8;border-bottom:2px solid var(--gold)"></td>';}
+  var sRet=0,sCost=0,sComm=0,sTax=0,sGp=0,sPat=0;
+  _drFiltered.forEach(function(r){sRet+=r[9];sCost+=r[10];sComm+=r[12];sTax+=r[13];sGp+=r[14];sPat+=r[15];});
+
   var hdr='<table style="table-layout:fixed;width:'+T+'px;border-collapse:collapse;background:#f8f6f2"><thead>'
     +'<tr>'
     +'<th style="width:'+W.chk+'px;min-width:'+W.chk+'px;padding:7px 6px;text-align:center;background:#f8f6f2;border-bottom:2px solid #e8e4dc"><input type="checkbox" id="dr-all-cb" onclick="drSelAll()" style="cursor:pointer;accent-color:var(--gold)"></th>'
+    +th(W.conum,'Ch.Order#')
     +th(W.onum,'Order#')
     +'<th id="dr-date-sort" onclick="drToggleSort()" style="width:'+W.date+'px;min-width:'+W.date+'px;padding:7px 6px;text-align:left;font-size:9px;color:var(--gold2);text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc;white-space:nowrap;cursor:pointer;user-select:none">Date ↑</th>'
-    +th(W.prd,'Product')+th(W.sku,'SKU')+th(W.sz,'Sz','center')
+    +th(W.prd,'Product')+th(W.sz,'Sz','center')
     +th(W.stat,'Status','center')+th(W.pf,'Platform','center')+th(W.dst,'Dest','center')+th(W.pay,'Payment','center')
     +th(W.days,'Days','right')+th(W.ret,'Retail','right')
     +'<th style="width:'+W.cost+'px;min-width:'+W.cost+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Cost 🟠</th>'
     +'<th style="width:'+W.cpct+'px;min-width:'+W.cpct+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Comm%</th>'
-    +th(W.comm,'Comm','right')+th(W.tax,'Tax','right')+th(W.gp,'GP','right')+th(W.pat,'PAT','right')
+    +th(W.comm,'Comm','right')+th(W.taxpct,'Tax%','right')+th(W.tax,'Tax','right')+th(W.gp,'GP','right')+th(W.pat,'PAT','right')
     +'<th style="width:'+W.exc+'px;min-width:'+W.exc+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Excess 🔴</th>'
+    +'</tr>'
+    +'<tr style="background:#f0ede8;font-weight:800">'
+    +ste(W.chk)+ste(W.conum)+ste(W.onum)
+    +'<td style="width:'+W.date+'px;min-width:'+W.date+'px;max-width:'+W.date+'px;padding:5px 6px;background:#f0ede8;border-bottom:2px solid var(--gold);font-size:9px;color:var(--gold2);font-weight:800">SUBTOTAL</td>'
+    +ste(W.prd)+ste(W.sz)+ste(W.stat)+ste(W.pf)+ste(W.dst)+ste(W.pay)+ste(W.days)
+    +stc(W.ret,'dr-st-ret',sRet,'#1a1a1a')+stc(W.cost,'dr-st-cost',sCost,'#c0392b')+ste(W.cpct)+stc(W.comm,'dr-st-comm',sComm,'#d4944a')+ste(W.taxpct)+stc(W.tax,'dr-st-tax',sTax,'#888')+stc(W.gp,'dr-st-gp',sGp,'#27ae60')+stc(W.pat,'dr-st-pat',sPat,'#c8a96e')
+    +ste(W.exc)
     +'</tr>'
     +'<tr style="background:#fafafa">'
     +fempty(W.chk)
+    +fempty(W.conum)
     +fempty(W.onum)
     +fempty(W.date)
     +fcell(W.prd, prdDropdown)
-    +fempty(W.sku)
     +fcell(W.sz, fsel('sz',['S','M','L','XL']))
     +fcell(W.stat, fsel('stat',sts))
     +fcell(W.pf, fsel('pf',pfs))
@@ -1701,6 +1729,7 @@ function rDR(){
     +fempty(W.cost)
     +fcell(W.cpct, fsel('cpct',cpcts))
     +fempty(W.comm)
+    +fempty(W.taxpct)
     +fempty(W.tax)
     +fempty(W.gp)
     +fempty(W.pat)
@@ -2185,8 +2214,8 @@ document.addEventListener('keydown',function(e){
   }
 });
 
-function expDR(){csvDL(_drFiltered.map(function(r){return[r[18],fmtD(r[0]),r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12],r[13],r[14],r[15],r[16],r[17]];}),['Order#','Date','Product','SKU','Size','Status','Platform','Dest','Payment','Days','Retail','Cost','Comm%','Commission','Tax','GP','PAT','IsExcess','ExcessAmt'],'detail_report.csv');}
-function expDRSel(){var rows=Array.from(_drSel).sort(function(a,b){return a-b;}).map(function(i){return _drFiltered[i];});csvDL(rows.map(function(r){return[r[18],fmtD(r[0]),r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12],r[13],r[14],r[15],r[16],r[17]];}),['Order#','Date','Product','SKU','Size','Status','Platform','Dest','Payment','Days','Retail','Cost','Comm%','Commission','Tax','GP','PAT','IsExcess','ExcessAmt'],'selected_rows.csv');}
+function expDR(){csvDL(_drFiltered.map(function(r){return[r[23],r[18],fmtD(r[0]),r[1],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12],r[24],r[13],r[14],r[15],r[16],r[17]];}),['ChOrderNo','Order#','Date','Product','Size','Status','Platform','Dest','Payment','Days','Retail','Cost','Comm%','Commission','Tax%','Tax','GP','PAT','IsExcess','ExcessAmt'],'detail_report.csv');}
+function expDRSel(){var rows=Array.from(_drSel).sort(function(a,b){return a-b;}).map(function(i){return _drFiltered[i];});csvDL(rows.map(function(r){return[r[23],r[18],fmtD(r[0]),r[1],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12],r[24],r[13],r[14],r[15],r[16],r[17]];}),['ChOrderNo','Order#','Date','Product','Size','Status','Platform','Dest','Payment','Days','Retail','Cost','Comm%','Commission','Tax%','Tax','GP','PAT','IsExcess','ExcessAmt'],'selected_rows.csv');}
 
 
 // ── PASSWORD PERSISTENCE ──
