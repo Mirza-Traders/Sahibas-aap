@@ -1190,8 +1190,8 @@ function rCS(){
     gRow+='<th colspan="'+(G.s_stock?5:1)+'" style="background:#eeeaff;color:#5050b0;text-align:center;padding:3px;border-bottom:2px solid #8080d0">⏩ Sell Ahead</th>';
     gRow+='<th colspan="'+(G.s_stock?5:1)+'" style="background:#e4eef8;color:#2980b9;text-align:center;padding:3px;border-bottom:2px solid #2980b9">📦 Stock Qty</th>';
   }
+  gRow+='<th style="background:#dce8f8;color:#2471a3;text-align:center;padding:3px;border-bottom:2px solid #2471a3">🛍 Shopify Stock</th>';
   gRow+='<th style="background:#fce4ec;color:#c0392b;text-align:center;padding:3px;border-bottom:2px solid #c0392b">Diff</th>';
-  gRow+='<th style="background:#dce8f8;color:#2471a3;text-align:center;padding:3px;border-bottom:2px solid #2471a3">🛍 Shopify</th>';
   gRow+='<th colspan="'+(G.vel20?3:1)+'" style="background:#fffdf0;color:#8a6800;text-align:center;padding:3px;border-bottom:1px solid #e8e0b0">MP-INT</th>';
   gRow+='<th colspan="'+(G.vel20?3:1)+'" style="background:#fffdf0;color:#8a6800;text-align:center;padding:3px;border-bottom:1px solid #e8e0b0">MP-LCL</th>';
   gRow+='<th colspan="'+(G.vel20?3:1)+'" style="background:#fffdf0;color:#8a6800;text-align:center;padding:3px;border-bottom:1px solid #e8e0b0">OCT</th>';
@@ -1238,8 +1238,8 @@ function rCS(){
     if(G.s_stock){cRow+=mkTH('S','laamS','#e4eef8','right',38)+mkTH('M','laamM','#e4eef8','right',38)+mkTH('L','laamL','#e4eef8','right',38)+mkTH('XL','laamXL','#e4eef8','right',38);}
     cRow+=mkTH('Total Stock','laamTotal','#e4eef8','right',80);
   }
-  cRow+=mkTH('Stock Diff','stockDiff','#fce4ec','right',70);
   cRow+=mkTH('Shopify Stock','shopStock','#dce8f8','right',85);
+  cRow+=mkTH('Stock Diff','stockDiff','#fce4ec','right',70);
   cRow+=mkTH('10d','v10i','#fffdf0','right',55);
   if(G.vel20){cRow+=mkTH('20d','v20i','#fffdf0','right',55);cRow+=mkTH('30d','v30i','#fffdf0','right',55);}
   cRow+=mkTH('10d','v10l','#fffdf0','right',55);
@@ -1274,8 +1274,8 @@ function rCS(){
    +(G.orders?tdc(NF(totOrders),''):'')+tdc(NF(totDel),'')+( G.orders?tdc(totPend>0?NF(totPend):'—',totPend>0?'color:#d4944a':'')+tdc(totCr+'%',''):'')
    +(hasStock?((G.s_stock?tdc(NF(totSaS),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaM),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaL),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaXL),'background:#f2f0ff;color:#5050b0'):'')+tdc(NF(totSa),'background:#f2f0ff;color:#5050b0;font-weight:800')):'')
    +(hasStock?((G.s_stock?tdc(NF(totLaamS),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamM),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamL),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamXL),'background:#e4eef8;color:#2980b9'):'')+tdc(NF(totLaam),'background:#e4eef8;color:var(--gold2);font-weight:800')):'')
-   +tdc(NF(totLaam-totShopStock),'background:#fce4ec;color:#c0392b;font-weight:800')
    +tdc(totShopStock>0?NF(totShopStock):'—','background:#dce8f8;color:#2471a3;font-weight:800')
+   +tdc(NF(totLaam-totShopStock),'background:#fce4ec;color:#c0392b;font-weight:800')
    +tdc(NF(tot10i),'background:#fffdf0')+(G.vel20?tdc(NF(tot20i),'background:#fffdf0')+tdc(NF(tot30i),'background:#fffdf0'):'')
    +tdc(NF(tot10l),'background:#fffdf0')+(G.vel20?tdc(NF(tot20l),'background:#fffdf0')+tdc(NF(tot30l),'background:#fffdf0'):'')
    +tdc(NF(tot10o),'background:#fffdf0')+(G.vel20?tdc(NF(tot20o),'background:#fffdf0')+tdc(NF(tot30o),'background:#fffdf0'):'')
@@ -1330,8 +1330,8 @@ function rCS(){
      +(G.orders?'<td style="padding:6px 8px;text-align:right;'+(p.pending>0?'color:#d4944a;font-weight:700':'color:#bbb')+'">'+(p.pending||'-')+'</td>'+'<td style="padding:6px 8px;text-align:right;'+cc+'">'+p.cr+'%</td>':'')
      +(hasStock?((G.s_stock?'<td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saS||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saM||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saL||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saXL||'-')+'</td>':'')+'<td style="padding:6px 8px;text-align:right;background:#f2f0ff;'+saSt+'">'+(p.saTotal!==null?NF(p.saTotal):'-')+'</td>'):'')
      +(hasStock?((G.s_stock?'<td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamS||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamM||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamL||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamXL||'-')+'</td>':'')+'<td style="padding:6px 8px;text-align:right;background:#e4eef8;'+lSt+'">'+(p.laamTotal!==null?NF(p.laamTotal):'-')+'</td>'):'')
-     +(function(){var d=(p.laamTotal||0)-(p.shopStock||0);var c=d===0?'color:#bbb':d>0?'color:#c0392b;font-weight:700':'color:#2471a3;font-weight:700';return '<td data-v="'+d+'" style="padding:6px 8px;text-align:right;background:#fce4ec;'+c+'">'+(p.laamTotal!=null&&p.shopStock!=null?(d>0?'+':'')+NF(d):'-')+'</td>';})()
      +'<td style="padding:6px 8px;text-align:right;background:#dce8f8;'+(p.shopStock!=null?(p.shopStock>=10?'color:#2471a3;font-weight:700':p.shopStock>0?'color:#d4944a;font-weight:700':'color:#c0392b;font-weight:700'):'color:#bbb')+'">'+(p.shopStock!=null?NF(p.shopStock):'-')+'</td>'
+     +(function(){var d=(p.laamTotal||0)-(p.shopStock||0);var c=d===0?'color:#bbb':d>0?'color:#c0392b;font-weight:700':'color:#2471a3;font-weight:700';return '<td data-v="'+d+'" style="padding:6px 8px;text-align:right;background:#fce4ec;'+c+'">'+(p.laamTotal!=null&&p.shopStock!=null?(d>0?'+':'')+NF(d):'-')+'</td>';})()
      +'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v10i||'-')+'</td>'
      +(G.vel20?'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v20i||'-')+'</td>'+'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v30i||'-')+'</td>':'')
      +'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v10l||'-')+'</td>'
