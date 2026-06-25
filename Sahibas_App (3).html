@@ -2402,10 +2402,15 @@ function openNewPO(name){
   // Reset fields
   document.getElementById('po-prod').value=name||'';
   document.getElementById('po-qty').value='';
+  document.getElementById('po-rs').value='';
+  document.getElementById('po-rm').value='';
+  document.getElementById('po-rl').value='';
+  document.getElementById('po-rxl').value='';
   document.getElementById('po-s').value='';
   document.getElementById('po-m').value='';
   document.getElementById('po-l').value='';
   document.getElementById('po-xl').value='';
+  document.getElementById('po-size-sum').innerHTML='';
   document.getElementById('po-notes').value='';
   document.getElementById('po-fabric').value='';
   document.getElementById('po-requirement').value='ROUTINE';
@@ -2444,6 +2449,47 @@ function poProdHint(name){
   }else{dupEl.innerHTML='';}
 }
 
+function poCalcFromRatio(){
+  var qty=parseInt(document.getElementById('po-qty').value)||0;
+  var rs=parseInt(document.getElementById('po-rs').value)||0;
+  var rm=parseInt(document.getElementById('po-rm').value)||0;
+  var rl=parseInt(document.getElementById('po-rl').value)||0;
+  var rxl=parseInt(document.getElementById('po-rxl').value)||0;
+  var tot=rs+rm+rl+rxl;
+  if(tot>0&&qty>0){
+    var sQ=Math.round(qty*rs/tot);
+    var mQ=Math.round(qty*rm/tot);
+    var lQ=Math.round(qty*rl/tot);
+    var xlQ=qty-sQ-mQ-lQ;
+    document.getElementById('po-s').value=sQ||'';
+    document.getElementById('po-m').value=mQ||'';
+    document.getElementById('po-l').value=lQ||'';
+    document.getElementById('po-xl').value=xlQ||'';
+  }
+  poUpdateSizeSum();
+}
+function poSetRatio(s,m,l,xl){
+  document.getElementById('po-rs').value=s||'';
+  document.getElementById('po-rm').value=m||'';
+  document.getElementById('po-rl').value=l||'';
+  document.getElementById('po-rxl').value=xl||'';
+  poCalcFromRatio();
+}
+function poSizeManualEdit(){poUpdateSizeSum();}
+function poUpdateSizeSum(){
+  var s=parseInt(document.getElementById('po-s').value)||0;
+  var m=parseInt(document.getElementById('po-m').value)||0;
+  var l=parseInt(document.getElementById('po-l').value)||0;
+  var xl=parseInt(document.getElementById('po-xl').value)||0;
+  var sum=s+m+l+xl;
+  var qty=parseInt(document.getElementById('po-qty').value)||0;
+  var el=document.getElementById('po-size-sum');
+  if(sum>0){
+    var match=sum===qty;
+    el.innerHTML='S:'+s+' + M:'+m+' + L:'+l+' + XL:'+xl+' = <b style="color:'+(match?'#27ae60':'#e74c3c')+'">'+sum+(match?' ✓':' ≠ '+qty)+'</b>';
+  }else{el.innerHTML='';}
+}
+
 function poSizeChartPreview(inp){
   var prev=document.getElementById('po-sizechart-preview');
   if(inp.files&&inp.files[0]){
@@ -2475,6 +2521,8 @@ function submitPO(){
   var m=parseInt(document.getElementById('po-m').value)||0;
   var l=parseInt(document.getElementById('po-l').value)||0;
   var xl=parseInt(document.getElementById('po-xl').value)||0;
+  var sizeSum=s+m+l+xl;
+  if(sizeSum>0&&sizeSum!==qty){showToast('Size breakdown ('+sizeSum+') does not match ordered qty ('+qty+').');return;}
   var orders=loadPO();
   // Generate next ID
   var maxNum=0;
@@ -3626,14 +3674,36 @@ function toggleSB(){
     <div id="po-dup-alert"></div>
 
     <label class="po-lbl">ORDERED QTY<span class="po-req">*</span></label>
-    <input id="po-qty" type="number" min="1" placeholder="Total quantity" class="po-inp">
+    <input id="po-qty" type="number" min="1" placeholder="Total quantity" class="po-inp" oninput="poCalcFromRatio()">
 
     <label class="po-lbl">SIZE BREAKDOWN (optional)</label>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
-      <div style="text-align:center"><div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">S</div><input id="po-s" type="number" min="0" placeholder="0" class="po-inp-sm"></div>
-      <div style="text-align:center"><div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">M</div><input id="po-m" type="number" min="0" placeholder="0" class="po-inp-sm"></div>
-      <div style="text-align:center"><div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">L</div><input id="po-l" type="number" min="0" placeholder="0" class="po-inp-sm"></div>
-      <div style="text-align:center"><div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">XL</div><input id="po-xl" type="number" min="0" placeholder="0" class="po-inp-sm"></div>
+    <div style="font-size:10px;color:#777;margin-bottom:6px">Fill ratio row — qty auto-calculates to match ordered qty</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:4px">
+      <div style="text-align:center"><div style="font-size:9px;color:#888;margin-bottom:2px">S</div></div>
+      <div style="text-align:center"><div style="font-size:9px;color:#888;margin-bottom:2px">M</div></div>
+      <div style="text-align:center"><div style="font-size:9px;color:#888;margin-bottom:2px">L</div></div>
+      <div style="text-align:center"><div style="font-size:9px;color:#888;margin-bottom:2px">XL</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:40px 1fr 1fr 1fr 1fr;gap:8px;align-items:center;margin-bottom:4px">
+      <div style="font-size:9px;color:#aaa;font-weight:700;text-align:right">Ratio:</div>
+      <input id="po-rs" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poCalcFromRatio()">
+      <input id="po-rm" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poCalcFromRatio()">
+      <input id="po-rl" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poCalcFromRatio()">
+      <input id="po-rxl" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poCalcFromRatio()">
+    </div>
+    <div style="display:grid;grid-template-columns:40px 1fr 1fr 1fr 1fr;gap:8px;align-items:center;margin-bottom:4px">
+      <div style="font-size:9px;color:#aaa;font-weight:700;text-align:right">Qty:</div>
+      <input id="po-s" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poSizeManualEdit()">
+      <input id="po-m" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poSizeManualEdit()">
+      <input id="po-l" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poSizeManualEdit()">
+      <input id="po-xl" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poSizeManualEdit()">
+    </div>
+    <div id="po-size-sum" style="text-align:right;font-size:10px;color:#aaa;margin-bottom:4px"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <button type="button" onclick="poSetRatio(1,2,2,1)" style="background:#333;border:1px solid #555;color:#ccc;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;font-weight:600">1:2:2:1</button>
+      <button type="button" onclick="poSetRatio(1,3,3,1)" style="background:#333;border:1px solid #555;color:#ccc;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;font-weight:600">1:3:3:1</button>
+      <button type="button" onclick="poSetRatio(1,1,1,1)" style="background:#333;border:1px solid #555;color:#ccc;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;font-weight:600">1:1:1:1</button>
+      <button type="button" onclick="poSetRatio(1,2,1,0)" style="background:#333;border:1px solid #555;color:#ccc;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;font-weight:600">1:2:1:0</button>
     </div>
 
     <label class="po-lbl">SIZE CHART ATTACHMENT<span class="po-req">*</span></label>
