@@ -567,6 +567,7 @@ function parseSales(txt,cm){
     var ret=parseFloat(row['Retail Price']||0)||0;
     var cpct=parseFloat(row['Commission Percentage']||0)||0;
     var stat=(row['Item Status']||'').toLowerCase().replace(/ /g,'_').replace(/-/g,'_');
+    if(stat==='fulfilled')stat='delivered';
     var pf=(row['Platform']||'MARKETPLACE').toUpperCase();
     var dst=(row['Destination']||'LOCAL').toUpperCase();
     var sz=row['Variant']||'';
