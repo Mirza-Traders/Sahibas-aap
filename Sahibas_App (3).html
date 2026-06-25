@@ -79,7 +79,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--dk
 #sb-tog:hover{opacity:1}
 #main-area{flex:1;min-width:0}
 .sb-section{padding:12px 0 4px}
-.sb-head{font-size:7.5px;font-weight:700;letter-spacing:.14em;color:#666;text-transform:uppercase;padding:0 12px 5px;white-space:nowrap}
+.sb-head{font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;padding:0 12px 5px;white-space:nowrap}
 .sb-item{display:flex;align-items:center;gap:8px;padding:7px 12px 7px 10px;font-size:11px;color:#b8b4ae;cursor:pointer;transition:color .12s,background .12s;border-left:3px solid transparent;font-weight:500;white-space:nowrap}
 .sb-item:hover{color:#e8e4dc;background:#1e1e1e;border-left-color:#555}
 .sb-item.on{color:var(--gold);background:#1d1a11;border-left-color:var(--gold);font-weight:700}
@@ -89,7 +89,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--dk
 
 /* Tables */
 .tw{border:1px solid #e8e4dc;border-radius:6px;overflow:hidden;overflow-x:auto;max-height:68vh}
-table{width:100%;border-collapse:collapse;font-size:11px;background:#fff}
+table{width:100%;border-collapse:collapse;font-size:12px;background:#fff}
 thead{position:sticky;top:0;z-index:5}
 th{background:#f8f6f2;padding:7px 9px;text-align:left;font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #e8e4dc;white-space:nowrap;font-weight:700;cursor:pointer;user-select:none}
 th:hover{color:var(--gold);background:#faf8f4}
@@ -2910,162 +2910,96 @@ function rPO(){
    +(isOwner?'<button class="po-tbtn sec" onclick="openCustMgr()">Manage Customers</button>':'')
    +'</div>';
 
-  // Order cards
+  // Compact order table
   var ordHtml='';
   if(filtered.length===0){
     ordHtml='<div style="text-align:center;padding:36px;color:#bbb;background:#fff;border:1px solid #e8e4dc;border-radius:10px;font-size:13px">No orders match your filters.</div>';
   } else {
-    filtered.forEach(function(o){
+    ordHtml='<div class="tw" style="max-height:none"><table style="border-collapse:collapse;width:100%;font-size:12px;background:#fff">';
+    ordHtml+='<thead><tr style="background:#f8f6f2">'
+     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc;width:30px">#</th>'
+     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc;min-width:60px">ID</th>'
+     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">Date</th>'
+     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">Customer</th>'
+     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">Product</th>'
+     +'<th style="padding:7px 8px;text-align:right;border-bottom:2px solid #e8e4dc">Qty</th>'
+     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc">Sizes</th>'
+     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">Fabric</th>'
+     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc">Req</th>'
+     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc">Status</th>'
+     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc">Progress</th>'
+     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">ETA</th>'
+     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">By</th>'
+     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc">Actions</th>'
+     +'</tr></thead><tbody>';
+    filtered.forEach(function(o,idx){
       var stClass=o.status==='Pending Approval'?'pending-approval':o.status==='Approved'?'approved':o.status==='Fabric Review'?'fabric-review':o.status==='In Production'?'in-production':o.status==='Completed'?'completed':o.status==='Rejected'?'rejected':'';
       var isOverdue=o.status!=='Completed'&&o.status!=='Rejected'&&o.eta&&o.eta<today;
-      var simg=o.img&&o.img.startsWith('http')?(o.img.indexOf('?')>=0?o.img+'&width=100':o.img+'?width=100'):'';
+      var cnt=PHASES.filter(function(p){return o.phases[p[0]]&&o.phases[p[0]].done;}).length;
+      var pct=Math.round(cnt/PHASES.length*100);
+      var szStr=(o.S||0)+'/'+(o.M||0)+'/'+(o.L||0)+'/'+(o.XL||0);
+      var bg=idx%2===0?'#fff':'#fafaf8';
 
-      // Phase stepper (only show when In Production or Completed)
-      var stepper='';
-      if(o.status==='In Production'||o.status==='Completed'){
-        var cnt=PHASES.filter(function(p){return o.phases[p[0]]&&o.phases[p[0]].done;}).length;
-        var pct=Math.round(cnt/PHASES.length*100);
-        stepper='<div class="po-stepper">';
-        PHASES.forEach(function(p){
-          var pd=o.phases[p[0]]||{};var done=pd.done;
-          var cls=done?'done':'pending';
-          var tip=done?'Done'+(pd.by?' by '+pd.by:'')+(pd.date?' on '+fmtD(pd.date):''):'Click to mark done';
-          var canToggle=(o.status==='In Production');
-          stepper+='<button class="po-phase-btn '+cls+'" '+(canToggle?'onclick="togglePoPhase(\''+o.id+'\',\''+p[0]+'\')"':'')+' title="'+tip+'">'+PHASE_ICO[p[0]]+' '+p[1]+(done?' &#10003;':'')+'</button>';
-        });
-        stepper+='</div>';
-        stepper+='<div style="background:#f0ede8;border-radius:4px;height:5px;margin:2px 0 4px"><div style="background:linear-gradient(90deg,var(--gold),#27ae60);height:5px;border-radius:4px;width:'+pct+'%;transition:width .4s"></div></div>';
-        stepper+='<div style="font-size:10px;color:#aaa;margin-bottom:4px">'+pct+'% complete ('+cnt+'/'+PHASES.length+' phases)</div>';
+      // Compact actions
+      var acts='';
+      if(isOwner&&o.status==='Pending Approval'){
+        acts+='<button onclick="poApprove(\''+o.id+'\')" style="background:#27ae60;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Approve">&#10003;</button>';
+        acts+='<button onclick="poReject(\''+o.id+'\')" style="background:#c0392b;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Reject">&#10007;</button>';
       }
-
-      // Thumbnails
-      var scThumb='';
-      if(o.sizeChart){scThumb='<img src="'+o.sizeChart+'" class="po-thumb" onclick="poViewImg(\''+o.sizeChart.replace(/'/g,"\\'")+'\')" title="Size Chart" style="margin-right:6px">';}
-      var fsThumb='';
-      if(o.fabricSwatch){fsThumb='<img src="'+o.fabricSwatch+'" class="po-thumb" onclick="poViewImg(\''+o.fabricSwatch.replace(/'/g,"\\'")+'\')" title="Fabric Swatch">';}
-
-      // Action buttons
-      var actions='';
-      if(isOwner){
-        if(o.status==='Pending Approval'){
-          actions+='<button class="po-act-btn approve" onclick="poApprove(\''+o.id+'\')">Approve</button>';
-          actions+='<button class="po-act-btn reject" onclick="poReject(\''+o.id+'\')">Reject</button>';
-        }
-        if(o.status==='Fabric Review'){
-          actions+='<button class="po-act-btn approve" onclick="poApproveSwatch(\''+o.id+'\')">Approve Swatch</button>';
-        }
-        if(o.status!=='Completed'&&o.status!=='Rejected'){
-          actions+='<button class="po-act-btn edit" onclick="poOpenEdit(\''+o.id+'\')">Edit</button>';
-        }
+      if(isOwner&&o.status==='Fabric Review'){
+        acts+='<button onclick="poApproveSwatch(\''+o.id+'\')" style="background:#27ae60;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Approve Swatch">Swatch &#10003;</button>';
       }
       if(o.status==='Approved'){
-        actions+='<button class="po-act-btn" onclick="poUploadSwatch(\''+o.id+'\')">Upload Fabric Swatch</button>';
+        acts+='<button onclick="poUploadSwatch(\''+o.id+'\')" style="background:#8e44ad;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Upload Fabric Swatch">Swatch</button>';
+      }
+      if(isOwner&&o.status!=='Completed'&&o.status!=='Rejected'){
+        acts+='<button onclick="poOpenEdit(\''+o.id+'\')" style="background:#2980b9;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Edit">&#9998;</button>';
       }
       if(o.status==='In Production'||o.status==='Approved'){
-        actions+='<button class="po-act-btn" onclick="poSetEta(\''+o.id+'\')">Set ETA</button>';
+        acts+='<button onclick="poSetEta(\''+o.id+'\')" style="background:#e67e22;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Set ETA">ETA</button>';
       }
+      acts+='<button onclick="poViewLog(\''+o.id+'\')" style="background:#f5f5f5;border:1px solid #ddd;color:#888;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;margin:1px" title="View Log">Log</button>';
       if(canPlace&&o.status!=='Completed'&&o.status!=='Rejected'){
-        actions+='<button class="po-act-btn reject" onclick="cancelPO(\''+o.id+'\')">Cancel</button>';
+        acts+='<button onclick="cancelPO(\''+o.id+'\')" style="background:none;border:1px solid #eee;color:#c0392b;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;margin:1px" title="Cancel">&#10007;</button>';
       }
-      actions+='<button class="po-act-btn" onclick="poViewLog(\''+o.id+'\')">&#128220; Log</button>';
 
-      ordHtml+='<div class="po-card'+(o.requirement==='URGENT'?' po-urgent':'')+'">'
-       +'<div style="display:flex;gap:14px;align-items:flex-start">'
-       +(simg?'<img src="'+simg+'" style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0" onerror="this.style.display=\'none\'">':'')
-       +'<div style="flex:1;min-width:0">'
-       // Header row
-       +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">'
-       +'<span style="font-size:10px;color:#888;font-weight:700;background:#f5f5f5;padding:2px 8px;border-radius:4px">'+o.id+'</span>'
-       +'<span style="font-weight:700;font-size:13px">'+o.product+'</span>'
-       +'<span class="po-badge '+stClass+'">'+o.status.toUpperCase()+'</span>'
-       +(o.requirement==='URGENT'?'<span class="po-badge urgent-req">URGENT</span>':'<span class="po-badge routine-req">ROUTINE</span>')
-       +(isOverdue?'<span class="po-badge overdue">OVERDUE</span>':'')
-       +'<span style="margin-left:auto;font-size:10px;color:#bbb">'+fmtD(o.date)+' &middot; '+o.placedBy+'</span>'
-       +'</div>'
-       // Customer & details row
-       +'<div style="display:flex;gap:12px;font-size:11px;color:#888;flex-wrap:wrap;margin-bottom:4px">'
-       +(o.customer?'<span>Customer: <b style="color:#1a1a1a">'+o.customer+'</b></span>':'')
-       +'<span>Qty: <b style="color:var(--gold2)">'+(o.qty||0)+'</b></span>'
-       +'<span>S:<b style="color:#1a1a1a">'+(o.S||'-')+'</b></span>'
-       +'<span>M:<b style="color:#1a1a1a">'+(o.M||'-')+'</b></span>'
-       +'<span>L:<b style="color:#1a1a1a">'+(o.L||'-')+'</b></span>'
-       +'<span>XL:<b style="color:#1a1a1a">'+(o.XL||'-')+'</b></span>'
-       +(o.fabric?'<span>Fabric: <b style="color:#1a1a1a">'+o.fabric+'</b></span>':'')
-       +(o.eta?'<span style="color:#2980b9">ETA: '+fmtD(o.eta)+'</span>':'')
-       +'</div>'
-       +(o.notes?'<div style="font-size:11px;color:#999;font-style:italic;margin-bottom:4px">'+o.notes+'</div>':'')
-       // Thumbnails row
-       +'<div style="display:flex;gap:8px;align-items:center;margin:4px 0">'+scThumb+fsThumb+'</div>'
-       +stepper
-       // Actions row
-       +'<div style="margin-top:4px">'+actions+'</div>'
-       +'</div></div></div>';
+      // Progress bar or phase buttons
+      var progHtml='';
+      if(o.status==='In Production'||o.status==='Completed'){
+        progHtml='<div style="display:flex;gap:2px;align-items:center">';
+        PHASES.forEach(function(p){
+          var pd=o.phases[p[0]]||{};var done=pd.done;
+          var bg2=done?'#27ae60':'#eee';var fg=done?'#fff':'#aaa';
+          var canToggle=(o.status==='In Production');
+          var tip=p[1]+(done?' ✓ '+(pd.date?fmtD(pd.date):''):'');
+          progHtml+='<button '+(canToggle?'onclick="togglePoPhase(\''+o.id+'\',\''+p[0]+'\')"':'')+' title="'+tip+'" style="background:'+bg2+';color:'+fg+';border:none;border-radius:3px;padding:2px 5px;font-size:8px;cursor:'+(canToggle?'pointer':'default')+';font-weight:700;line-height:1.2">'+p[1].substring(0,3)+(done?' ✓':'')+'</button>';
+        });
+        progHtml+='</div>';
+      } else {
+        progHtml='<span style="font-size:10px;color:#aaa">—</span>';
+      }
+
+      ordHtml+='<tr style="background:'+bg+';border-bottom:1px solid #f0ede8'+(isOverdue?';border-left:3px solid #c0392b':'')+'">'
+       +'<td style="padding:6px 8px;text-align:center;color:#bbb;font-size:10px">'+(idx+1)+'</td>'
+       +'<td style="padding:6px 8px;font-weight:700;font-size:10px;color:#888">'+o.id+'</td>'
+       +'<td style="padding:6px 8px;font-size:11px;white-space:nowrap">'+fmtD(o.date)+'</td>'
+       +'<td style="padding:6px 8px;font-weight:600">'+( o.customer||'—')+'</td>'
+       +'<td style="padding:6px 8px;font-weight:600">'+o.product+'</td>'
+       +'<td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--gold2)">'+(o.qty||0)+'</td>'
+       +'<td style="padding:6px 8px;text-align:center;font-size:10px;color:#888">'+szStr+'</td>'
+       +'<td style="padding:6px 8px;font-size:11px">'+(o.fabric||'—')+'</td>'
+       +'<td style="padding:6px 8px;text-align:center"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;'+(o.requirement==='URGENT'?'background:#fdeaea;color:#c0392b':'background:#f5f5f5;color:#888')+'">'+o.requirement+'</span></td>'
+       +'<td style="padding:6px 8px;text-align:center"><span class="po-badge '+stClass+'" style="font-size:9px">'+o.status.toUpperCase()+'</span>'+(isOverdue?'<br><span class="po-badge overdue" style="font-size:8px;margin-top:2px">OVERDUE</span>':'')+'</td>'
+       +'<td style="padding:6px 8px;text-align:center">'+progHtml+'</td>'
+       +'<td style="padding:6px 8px;font-size:11px;white-space:nowrap;'+(isOverdue?'color:#c0392b;font-weight:700':'color:#2980b9')+'">'+(o.eta?fmtD(o.eta):'—')+'</td>'
+       +'<td style="padding:6px 8px;font-size:10px;color:#aaa;white-space:nowrap">'+(o.placedBy||'—')+'</td>'
+       +'<td style="padding:6px 8px;text-align:center;white-space:nowrap">'+acts+'</td>'
+       +'</tr>';
     });
+    ordHtml+='</tbody></table></div>';
   }
 
-  // Suggestions
-  var sugHtml='';
-  if(STOCK_PRODS&&Object.keys(STOCK_PRODS).length&&DETAIL.length){
-    var refD=META.max_date||today;
-    var s30=new Date(refD);s30.setDate(s30.getDate()-30);var s30s=s30.toISOString().split('T')[0];
-    var s10=new Date(refD);s10.setDate(s10.getDate()-10);var s10s=s10.toISOString().split('T')[0];
-    var vel30={},vel10={};
-    DETAIL.forEach(function(r){if(r[4]==='delivered'){if(r[0]>=s30s)vel30[r[1]]=(vel30[r[1]]||0)+1;if(r[0]>=s10s)vel10[r[1]]=(vel10[r[1]]||0)+1;}});
-    var sugs=Object.keys(STOCK_PRODS).map(function(k){
-      var sp=STOCK_PRODS[k];var v30=vel30[sp.title]||0;var v10=vel10[sp.title]||0;
-      var rate=Math.round(v30/30*10)/10;
-      var days=rate>0?Math.round(sp.total/rate):9999;
-      var sug=Math.max(0,Math.round(rate*60)-sp.total);
-      var urg=sp.total===0&&v30>0?0:days<7&&v30>0?1:days<21&&v30>0?2:days<45&&v30>0?3:4;
-      return{k:k,sp:sp,v30:v30,v10:v10,rate:rate,days:days,sug:sug,urg:urg};
-    }).filter(function(x){return x.urg<4&&x.v30>0;}).sort(function(a,b){return a.urg-b.urg||a.days-b.days;}).slice(0,40);
-
-    if(sugs.length){
-      sugHtml='<div style="margin-top:22px">'
-       +'<div style="font-size:14px;font-weight:700;margin-bottom:8px">Reorder Suggestions <span style="font-size:10px;color:#bbb;font-weight:400">sorted by urgency, based on 30-day velocity</span></div>'
-       +'<div style="overflow:auto;border:1px solid #e8e4dc;border-radius:8px"><table style="border-collapse:collapse;font-size:11px;background:#fff;width:100%;min-width:820px">'
-       +'<thead><tr style="background:#f8f6f2">'
-       +'<th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e8e4dc;min-width:160px">Product</th>'
-       +'<th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e8e4dc">Urgency</th>'
-       +'<th style="padding:8px 8px;text-align:right;border-bottom:2px solid #e8e4dc">Stock</th>'
-       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">S</th>'
-       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">M</th>'
-       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">L</th>'
-       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">XL</th>'
-       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">30d Sales</th>'
-       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">Last 10d</th>'
-       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">Daily Rate</th>'
-       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">Days Left</th>'
-       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc;background:#fdf8f0">Suggest (60d)</th>'
-       +(canPlace?'<th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e8e4dc">Order</th>':'')
-       +'</tr></thead><tbody>';
-      sugs.forEach(function(x,i){
-        var sp=x.sp;
-        var urgL=x.urg===0?'OUT':x.urg===1?'CRITICAL':x.urg===2?'LOW':'SOON';
-        var urgC=x.urg===0?'color:#c0392b':x.urg===1?'color:#e67e22':x.urg===2?'color:#d4944a':'color:#27ae60';
-        var dc=x.urg<=1?'color:#c0392b;font-weight:700':x.urg===2?'color:#d4944a;font-weight:700':'color:#27ae60;font-weight:600';
-        var bg=i%2===0?'#fff':'#fafaf8';
-        sugHtml+='<tr style="background:'+bg+';border-bottom:1px solid #f2efe9">'
-         +'<td style="padding:7px 10px;font-weight:600">'+sp.title+'</td>'
-         +'<td style="padding:7px 10px;text-align:center;'+urgC+';font-weight:700">'+urgL+'</td>'
-         +'<td style="padding:7px 8px;text-align:right;font-weight:700">'+NF(sp.total)+'</td>'
-         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.S||'-')+'</td>'
-         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.M||'-')+'</td>'
-         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.L||'-')+'</td>'
-         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.XL||'-')+'</td>'
-         +'<td style="padding:7px 10px;text-align:right">'+NF(x.v30)+'</td>'
-         +'<td style="padding:7px 10px;text-align:right;color:#2980b9;font-weight:600">'+NF(x.v10)+'</td>'
-         +'<td style="padding:7px 10px;text-align:right;color:#888">'+x.rate+'/d</td>'
-         +'<td style="padding:7px 10px;text-align:right;'+dc+'">'+(x.days<9999?x.days+'d':'-')+'</td>'
-         +'<td style="padding:7px 10px;text-align:right;background:#fdf8f0;color:var(--gold2);font-weight:700">'+(x.sug>0?NF(x.sug):'-')+'</td>'
-         +(canPlace?'<td style="padding:7px 10px;text-align:center"><button onclick="openNewPO(\''+sp.title.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\')" style="background:var(--gold);color:#111;border:none;border-radius:5px;padding:4px 12px;font-size:10px;font-weight:700;cursor:pointer">+ Order</button></td>':'')
-         +'</tr>';
-      });
-      sugHtml+='</tbody></table></div></div>';
-    }
-  }
-
-  el.innerHTML=kh+tb+'<div>'+ordHtml+'</div>'+sugHtml;
+  el.innerHTML=kh+tb+'<div>'+ordHtml+'</div>';
 }
 
 // ── CHANGE PASSWORD (self-service) ──
