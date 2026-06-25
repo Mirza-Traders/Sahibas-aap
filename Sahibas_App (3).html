@@ -2428,23 +2428,100 @@ function openNewPO(name){
 function poProdHint(name){
   var k=name.toLowerCase().trim();
   var sp=STOCK_PRODS[k]||null;
-  var h=document.getElementById('po-stkhint');
-  if(!h)return;
-  // Show stock hint
-  if(sp){h.innerHTML='<span style="font-size:10px;color:#aaa">Current stock: S:<b style="color:#fff"> '+(sp.S||0)+'</b> M:<b style="color:#fff"> '+(sp.M||0)+'</b> L:<b style="color:#fff"> '+(sp.L||0)+'</b> XL:<b style="color:#fff"> '+(sp.XL||0)+'</b> | Total: <b style="color:var(--gold)"> '+(sp.total||0)+'</b></span>';}
-  else{h.innerHTML='';}
+  var hint=document.getElementById('po-stkhint');
+  if(!hint)return;
   // Show product image
   var img=findImg(k);
   var imgEl=document.getElementById('po-prod-img');
   if(img){imgEl.src=img+(img.indexOf('?')>=0?'&width=120':'?width=120');imgEl.style.display='block';}
   else{imgEl.style.display='none';}
+  if(!k||!sp){hint.innerHTML='';document.getElementById('po-dup-alert').innerHTML='';return;}
+
+  // Gather data
+  var stkS=sp.S||0,stkM=sp.M||0,stkL=sp.L||0,stkXL=sp.XL||0,stkT=sp.total||0;
+  var saS=sp.saS||0,saM=sp.saM||0,saL=sp.saL||0,saXL=sp.saXL||0,saT=sp.saTotal||0;
+
+  // Pending production orders
+  var orders=loadPO();
+  var actPO=orders.filter(function(o){return o.product&&o.product.toLowerCase().trim()===k&&o.status!=='Completed'&&o.status!=='Rejected'&&o.status!=='Cancelled';});
+  var poS=0,poM=0,poL=0,poXL=0,poT=0;
+  actPO.forEach(function(o){poS+=(o.S||0);poM+=(o.M||0);poL+=(o.L||0);poXL+=(o.XL||0);poT+=(o.qty||0);});
+
+  // Net stock after production
+  var netS=stkS+poS,netM=stkM+poM,netL=stkL+poL,netXL=stkXL+poXL,netT=stkT+poT;
+
+  // Sales data — delivered orders, size-wise
+  var pName=sp.title;
+  var delAll=DETAIL.filter(function(r){return r[1]===pName&&r[4]==='delivered';});
+  var totDel=delAll.length;
+  var dS=0,dM=0,dL=0,dXL=0;
+  delAll.forEach(function(r){var sz=r[3];if(sz==='S')dS++;else if(sz==='M')dM++;else if(sz==='L')dL++;else if(sz==='XL')dXL++;});
+
+  // 30d sales
+  var refD=META.max_date||new Date().toISOString().split('T')[0];
+  var s30=new Date(refD);s30.setDate(s30.getDate()-30);var s30s=s30.toISOString().split('T')[0];
+  var del30=delAll.filter(function(r){return r[0]>=s30s;});
+  var d30=del30.length,d30S=0,d30M=0,d30L=0,d30XL=0;
+  del30.forEach(function(r){var sz=r[3];if(sz==='S')d30S++;else if(sz==='M')d30M++;else if(sz==='L')d30L++;else if(sz==='XL')d30XL++;});
+  var daily=Math.round(d30/30*10)/10;
+
+  // Days of cover per size
+  var dRateS=d30S/30,dRateM=d30M/30,dRateL=d30L/30,dRateXL=d30XL/30;
+  function covD(stk,rate){return rate>0?Math.round(stk/rate)+'d':'—';}
+  function covC(stk,rate){return rate>0&&stk/rate<7?'color:#e74c3c;font-weight:700':rate>0&&stk/rate<15?'color:#d4944a;font-weight:700':'color:#27ae60';}
+
+  // Size ratio from sales
+  var ratioS=totDel>0?Math.round(dS/totDel*100):0;
+  var ratioM=totDel>0?Math.round(dM/totDel*100):0;
+  var ratioL=totDel>0?Math.round(dL/totDel*100):0;
+  var ratioXL=totDel>0?Math.round(dXL/totDel*100):0;
+  // Simplify ratio to smallest integers
+  function simplifyRatio(a,b,c,d){
+    if(!a&&!b&&!c&&!d)return'—';
+    var g=gcd(gcd(a||1,b||1),gcd(c||1,d||1));
+    if(g<1)g=1;
+    return Math.round(a/g)+':'+Math.round(b/g)+':'+Math.round(c/g)+':'+Math.round(d/g);
+  }
+  function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b){var t=b;b=a%b;a=t;}return a;}
+  var sRatio=simplifyRatio(dS,dM,dL,dXL);
+  // Normalized ratio for apply button
+  var rSum=dS+dM+dL+dXL;
+  var nrS=rSum>0?Math.round(dS/rSum*10):0,nrM=rSum>0?Math.round(dM/rSum*10):0,nrL=rSum>0?Math.round(dL/rSum*10):0,nrXL=rSum>0?Math.round(dXL/rSum*10):0;
+
+  var tb='border:1px solid #3a3a3a;padding:4px 7px;font-size:10px;text-align:right;';
+  var th='border:1px solid #3a3a3a;padding:4px 7px;font-size:9px;text-align:center;color:#aaa;background:#252525;font-weight:700;';
+  var tl=tb+'text-align:left;color:#aaa;font-weight:600;font-size:9px;';
+  var card='<div style="background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:10px;margin:6px 0 8px">';
+  // Stock Position
+  card+='<div style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:.06em;margin-bottom:5px">STOCK POSITION</div>';
+  card+='<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tr><td style="'+th+'"></td><td style="'+th+'">Total</td><td style="'+th+'">S</td><td style="'+th+'">M</td><td style="'+th+'">L</td><td style="'+th+'">XL</td></tr>';
+  card+='<tr><td style="'+tl+'">On Hand (Laam)</td><td style="'+tb+'font-weight:700;color:#fff">'+stkT+'</td><td style="'+tb+'color:#ccc">'+stkS+'</td><td style="'+tb+'color:#ccc">'+stkM+'</td><td style="'+tb+'color:#ccc">'+stkL+'</td><td style="'+tb+'color:#ccc">'+stkXL+'</td></tr>';
+  card+='<tr><td style="'+tl+'">Sell Ahead</td><td style="'+tb+'color:#e67e22">'+saT+'</td><td style="'+tb+'color:#e67e22">'+saS+'</td><td style="'+tb+'color:#e67e22">'+saM+'</td><td style="'+tb+'color:#e67e22">'+saL+'</td><td style="'+tb+'color:#e67e22">'+saXL+'</td></tr>';
+  if(poT>0){card+='<tr><td style="'+tl+'">Pending Orders</td><td style="'+tb+'color:#2980b9">'+poT+'</td><td style="'+tb+'color:#2980b9">'+poS+'</td><td style="'+tb+'color:#2980b9">'+poM+'</td><td style="'+tb+'color:#2980b9">'+poL+'</td><td style="'+tb+'color:#2980b9">'+poXL+'</td></tr>';}
+  card+='<tr style="background:#222"><td style="'+tl+'font-weight:700;color:var(--gold)">Net Stock'+(poT>0?' (after prod)':'')+'</td><td style="'+tb+'font-weight:700;color:var(--gold)">'+netT+'</td><td style="'+tb+'color:var(--gold)">'+netS+'</td><td style="'+tb+'color:var(--gold)">'+netM+'</td><td style="'+tb+'color:var(--gold)">'+netL+'</td><td style="'+tb+'color:var(--gold)">'+netXL+'</td></tr>';
+  card+='<tr><td style="'+tl+'">Days of Cover</td><td style="'+tb+covC(stkT,daily)+'">'+covD(stkT,daily)+'</td><td style="'+tb+covC(stkS,dRateS)+'">'+covD(stkS,dRateS)+'</td><td style="'+tb+covC(stkM,dRateM)+'">'+covD(stkM,dRateM)+'</td><td style="'+tb+covC(stkL,dRateL)+'">'+covD(stkL,dRateL)+'</td><td style="'+tb+covC(stkXL,dRateXL)+'">'+covD(stkXL,dRateXL)+'</td></tr>';
+  card+='</table>';
+  // Sales
+  card+='<div style="font-size:9px;color:#27ae60;font-weight:700;letter-spacing:.06em;margin-bottom:5px">SALES PERFORMANCE</div>';
+  card+='<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tr><td style="'+th+'"></td><td style="'+th+'">Total</td><td style="'+th+'">S</td><td style="'+th+'">M</td><td style="'+th+'">L</td><td style="'+th+'">XL</td></tr>';
+  card+='<tr><td style="'+tl+'">Total Delivered</td><td style="'+tb+'font-weight:700;color:#fff">'+NF(totDel)+'</td><td style="'+tb+'color:#ccc">'+NF(dS)+'</td><td style="'+tb+'color:#ccc">'+NF(dM)+'</td><td style="'+tb+'color:#ccc">'+NF(dL)+'</td><td style="'+tb+'color:#ccc">'+NF(dXL)+'</td></tr>';
+  card+='<tr><td style="'+tl+'">30d Sales</td><td style="'+tb+'color:#2980b9;font-weight:700">'+d30+'</td><td style="'+tb+'color:#2980b9">'+d30S+'</td><td style="'+tb+'color:#2980b9">'+d30M+'</td><td style="'+tb+'color:#2980b9">'+d30L+'</td><td style="'+tb+'color:#2980b9">'+d30XL+'</td></tr>';
+  card+='<tr><td style="'+tl+'">Daily Rate</td><td style="'+tb+'color:#888">'+daily+'/d</td><td colspan="4" style="'+tb+'color:#555;text-align:center;font-size:9px">'+Math.round(dRateS*10)/10+'/d · '+Math.round(dRateM*10)/10+'/d · '+Math.round(dRateL*10)/10+'/d · '+Math.round(dRateXL*10)/10+'/d</td></tr>';
+  card+='<tr style="background:#222"><td style="'+tl+'font-weight:700;color:#27ae60">Size Ratio</td><td style="'+tb+'font-weight:700;color:#27ae60">'+sRatio+'</td><td style="'+tb+'color:#27ae60">'+ratioS+'%</td><td style="'+tb+'color:#27ae60">'+ratioM+'%</td><td style="'+tb+'color:#27ae60">'+ratioL+'%</td><td style="'+tb+'color:#27ae60">'+ratioXL+'%</td></tr>';
+  card+='</table>';
+  // Suggest ratio button
+  if(rSum>0){
+    card+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:10px;color:#aaa">Suggested ratio from sales:</span><b style="color:var(--gold);font-size:11px">'+sRatio+'</b>';
+    card+='<button onclick="poSetRatio('+nrS+','+nrM+','+nrL+','+nrXL+')" style="background:var(--gold);color:#111;border:none;border-radius:4px;padding:3px 12px;font-size:10px;font-weight:700;cursor:pointer">Apply</button></div>';
+  }
+  card+='</div>';
+  hint.innerHTML=card;
+
   // Duplicate order alert
   var dupEl=document.getElementById('po-dup-alert');
-  var orders=loadPO();
-  var dups=orders.filter(function(o){return o.product&&o.product.toLowerCase().trim()===k&&o.status!=='Completed'&&o.status!=='Rejected'&&o.status!=='Cancelled';});
-  if(dups.length){
+  if(actPO.length){
     var dh='<div class="po-dup-alert"><b>Warning:</b> Active production order(s) exist for this product:<br>';
-    dups.forEach(function(d){dh+='<span style="display:inline-block;margin:3px 0">'+d.id+' — Customer: '+(d.customer||'N/A')+', Qty: '+(d.qty||d.total||0)+', Status: '+d.status+(d.eta?', ETA: '+fmtD(d.eta):'')+'</span><br>';});
+    actPO.forEach(function(d){dh+='<span style="display:inline-block;margin:3px 0">'+d.id+' — Customer: '+(d.customer||'N/A')+', Qty: '+(d.qty||d.total||0)+', Status: '+d.status+(d.eta?', ETA: '+fmtD(d.eta):'')+'</span><br>';});
     dh+='</div>';dupEl.innerHTML=dh;
   }else{dupEl.innerHTML='';}
 }
@@ -2626,15 +2703,22 @@ function togglePoPhase(oid,ph){
 
 // ── Update ETA ──
 function poSetEta(oid){
-  var eta=prompt('Enter ETA date (YYYY-MM-DD):');
-  if(!eta)return;
   var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});
   if(!o)return;
-  var oldEta=o.eta;
-  o.eta=eta;
-  o.log.push({action:'ETA Updated',by:CU?CU.name:'',date:new Date().toISOString().split('T')[0],detail:'ETA changed from '+(oldEta||'none')+' to '+eta});
-  savePO(orders);rendered.po=false;doR('po');
-  showToast('ETA updated for '+oid);
+  var inp=document.createElement('input');inp.type='date';inp.value=o.eta||'';
+  inp.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99999;font-size:18px;padding:12px 16px;border:2px solid var(--gold);border-radius:8px;background:#1e1e1e;color:#fff;outline:none;box-shadow:0 10px 40px rgba(0,0,0,.6)';
+  var bg=document.createElement('div');bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99998';
+  bg.onclick=function(){bg.remove();inp.remove();};
+  document.body.appendChild(bg);document.body.appendChild(inp);
+  inp.focus();inp.showPicker&&inp.showPicker();
+  inp.onchange=function(){
+    var val=inp.value;bg.remove();inp.remove();
+    if(!val)return;
+    var oldEta=o.eta;o.eta=val;
+    o.log.push({action:'ETA Updated',by:CU?CU.name:'',date:new Date().toISOString().split('T')[0],detail:'ETA changed from '+(oldEta?fmtD(oldEta):'none')+' to '+fmtD(val)});
+    savePO(orders);rendered.po=false;doR('po');
+    showToast('ETA updated for '+oid);
+  };
 }
 
 // ── Cancel order ──
@@ -2691,7 +2775,7 @@ function poOpenEdit(oid){
   h+='</div>';
   h+='<label class="po-lbl">Fabric/Material<span class="po-req">*</span></label><input id="poe-fabric" class="po-inp" value="'+(o.fabric||'')+'">';
   h+='<label class="po-lbl">Requirement</label><select id="poe-req" class="po-inp"><option value="URGENT"'+(o.requirement==='URGENT'?' selected':'')+'>URGENT</option><option value="ROUTINE"'+(o.requirement==='ROUTINE'?' selected':'')+'>ROUTINE</option></select>';
-  h+='<label class="po-lbl">ETA (YYYY-MM-DD)</label><input id="poe-eta" type="date" class="po-inp" value="'+(o.eta||'')+'">';
+  h+='<label class="po-lbl">ETA</label><input id="poe-eta" type="date" class="po-inp" value="'+(o.eta||'')+'">';
   h+='<label class="po-lbl">Status</label><select id="poe-status" class="po-inp">'+statSel+'</select>';
   h+='<label class="po-lbl">Notes</label><textarea id="poe-notes" rows="2" class="po-inp" style="resize:vertical">'+(o.notes||'')+'</textarea>';
   h+='<div class="po-btn-row"><button class="po-btn-primary" onclick="poSaveEdit(\''+oid+'\')">Save Changes</button><button class="po-btn-cancel" onclick="document.getElementById(\'po-edit-modal\').classList.remove(\'open\')">Cancel</button></div>';
