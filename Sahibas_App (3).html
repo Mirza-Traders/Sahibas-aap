@@ -2315,7 +2315,12 @@ function loadPO(){
   }catch(e){return[];}
 }
 function savePO(arr){try{localStorage.setItem('sbm_prod_orders',JSON.stringify(arr));}catch(e){}}
-function loadCustomers(){try{return JSON.parse(localStorage.getItem('sbm_customers')||'[]');}catch(e){return[];}}
+var DEFAULT_CUSTOMERS=['Laam','Sahibas by Mirza','Stock Build'];
+function loadCustomers(){
+  try{var c=JSON.parse(localStorage.getItem('sbm_customers')||'null');
+  if(!c){c=DEFAULT_CUSTOMERS.slice();localStorage.setItem('sbm_customers',JSON.stringify(c));}
+  return c;}catch(e){return DEFAULT_CUSTOMERS.slice();}
+}
 function saveCustomers(arr){try{localStorage.setItem('sbm_customers',JSON.stringify(arr));}catch(e){}}
 
 // PO filter state
