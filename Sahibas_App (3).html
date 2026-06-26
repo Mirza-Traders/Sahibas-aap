@@ -2244,13 +2244,125 @@ function openNewPO(name){
   setTimeout(function(){document.getElementById('po-prod').focus();},80);
 }
 
+function poSizeHintUpdate(){
+  var prod=document.getElementById('po-prod').value.trim();
+  if(prod)poProdHint(prod);
+}
 function poProdHint(name){
   var k=name.toLowerCase().trim();
-  var sp=STOCK_PRODS[k]||null;
   var h=document.getElementById('po-stkhint');
   if(!h)return;
-  if(sp){h.innerHTML='<span style="font-size:10px;color:#aaa">Current stock → S:<b style="color:#fff"> '+(sp.S||0)+'</b> M:<b style="color:#fff"> '+(sp.M||0)+'</b> L:<b style="color:#fff"> '+(sp.L||0)+'</b> XL:<b style="color:#fff"> '+(sp.XL||0)+'</b> | Total: <b style="color:var(--gold)"> '+(sp.total||0)+'</b></span>';}
-  else{h.innerHTML='';}
+  if(!name){h.innerHTML='';return;}
+  var sp=STOCK_PRODS[k]||null;
+  // On Hand
+  var onH={S:sp?sp.S||0:0,M:sp?sp.M||0:0,L:sp?sp.L||0:0,XL:sp?sp.XL||0:0};
+  // Current Order (live from inputs)
+  var curS=parseInt(document.getElementById('po-s').value)||0;
+  var curM=parseInt(document.getElementById('po-m').value)||0;
+  var curL=parseInt(document.getElementById('po-l').value)||0;
+  var curXL=parseInt(document.getElementById('po-xl').value)||0;
+  var cur={S:curS,M:curM,L:curL,XL:curXL};
+  // Total Stock
+  var tot={S:onH.S+curS,M:onH.M+curM,L:onH.L+curL,XL:onH.XL+curXL};
+  // Open Orders from sales data (status='open')
+  var openOrd={S:0,M:0,L:0,XL:0};
+  if(DETAIL&&DETAIL.length){
+    DETAIL.forEach(function(r){
+      if(r[1]&&r[1].toLowerCase().trim()===k&&r[4]==='open'){
+        var sz=(r[3]||'').trim().toUpperCase();
+        if(sz==='S'||sz==='M'||sz==='L'||sz==='XL')openOrd[sz]++;
+      }
+    });
+  }
+  // Net Available
+  var net={S:tot.S-openOrd.S,M:tot.M-openOrd.M,L:tot.L-openOrd.L,XL:tot.XL-openOrd.XL};
+  // Sell Ahead from stock file
+  var sa={S:sp?sp.saS||0:0,M:sp?sp.saM||0:0,L:sp?sp.saL||0:0,XL:sp?sp.saXL||0:0};
+  // Sales Ratio from delivered orders
+  var saleSz={S:0,M:0,L:0,XL:0};var saleTot=0;
+  if(DETAIL&&DETAIL.length){
+    DETAIL.forEach(function(r){
+      if(r[1]&&r[1].toLowerCase().trim()===k&&r[4]==='delivered'){
+        var sz=(r[3]||'').trim().toUpperCase();
+        if(sz==='S'||sz==='M'||sz==='L'||sz==='XL'){saleSz[sz]++;saleTot++;}
+      }
+    });
+  }
+  var sR={S:saleTot?Math.round(saleSz.S/saleTot*100):0,M:saleTot?Math.round(saleSz.M/saleTot*100):0,
+          L:saleTot?Math.round(saleSz.L/saleTot*100):0,XL:saleTot?Math.round(saleSz.XL/saleTot*100):0};
+
+  var cs='padding:5px 8px;text-align:right;font-size:11px;';
+  var lcs='padding:5px 8px;font-size:11px;';
+  function sumOf(d){return (d.S||0)+(d.M||0)+(d.L||0)+(d.XL||0);}
+  function mkRow(label,d,labelColor,valColor,bold,borderTop){
+    var s=borderTop?'border-top:'+borderTop+';':'';
+    var lStyle=lcs+'color:'+(labelColor||'#aaa')+';'+(bold?'font-weight:700;':'');
+    var vStyle=cs+'color:'+(valColor||'#fff')+';'+(bold?'font-weight:700;':'');
+    return '<tr style="'+s+'">'
+     +'<td style="'+lStyle+'">'+label+'</td>'
+     +'<td style="'+vStyle+'">'+d.S+'</td>'
+     +'<td style="'+vStyle+'">'+d.M+'</td>'
+     +'<td style="'+vStyle+'">'+d.L+'</td>'
+     +'<td style="'+vStyle+'">'+d.XL+'</td>'
+     +'<td style="'+vStyle+';color:var(--gold)">'+sumOf(d)+'</td>'
+     +'</tr>';
+  }
+  function netColor(v){return v<0?'#c0392b':v<5?'#d4944a':'#27ae60';}
+  var netTot=sumOf(net);
+
+  var html='<div style="background:#252525;border:1px solid #383838;border-radius:8px;overflow:hidden;margin:8px 0 12px;font-size:11px">'
+   +'<table style="border-collapse:collapse;width:100%">'
+   +'<thead><tr style="background:#1a1a1a">'
+   +'<th style="'+lcs+'font-size:9px;color:#555;font-weight:600;letter-spacing:.06em">STOCK POSITION</th>'
+   +'<th style="'+cs+'font-size:9px;color:#666">S</th>'
+   +'<th style="'+cs+'font-size:9px;color:#666">M</th>'
+   +'<th style="'+cs+'font-size:9px;color:#666">L</th>'
+   +'<th style="'+cs+'font-size:9px;color:#666">XL</th>'
+   +'<th style="'+cs+'font-size:9px;color:#666">Total</th>'
+   +'</tr></thead><tbody>'
+   +mkRow('On Hand (Laam)',onH,'#aaa','#ccc',false,'')
+   +mkRow('+ Current Order',cur,'var(--gold)','var(--gold)',false,'1px solid #2e2e2e')
+   +mkRow('= Total Stock',tot,'#fff','#fff',true,'2px solid #333')
+   +'<tr style="border-top:1px solid #2e2e2e">'
+   +'<td style="'+lcs+'color:#c0392b">Less: Open Orders</td>'
+   +'<td style="'+cs+'color:#c0392b">'+openOrd.S+'</td>'
+   +'<td style="'+cs+'color:#c0392b">'+openOrd.M+'</td>'
+   +'<td style="'+cs+'color:#c0392b">'+openOrd.L+'</td>'
+   +'<td style="'+cs+'color:#c0392b">'+openOrd.XL+'</td>'
+   +'<td style="'+cs+'color:#c0392b;font-weight:700">'+sumOf(openOrd)+'</td>'
+   +'</tr>'
+   +'<tr style="background:#1e2e1e;border-top:2px solid #3a4a3a">'
+   +'<td style="'+lcs+'color:#27ae60;font-weight:700">Net Available Stock</td>'
+   +'<td style="'+cs+'font-weight:700;color:'+netColor(net.S)+'">'+net.S+'</td>'
+   +'<td style="'+cs+'font-weight:700;color:'+netColor(net.M)+'">'+net.M+'</td>'
+   +'<td style="'+cs+'font-weight:700;color:'+netColor(net.L)+'">'+net.L+'</td>'
+   +'<td style="'+cs+'font-weight:700;color:'+netColor(net.XL)+'">'+net.XL+'</td>'
+   +'<td style="'+cs+'font-weight:700;color:'+(netTot<0?'#c0392b':netTot<10?'#d4944a':'#27ae60')+'">'+netTot+'</td>'
+   +'</tr>'
+   // Divider
+   +'<tr style="background:#1a1a1a"><td colspan="6" style="padding:2px 8px;font-size:9px;color:#444;letter-spacing:.06em">SELL AHEAD &amp; SALES</td></tr>'
+   // Sell Ahead
+   +'<tr style="border-top:1px solid #2e2e2e">'
+   +'<td style="'+lcs+'color:#8e44ad">Sell Ahead</td>'
+   +'<td style="'+cs+'color:#8e44ad">'+(sa.S||0)+'</td>'
+   +'<td style="'+cs+'color:#8e44ad">'+(sa.M||0)+'</td>'
+   +'<td style="'+cs+'color:#8e44ad">'+(sa.L||0)+'</td>'
+   +'<td style="'+cs+'color:#8e44ad">'+(sa.XL||0)+'</td>'
+   +'<td style="'+cs+'color:#8e44ad;font-weight:700">'+sumOf(sa)+'</td>'
+   +'</tr>'
+   // Sales Ratio
+   +(saleTot>0
+     ?'<tr style="border-top:1px solid #2e2e2e;background:#1a1a1a">'
+      +'<td style="'+lcs+'color:#2980b9">Sales Ratio</td>'
+      +'<td style="'+cs+'color:#2980b9">'+sR.S+'%</td>'
+      +'<td style="'+cs+'color:#2980b9">'+sR.M+'%</td>'
+      +'<td style="'+cs+'color:#2980b9">'+sR.L+'%</td>'
+      +'<td style="'+cs+'color:#2980b9">'+sR.XL+'%</td>'
+      +'<td style="'+cs+'color:#555;font-size:10px">'+saleTot+' del</td>'
+      +'</tr>'
+     :'')
+   +'</tbody></table></div>';
+  h.innerHTML=html;
 }
 
 function closePO(){document.getElementById('po-modal').style.display='none';}
@@ -3119,19 +3231,19 @@ function toggleSB(){
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px">
       <div style="text-align:center">
         <div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">S</div>
-        <input id="po-s" type="number" min="0" placeholder="0" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
+        <input id="po-s" type="number" min="0" placeholder="0" oninput="poSizeHintUpdate()" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
       </div>
       <div style="text-align:center">
         <div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">M</div>
-        <input id="po-m" type="number" min="0" placeholder="0" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
+        <input id="po-m" type="number" min="0" placeholder="0" oninput="poSizeHintUpdate()" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
       </div>
       <div style="text-align:center">
         <div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">L</div>
-        <input id="po-l" type="number" min="0" placeholder="0" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
+        <input id="po-l" type="number" min="0" placeholder="0" oninput="poSizeHintUpdate()" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
       </div>
       <div style="text-align:center">
         <div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">XL</div>
-        <input id="po-xl" type="number" min="0" placeholder="0" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
+        <input id="po-xl" type="number" min="0" placeholder="0" oninput="poSizeHintUpdate()" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
       </div>
     </div>
     <label style="display:block;font-size:11px;color:#aaa;margin-bottom:5px;font-weight:600;letter-spacing:.04em">TARGET COMPLETION DATE</label>
