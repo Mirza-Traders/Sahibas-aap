@@ -557,7 +557,7 @@ function parseSales(txt,cm){
     var sz=row['Variant']||'';
     var sku=row['SKU']||'';
     var dp=parseInt(row['Days Pending']||0)||0;
-    var onum=String(row['Order ID']||row['Item Id']||'');
+    var onum=String(row['Order Number']||row['Order ID']||row['Item Id']||'');
     var conum=String(row['Channel Order Number']||row['channel_order_number']||'');
     var pay=(row['Payment Status']||'').toUpperCase();
     var dt=parseD(row['Creation Date']);
@@ -1564,10 +1564,10 @@ function applyDrFilters(){
 }
 
 function updDrSubtotals(){
-  var sRet=0,sCost=0,sComm=0,sTax=0,sGp=0,sPat=0;
-  _drFiltered.forEach(function(r){sRet+=r[9];sCost+=r[10];sComm+=r[12];sTax+=r[13];sGp+=r[14];sPat+=r[15];});
+  var sRet=0,sCost=0,sComm=0,sTax=0,sGp=0,sPat=0,sExc=0;
+  _drFiltered.forEach(function(r){sRet+=r[9];sCost+=r[10];sComm+=r[12];sTax+=r[13];sGp+=r[14];sPat+=r[15];sExc+=r[17];});
   var u=function(id,v){var el=document.getElementById(id);if(el)el.textContent=NF(v);};
-  u('dr-st-ret',sRet);u('dr-st-cost',sCost);u('dr-st-comm',sComm);u('dr-st-tax',sTax);u('dr-st-gp',sGp);u('dr-st-pat',sPat);
+  u('dr-st-ret',sRet);u('dr-st-cost',sCost);u('dr-st-comm',sComm);u('dr-st-tax',sTax);u('dr-st-gp',sGp);u('dr-st-pat',sPat);u('dr-st-exc',sExc);
 }
 
 function drSortRows(){
@@ -1600,8 +1600,8 @@ function renderDrVirtual(){
     var pc=r[7]==='PAID'?'color:#27ae60;font-weight:600':r[7]==='PENDING'?'color:#d4944a;font-weight:600':r[7]==='PARTIALLY_PAID'?'color:#e67e22;font-weight:600':'color:#888';
     h+='<tr style="height:'+_drRH+'px;background:'+bg+';'+lb+';cursor:pointer" onclick="drToggle('+i+')">';
     h+=drCell(DR_W.chk,'text-align:center','<input type="checkbox" '+(sel?'checked':'')+' onclick="event.stopPropagation();drToggle('+i+')" style="cursor:pointer;accent-color:var(--gold)">');
-    h+=drCell(DR_W.conum,'font-family:monospace;font-size:9px;color:#888',r[23]||'-');
-    h+=drCell(DR_W.onum,'font-family:monospace;font-size:9px;color:#bbb',r[18]);
+    h+=drCell(DR_W.conum,'font-family:monospace;font-size:11px;color:#444',r[23]||'-');
+    h+=drCell(DR_W.onum,'font-family:monospace;font-size:11px;color:#444',r[18]);
     h+=drCell(DR_W.date,'color:#555;font-weight:500',fmtD(r[0]));
     h+=drCell(DR_W.prd,'font-weight:700',r[1]);
     h+=drCell(DR_W.sz,'text-align:center;font-weight:600',r[3]);
@@ -1689,8 +1689,8 @@ function rDR(){
   // Subtotals
   function stc(w,id,val,clr){return '<td id="'+id+'" style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:5px 6px;text-align:right;background:#f0ede8;font-weight:800;font-size:11px;border-bottom:2px solid var(--gold);color:'+(clr||'#1a1a1a')+'">'+NF(val)+'</td>';}
   function ste(w){return '<td style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:5px 6px;background:#f0ede8;border-bottom:2px solid var(--gold)"></td>';}
-  var sRet=0,sCost=0,sComm=0,sTax=0,sGp=0,sPat=0;
-  _drFiltered.forEach(function(r){sRet+=r[9];sCost+=r[10];sComm+=r[12];sTax+=r[13];sGp+=r[14];sPat+=r[15];});
+  var sRet=0,sCost=0,sComm=0,sTax=0,sGp=0,sPat=0,sExc=0;
+  _drFiltered.forEach(function(r){sRet+=r[9];sCost+=r[10];sComm+=r[12];sTax+=r[13];sGp+=r[14];sPat+=r[15];sExc+=r[17];});
 
   var hdr='<table style="table-layout:fixed;width:'+T+'px;border-collapse:collapse;background:#f8f6f2"><thead>'
     +'<tr>'
@@ -1711,7 +1711,7 @@ function rDR(){
     +'<td style="width:'+W.date+'px;min-width:'+W.date+'px;max-width:'+W.date+'px;padding:5px 6px;background:#f0ede8;border-bottom:2px solid var(--gold);font-size:9px;color:var(--gold2);font-weight:800">SUBTOTAL</td>'
     +ste(W.prd)+ste(W.sz)+ste(W.stat)+ste(W.pf)+ste(W.dst)+ste(W.pay)+ste(W.days)
     +stc(W.ret,'dr-st-ret',sRet,'#1a1a1a')+stc(W.cost,'dr-st-cost',sCost,'#c0392b')+ste(W.cpct)+stc(W.comm,'dr-st-comm',sComm,'#d4944a')+ste(W.taxpct)+stc(W.tax,'dr-st-tax',sTax,'#888')+stc(W.gp,'dr-st-gp',sGp,'#27ae60')+stc(W.pat,'dr-st-pat',sPat,'#c8a96e')
-    +ste(W.exc)
+    +stc(W.exc,'dr-st-exc',sExc,'#e74c3c')
     +'</tr>'
     +'<tr style="background:#fafafa">'
     +fempty(W.chk)
