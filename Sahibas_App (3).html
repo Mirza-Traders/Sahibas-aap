@@ -2817,7 +2817,7 @@ function rPO(){
    +'<th style="'+TH+'" rowspan="3">Fabric</th>'
    +'<th style="'+TH+'" rowspan="3">Image</th>'
    +'<th style="'+TH+'" rowspan="3">Fabric<br>Swatch</th>'
-   +'<th style="'+TH+'background:#fdf8f0" rowspan="3">Ordered<br>Qty</th>'
+   +'<th style="'+TH+'background:#fdf8f0" rowspan="3">Ordered<br>Qty<br><span style="font-size:13px;color:var(--gold2)">'+tQ+'</span></th>'
    +'<th style="'+TH+'background:#fff8e0;color:#a07030;border-bottom:none" colspan="4">Size Ratio</th>'
    +'<th style="'+TH+'background:#eef3fb;color:#2471a3;border-bottom:none" colspan="5">Production Phases</th>'
    +'<th style="'+TH+'" rowspan="3">ETA</th>'
@@ -2833,17 +2833,13 @@ function rPO(){
    +'<th style="'+TH+'background:#eef3fb;font-size:10px">🧵 Stitch</th>'
    +'<th style="'+TH+'background:#eef3fb;font-size:10px">✨ Finish</th>'
    +'</tr>'
-   // Totals row (sticky)
+   // Totals row — only fills the 9 non-rowspan columns: S, M, L, XL, 5 phases
    +'<tr style="background:#fdf8f0;border-top:2px solid #c8a96e">'
-   +'<td style="'+TDL+'font-size:10px;color:#888;font-weight:700" colspan="3">SUBTOTAL — '+active.length+' orders</td>'
-   +'<td style="'+TD+'"></td><td style="'+TD+'"></td><td style="'+TD+'"></td>'
-   +'<td style="'+TD+'font-weight:700;color:var(--gold2)">'+tQ+'</td>'
-   +'<td style="'+TD+'background:#fff8e0;font-weight:700">'+tS+'</td>'
-   +'<td style="'+TD+'background:#fff8e0;font-weight:700">'+tM+'</td>'
-   +'<td style="'+TD+'background:#fff8e0;font-weight:700">'+tL+'</td>'
-   +'<td style="'+TD+'background:#fff8e0;font-weight:700">'+tXL+'</td>'
+   +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tS+'</td>'
+   +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tM+'</td>'
+   +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tL+'</td>'
+   +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tXL+'</td>'
    +'<td style="'+TD+'background:#eef3fb" colspan="5"></td>'
-   +'<td style="'+TD+'"></td><td style="'+TD+'"></td>'
    +'</tr>'
    +'</thead><tbody>';
   if(active.length===0){
