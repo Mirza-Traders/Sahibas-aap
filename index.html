@@ -2364,8 +2364,10 @@ function poProdHint(name){
       }
     });
   }
-  var sR={S:saleTot?Math.round(saleSz.S/saleTot*100):0,M:saleTot?Math.round(saleSz.M/saleTot*100):0,
-          L:saleTot?Math.round(saleSz.L/saleTot*100):0,XL:saleTot?Math.round(saleSz.XL/saleTot*100):0};
+  // Normalize to ratio where smallest size = 1 (rounded to nearest 0.5)
+  var sMin=saleTot>0?Math.min(saleSz.S||99999,saleSz.M||99999,saleSz.L||99999,saleSz.XL||99999):0;
+  var sR=sMin>0?{S:Math.round(saleSz.S/sMin*2)/2,M:Math.round(saleSz.M/sMin*2)/2,
+                 L:Math.round(saleSz.L/sMin*2)/2,XL:Math.round(saleSz.XL/sMin*2)/2}:{S:0,M:0,L:0,XL:0};
 
   var cs='padding:5px 8px;text-align:right;font-size:11px;';
   var lcs='padding:5px 8px;font-size:11px;';
@@ -2429,11 +2431,11 @@ function poProdHint(name){
    // Sales Ratio
    +(saleTot>0
      ?'<tr style="border-top:1px solid #2e2e2e;background:#1a1a1a">'
-      +'<td style="'+lcs+'color:#2980b9">Sales Ratio</td>'
-      +'<td style="'+cs+'color:#2980b9">'+sR.S+'%</td>'
-      +'<td style="'+cs+'color:#2980b9">'+sR.M+'%</td>'
-      +'<td style="'+cs+'color:#2980b9">'+sR.L+'%</td>'
-      +'<td style="'+cs+'color:#2980b9">'+sR.XL+'%</td>'
+      +'<td style="'+lcs+'color:#2980b9;font-size:10px">Sales Ratio<br><span style="font-size:9px;color:#555">'+sR.S+':'+sR.M+':'+sR.L+':'+sR.XL+'</span></td>'
+      +'<td style="'+cs+'color:#2980b9;font-weight:700">'+sR.S+'</td>'
+      +'<td style="'+cs+'color:#2980b9;font-weight:700">'+sR.M+'</td>'
+      +'<td style="'+cs+'color:#2980b9;font-weight:700">'+sR.L+'</td>'
+      +'<td style="'+cs+'color:#2980b9;font-weight:700">'+sR.XL+'</td>'
       +'<td style="'+cs+'color:#555;font-size:10px">'+saleTot+' del</td>'
       +'</tr>'
      :'')
@@ -2538,10 +2540,26 @@ function printPO(oid){
   var orders=loadPO();
   var o=orders.find(function(x){return x.id===oid;});
   if(!o){showToast('Order not found.');return;}
+  showToast('Preparing print…');
+  var imgUrl=o.img&&o.img.startsWith('http')?o.img:'';
+  if(imgUrl){
+    fetch(imgUrl)
+      .then(function(r){return r.blob();})
+      .then(function(blob){
+        var rd=new FileReader();
+        rd.onload=function(e){doPrintPO(o,e.target.result);};
+        rd.onerror=function(){doPrintPO(o,imgUrl);};
+        rd.readAsDataURL(blob);
+      })
+      .catch(function(){doPrintPO(o,imgUrl);});
+  } else {
+    doPrintPO(o,'');
+  }
+}
+function doPrintPO(o,imgSrc){
   var realTotal=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
   var hasSizes=(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0)>0;
   var urgColor=o.urgency==='URGENT'?'#c0392b':o.urgency==='SAMPLE'?'#8e44ad':'#333';
-  var imgUrl=o.img&&o.img.startsWith('http')?o.img:'';
   var html='<div style="font-family:Arial,sans-serif;padding:32px;max-width:760px;margin:0 auto;color:#1a1a1a">'
    // Header
    +'<div style="display:flex;align-items:flex-end;justify-content:space-between;border-bottom:3px solid #c8a96e;padding-bottom:14px;margin-bottom:24px">'
@@ -2552,8 +2570,8 @@ function printPO(oid){
    +'</div>'
    // Product info row
    +'<div style="display:flex;gap:20px;margin-bottom:24px;align-items:flex-start">'
-   // Product image - larger
-   +(imgUrl?'<img src="'+imgUrl+'" style="width:160px;height:160px;object-fit:cover;border-radius:10px;border:1px solid #e0dcd4;flex-shrink:0">':'')
+   // Product image - 320px
+   +(imgSrc?'<img src="'+imgSrc+'" style="width:320px;height:320px;object-fit:cover;border-radius:10px;border:1px solid #e0dcd4;flex-shrink:0">':'')
    // Details
    +'<div style="flex:1">'
    +'<div style="font-size:24px;font-weight:700;margin-bottom:10px;color:#1a1a1a">'+o.product+'</div>'
@@ -2605,8 +2623,7 @@ function printPO(oid){
    +'</div>';
   var pf=document.getElementById('po-print-frame');
   pf.innerHTML=html;
-  // Small delay to let images load before printing
-  setTimeout(function(){window.print();},300);
+  setTimeout(function(){window.print();},100);
 }
 
 function rPO(){
