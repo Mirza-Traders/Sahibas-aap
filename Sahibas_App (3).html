@@ -2243,8 +2243,29 @@ function saveRole(idx,role){
 }
 
 // ── PRODUCTION ORDERS ──
-function loadPO(){try{return JSON.parse(localStorage.getItem('sbm_prod_orders')||'[]');}catch(e){return[];}}
-function savePO(arr){try{localStorage.setItem('sbm_prod_orders',JSON.stringify(arr));}catch(e){}}
+// In-memory cache — avoids repeated JSON.parse of large base64 image data on every render
+function loadPO(){
+  if(window._poData)return window._poData;
+  try{window._poData=JSON.parse(localStorage.getItem('sbm_prod_orders')||'[]');}catch(e){window._poData=[];}
+  return window._poData;
+}
+function savePO(arr){
+  window._poData=arr; // update cache first so next loadPO() is instant
+  try{localStorage.setItem('sbm_prod_orders',JSON.stringify(arr));}catch(e){showToast('Storage full — please delete old orders or reduce image sizes.');}
+}
+// Compress image to JPEG before storing (prevents localStorage bloat & page freezes)
+function compressImg(dataUrl,maxPx,quality,cb){
+  var img=new Image();
+  img.onload=function(){
+    var w=img.width,h=img.height;
+    if(w>maxPx||h>maxPx){var s=Math.min(maxPx/w,maxPx/h);w=Math.round(w*s);h=Math.round(h*s);}
+    var c=document.createElement('canvas');c.width=w;c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    cb(c.toDataURL('image/jpeg',quality));
+  };
+  img.onerror=function(){cb(dataUrl);};
+  img.src=dataUrl;
+}
 
 var _poSizeChart='';var _poSizeChartName='';
 function poSetRatio(s,m,l,xl){
@@ -2284,9 +2305,11 @@ function poLoadSizeChart(input){
   _poSizeChartName=file.name;
   var reader=new FileReader();
   reader.onload=function(e){
-    _poSizeChart=e.target.result;
-    document.getElementById('po-sc-info').innerHTML='<span style="color:var(--gold)">✓ '+file.name+'</span><span style="font-size:9px;color:#666"> ('+Math.round(file.size/1024)+'KB)</span>';
-    document.getElementById('po-sc-area').style.borderColor='var(--gold)';
+    compressImg(e.target.result,900,0.82,function(compressed){
+      _poSizeChart=compressed;
+      document.getElementById('po-sc-info').innerHTML='<span style="color:var(--gold)">✓ '+file.name+'</span>';
+      document.getElementById('po-sc-area').style.borderColor='var(--gold)';
+    });
   };
   reader.readAsDataURL(file);
 }
@@ -2526,15 +2549,16 @@ function rejectPO(oid){
 function uploadFabricShade(oid,input){
   var file=input.files[0];
   if(!file)return;
-  if(file.size>3*1024*1024){showToast('Image too large — please use a photo under 3MB.');return;}
   var reader=new FileReader();
   reader.onload=function(e){
-    var orders=loadPO();
-    var o=orders.find(function(x){return x.id===oid;});
-    if(!o)return;
-    o.fabricShade=e.target.result;
-    savePO(orders);rendered.po=false;doR('po');
-    showToast('✓ Fabric shade uploaded for '+oid);
+    compressImg(e.target.result,600,0.78,function(compressed){
+      var orders=loadPO();
+      var o=orders.find(function(x){return x.id===oid;});
+      if(!o)return;
+      o.fabricShade=compressed;
+      savePO(orders);rendered.po=false;doR('po');
+      showToast('✓ Fabric shade uploaded for '+oid);
+    });
   };
   reader.readAsDataURL(file);
 }
@@ -2672,7 +2696,13 @@ function togglePoFlt(field,val){
 }
 function setPoFlt(field,val){
   if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};
-  window._poFlt[field]=val;rendered.po=false;doR('po');
+  window._poFlt[field]=val;
+  if(field==='ono'){
+    clearTimeout(window._poSearchTimer);
+    window._poSearchTimer=setTimeout(function(){rendered.po=false;doR('po');},300);
+    return;
+  }
+  rendered.po=false;doR('po');
 }
 function clearPoFlt(){window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};rendered.po=false;doR('po');}
 function clearPoFltField(field){if(window._poFlt)window._poFlt[field]=[];rendered.po=false;doR('po');}
