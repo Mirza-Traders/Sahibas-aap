@@ -2419,7 +2419,7 @@ function rPO(){
   var cancelled=orders.filter(function(o){return o.status==='Cancelled';});
   var inProg=active.filter(function(o){return o.status==='In Progress';}).length;
   var comp=active.filter(function(o){return o.status==='Completed';}).length;
-  var totQty=active.reduce(function(a,o){return a+o.total;},0);
+  var totQty=active.reduce(function(a,o){return a+(o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0));},0);
   var canPlace=CU&&(CU.role==='Owner'||CU.role==='Editor');
   var PHASES=[['cutting','✂️ Cutting'],['print','🖨️ Print'],['embroidery','🌸 Embroidery'],['stitching','🧵 Stitching'],['finishing','✨ Finishing']];
 
@@ -2468,7 +2468,7 @@ function rPO(){
        +'<span>M: <b style="color:#1a1a1a">'+(o.M||'-')+'</b></span>'
        +'<span>L: <b style="color:#1a1a1a">'+(o.L||'-')+'</b></span>'
        +'<span>XL: <b style="color:#1a1a1a">'+(o.XL||'-')+'</b></span>'
-       +'<span style="color:var(--gold2);font-weight:700">Total: '+o.total+'</span>'
+       +'<span style="color:var(--gold2);font-weight:700">Total: '+(o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0))+'</span>'
        +(o.targetDate?'<span style="margin-left:auto;color:#2980b9">🎯 Due: '+fmtD(o.targetDate)+'</span>':'')
        +'</div>'
        +(o.notes?'<div style="font-size:11px;color:#999;font-style:italic;margin-bottom:4px">📝 '+o.notes+'</div>':'')
