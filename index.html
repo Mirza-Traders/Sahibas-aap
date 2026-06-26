@@ -1544,6 +1544,7 @@ var DR_TOT=Object.values(DR_W).reduce(function(a,b){return a+b;},0);
 
 // Date format helper: YYYY-MM-DD → DD-MM-YYYY
 function fmtD(d){if(!d||d==='-')return'';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0].substring(2):d;}
+function fmtDMY(d){if(!d||d==='-')return'';var p=d.split('-');return p.length===3?p[2]+'-'+p[1]+'-'+p[0]:d;}
 
 function drCell(w,style,content){return '<td style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:4px 6px;border-bottom:1px solid #f2efe9;overflow:hidden;white-space:nowrap;'+style+'">'+content+'</td>';}
 
@@ -2296,6 +2297,7 @@ function openNewPO(name){
   DETAIL.forEach(function(r){if(!seen[r[1]]){seen[r[1]]=1;var o=document.createElement('option');o.value=r[1];dl.appendChild(o);}});
   document.getElementById('po-prod').value=name||'';
   document.getElementById('po-fabric').value='';
+  document.getElementById('po-customer').value='';
   document.getElementById('po-qty').value='';
   document.getElementById('po-rs').value='0';document.getElementById('po-rm').value='0';
   document.getElementById('po-rl').value='0';document.getElementById('po-rxl').value='0';
@@ -2394,9 +2396,9 @@ function poProdHint(name){
    +'<th style="'+cs+'font-size:10px;color:#aaa;font-weight:700">XL</th>'
    +'<th style="'+cs+'font-size:10px;color:#aaa;font-weight:700">Total</th>'
    +'</tr></thead><tbody>'
-   +mkRow('On Hand (Laam)',onH,'#ccc','#fff',false,'')
+   +'<tr style="background:#f0ece4"><td style="'+lcs+'color:#333;font-weight:600">On Hand (Laam)</td><td style="'+cs+'color:#1a1a1a;font-weight:600">'+onH.S+'</td><td style="'+cs+'color:#1a1a1a;font-weight:600">'+onH.M+'</td><td style="'+cs+'color:#1a1a1a;font-weight:600">'+onH.L+'</td><td style="'+cs+'color:#1a1a1a;font-weight:600">'+onH.XL+'</td><td style="'+cs+'color:#555;font-weight:700">'+sumOf(onH)+'</td></tr>'
    +mkRow('+ Current Order',cur,'var(--gold)','var(--gold)',false,'1px solid #2e2e2e')
-   +mkRow('= Total Stock',tot,'#fff','#fff',true,'2px solid #333')
+   +'<tr style="background:#fff;border-top:2px solid #555"><td style="'+lcs+'color:#1a1a1a;font-weight:700">= Total Stock</td><td style="'+cs+'color:#1a1a1a;font-weight:700">'+tot.S+'</td><td style="'+cs+'color:#1a1a1a;font-weight:700">'+tot.M+'</td><td style="'+cs+'color:#1a1a1a;font-weight:700">'+tot.L+'</td><td style="'+cs+'color:#1a1a1a;font-weight:700">'+tot.XL+'</td><td style="'+cs+'color:var(--gold2);font-weight:700">'+sumOf(tot)+'</td></tr>'
    +'<tr style="border-top:1px solid #2e2e2e">'
    +'<td style="'+lcs+'color:#c0392b">Less: Open Orders</td>'
    +'<td style="'+cs+'color:#c0392b">'+openOrd.S+'</td>'
@@ -2444,13 +2446,15 @@ function closePO(){document.getElementById('po-modal').style.display='none';}
 function submitPO(){
   var prod=document.getElementById('po-prod').value.trim();
   var fabric=document.getElementById('po-fabric').value.trim();
+  var customer=document.getElementById('po-customer').value.trim();
   var urgency=document.getElementById('po-urgency').value;
   var notes=document.getElementById('po-notes').value.trim();
   var s=parseInt(document.getElementById('po-s').value)||0;
   var m=parseInt(document.getElementById('po-m').value)||0;
   var l=parseInt(document.getElementById('po-l').value)||0;
   var xl=parseInt(document.getElementById('po-xl').value)||0;
-  var tot=s+m+l+xl;
+  var ordQty=parseInt(document.getElementById('po-qty').value)||0;
+  var tot=s+m+l+xl||ordQty;
   if(!prod){showToast('Enter a product name.');return;}
   if(!fabric){showToast('Fabric / Material Name is required ✱');return;}
   if(!_poSizeChart){showToast('Please attach the Size Chart ✱');return;}
@@ -2461,7 +2465,7 @@ function submitPO(){
   var img=findImg(prod.toLowerCase().trim());
   orders.unshift({id:id,date:today,product:prod,img:img,
     S:s,M:m,L:l,XL:xl,total:tot,
-    fabric:fabric,sizeChart:_poSizeChart,sizeChartName:_poSizeChartName,
+    fabric:fabric,customer:customer,sizeChart:_poSizeChart,sizeChartName:_poSizeChartName,
     urgency:urgency,notes:notes,
     targetDate:document.getElementById('po-target').value||'',
     placedBy:CU?CU.name:'',placedByEmail:CU?CU.email:'',
@@ -2535,52 +2539,74 @@ function printPO(oid){
   var o=orders.find(function(x){return x.id===oid;});
   if(!o){showToast('Order not found.');return;}
   var realTotal=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
-  var urgColor=o.urgency==='URGENT'?'#c0392b':o.urgency==='SAMPLE'?'#8e44ad':'#555';
-  var html='<div style="font-family:Arial,sans-serif;padding:32px;max-width:720px;margin:0 auto;color:#1a1a1a">'
-   +'<div style="display:flex;align-items:flex-end;justify-content:space-between;border-bottom:3px solid #c8a96e;padding-bottom:14px;margin-bottom:22px">'
-   +'<div><div style="font-size:22px;font-weight:700;letter-spacing:.1em">SAHIBAS BY MIRZA</div>'
-   +'<div style="font-size:11px;color:#888;letter-spacing:.08em;margin-top:2px">PRODUCTION ORDER</div></div>'
-   +'<div style="text-align:right"><div style="font-size:26px;font-weight:700;color:#c8a96e">'+o.id+'</div>'
-   +'<div style="font-size:10px;color:#888">Date: '+o.date+'</div></div>'
+  var hasSizes=(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0)>0;
+  var urgColor=o.urgency==='URGENT'?'#c0392b':o.urgency==='SAMPLE'?'#8e44ad':'#333';
+  var imgUrl=o.img&&o.img.startsWith('http')?o.img:'';
+  var html='<div style="font-family:Arial,sans-serif;padding:32px;max-width:760px;margin:0 auto;color:#1a1a1a">'
+   // Header
+   +'<div style="display:flex;align-items:flex-end;justify-content:space-between;border-bottom:3px solid #c8a96e;padding-bottom:14px;margin-bottom:24px">'
+   +'<div><div style="font-size:24px;font-weight:700;letter-spacing:.12em">SAHIBAS BY MIRZA</div>'
+   +'<div style="font-size:11px;color:#888;letter-spacing:.1em;margin-top:3px">PRODUCTION ORDER</div></div>'
+   +'<div style="text-align:right"><div style="font-size:28px;font-weight:700;color:#c8a96e">'+o.id+'</div>'
+   +'<div style="font-size:11px;color:#555;margin-top:2px">Date: <b>'+fmtDMY(o.date)+'</b></div></div>'
    +'</div>'
-   +'<div style="display:flex;gap:20px;margin-bottom:22px;align-items:flex-start">'
-   +(o.img&&o.img.startsWith('http')?'<img src="'+o.img+'?width=200" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #e0dcd4" onerror="this.style.display=\'none\'">':'')
+   // Product info row
+   +'<div style="display:flex;gap:20px;margin-bottom:24px;align-items:flex-start">'
+   // Product image - larger
+   +(imgUrl?'<img src="'+imgUrl+'" style="width:160px;height:160px;object-fit:cover;border-radius:10px;border:1px solid #e0dcd4;flex-shrink:0">':'')
+   // Details
    +'<div style="flex:1">'
-   +'<div style="font-size:22px;font-weight:700;margin-bottom:6px">'+o.product+'</div>'
-   +'<table style="font-size:12px;border-collapse:collapse">'
-   +(o.fabric?'<tr><td style="color:#888;padding-right:14px;padding-bottom:4px">Fabric:</td><td style="font-weight:600">'+o.fabric+'</td></tr>':'')
-   +(o.urgency?'<tr><td style="color:#888;padding-right:14px;padding-bottom:4px">Requirement:</td><td style="font-weight:700;color:'+urgColor+'">'+o.urgency+'</td></tr>':'')
-   +(o.targetDate?'<tr><td style="color:#888;padding-right:14px;padding-bottom:4px">Target Date:</td><td style="font-weight:600">'+o.targetDate+'</td></tr>':'')
+   +'<div style="font-size:24px;font-weight:700;margin-bottom:10px;color:#1a1a1a">'+o.product+'</div>'
+   +'<table style="font-size:12px;border-collapse:collapse;width:100%">'
+   +(o.customer?'<tr><td style="color:#888;padding-right:14px;padding-bottom:6px;white-space:nowrap">Customer:</td><td style="font-weight:700;font-size:13px">'+o.customer+'</td></tr>':'')
+   +(o.fabric?'<tr><td style="color:#888;padding-right:14px;padding-bottom:6px;white-space:nowrap">Fabric:</td><td style="font-weight:600">'+o.fabric+'</td></tr>':'')
+   +(o.urgency?'<tr><td style="color:#888;padding-right:14px;padding-bottom:6px;white-space:nowrap">Requirement:</td><td style="font-weight:700;color:'+urgColor+'">'+o.urgency+'</td></tr>':'')
    +'</table></div>'
-   +(o.sizeChart?'<div><div style="font-size:9px;color:#aaa;margin-bottom:4px;letter-spacing:.06em">SIZE CHART</div><img src="'+o.sizeChart+'" style="max-width:130px;max-height:130px;object-fit:contain;border:1px solid #e0dcd4;border-radius:4px"></div>':'')
+   // Size chart - larger
+   +(o.sizeChart?'<div style="flex-shrink:0"><div style="font-size:9px;color:#888;font-weight:600;letter-spacing:.08em;margin-bottom:6px;text-align:center">SIZE CHART</div><img src="'+o.sizeChart+'" style="width:180px;height:180px;object-fit:contain;border:1px solid #e0dcd4;border-radius:6px;display:block"></div>':'')
    +'</div>'
-   +'<table style="width:100%;border-collapse:collapse;margin-bottom:20px">'
-   +'<thead><tr style="background:#f8f6f2">'
-   +'<th style="padding:10px;border:1px solid #e0dcd4;font-size:13px;text-align:center">S</th>'
-   +'<th style="padding:10px;border:1px solid #e0dcd4;font-size:13px;text-align:center">M</th>'
-   +'<th style="padding:10px;border:1px solid #e0dcd4;font-size:13px;text-align:center">L</th>'
-   +'<th style="padding:10px;border:1px solid #e0dcd4;font-size:13px;text-align:center">XL</th>'
-   +'<th style="padding:10px;border:1px solid #e0dcd4;font-size:13px;text-align:center;background:#fdf8f0">TOTAL</th>'
-   +'</tr></thead><tbody><tr style="text-align:center">'
-   +'<td style="padding:14px;border:1px solid #e0dcd4;font-size:20px;font-weight:700">'+(o.S||0)+'</td>'
-   +'<td style="padding:14px;border:1px solid #e0dcd4;font-size:20px;font-weight:700">'+(o.M||0)+'</td>'
-   +'<td style="padding:14px;border:1px solid #e0dcd4;font-size:20px;font-weight:700">'+(o.L||0)+'</td>'
-   +'<td style="padding:14px;border:1px solid #e0dcd4;font-size:20px;font-weight:700">'+(o.XL||0)+'</td>'
-   +'<td style="padding:14px;border:1px solid #e0dcd4;font-size:22px;font-weight:700;color:#c8a96e;background:#fdf8f0">'+realTotal+'</td>'
-   +'</tr></tbody></table>'
+   // Quantity table
+   +'<div style="margin-bottom:20px">'
+   +'<div style="font-size:10px;color:#888;font-weight:700;letter-spacing:.08em;margin-bottom:8px">ORDER QUANTITY</div>'
+   +(hasSizes
+     ?'<table style="width:100%;border-collapse:collapse">'
+      +'<thead><tr style="background:#f8f6f2">'
+      +'<th style="padding:10px;border:1px solid #e0dcd4;font-size:13px;text-align:center">S</th>'
+      +'<th style="padding:10px;border:1px solid #e0dcd4;font-size:13px;text-align:center">M</th>'
+      +'<th style="padding:10px;border:1px solid #e0dcd4;font-size:13px;text-align:center">L</th>'
+      +'<th style="padding:10px;border:1px solid #e0dcd4;font-size:13px;text-align:center">XL</th>'
+      +'<th style="padding:10px;border:1px solid #e0dcd4;font-size:13px;text-align:center;background:#fdf8f0">TOTAL</th>'
+      +'</tr></thead><tbody><tr style="text-align:center">'
+      +'<td style="padding:16px;border:1px solid #e0dcd4;font-size:22px;font-weight:700">'+(o.S||0)+'</td>'
+      +'<td style="padding:16px;border:1px solid #e0dcd4;font-size:22px;font-weight:700">'+(o.M||0)+'</td>'
+      +'<td style="padding:16px;border:1px solid #e0dcd4;font-size:22px;font-weight:700">'+(o.L||0)+'</td>'
+      +'<td style="padding:16px;border:1px solid #e0dcd4;font-size:22px;font-weight:700">'+(o.XL||0)+'</td>'
+      +'<td style="padding:16px;border:1px solid #e0dcd4;font-size:26px;font-weight:700;color:#c8a96e;background:#fdf8f0">'+realTotal+'</td>'
+      +'</tr></tbody></table>'
+     :'<div style="background:#fdf8f0;border:2px solid #e0dcd4;border-radius:8px;padding:20px;text-align:center">'
+      +'<div style="font-size:13px;color:#888;margin-bottom:4px">Total Ordered Quantity</div>'
+      +'<div style="font-size:48px;font-weight:700;color:#c8a96e">'+realTotal+'</div>'
+      +'<div style="font-size:11px;color:#aaa">(size breakdown not specified)</div></div>')
+   +'</div>'
+   // Remarks
    +(o.notes?'<div style="background:#f8f6f2;border-left:3px solid #c8a96e;padding:10px 14px;margin-bottom:20px;font-size:11px;color:#555;border-radius:0 4px 4px 0"><b>Remarks:</b> '+o.notes+'</div>':'')
-   +(o.fabricShade?'<div style="margin-bottom:20px"><div style="font-size:9px;color:#888;font-weight:600;letter-spacing:.08em;margin-bottom:6px">FABRIC SHADE</div><img src="'+o.fabricShade+'" style="max-height:110px;border-radius:6px;border:1px solid #e0dcd4"></div>':'')
+   // Fabric shade
+   +(o.fabricShade?'<div style="margin-bottom:20px"><div style="font-size:9px;color:#888;font-weight:600;letter-spacing:.08em;margin-bottom:6px">FABRIC SHADE</div><img src="'+o.fabricShade+'" style="max-height:120px;border-radius:6px;border:1px solid #e0dcd4"></div>':'')
+   // Footer signatures
    +'<div style="display:flex;gap:30px;margin-top:30px;padding-top:20px;border-top:1px solid #e0dcd4">'
-   +'<div style="flex:1"><div style="font-size:9px;color:#888;letter-spacing:.08em;margin-bottom:8px">INITIATED BY</div>'
-   +'<div style="font-size:15px;font-weight:700">'+o.placedBy+'</div>'
-   +'<div style="font-size:10px;color:#aaa;margin-top:2px">'+o.date+'</div></div>'
-   +'<div style="flex:1;border-left:3px solid #c8a96e;padding-left:20px">'
-   +'<div style="font-size:9px;color:#888;letter-spacing:.08em;margin-bottom:8px">APPROVED BY</div>'
-   +'<div style="font-size:15px;font-weight:700;color:#c8a96e">'+o.approvedBy+'</div>'
-   +'<div style="font-size:10px;color:#aaa;margin-top:2px">'+o.approvedDate+'</div></div>'
-   +'</div></div>';
-  document.getElementById('po-print-frame').innerHTML=html;
-  window.print();
+   +'<div style="flex:1"><div style="font-size:9px;color:#888;letter-spacing:.1em;margin-bottom:8px;font-weight:600">INITIATED BY</div>'
+   +'<div style="font-size:16px;font-weight:700">'+o.placedBy+'</div>'
+   +'<div style="font-size:10px;color:#aaa;margin-top:3px">'+fmtDMY(o.date)+'</div></div>'
+   +'<div style="flex:1;border-left:3px solid #c8a96e;padding-left:24px">'
+   +'<div style="font-size:9px;color:#888;letter-spacing:.1em;margin-bottom:8px;font-weight:600">APPROVED BY</div>'
+   +'<div style="font-size:16px;font-weight:700;color:#c8a96e">'+(o.approvedBy||'—')+'</div>'
+   +'<div style="font-size:10px;color:#aaa;margin-top:3px">'+fmtDMY(o.approvedDate)+'</div></div>'
+   +'</div>'
+   +'</div>';
+  var pf=document.getElementById('po-print-frame');
+  pf.innerHTML=html;
+  // Small delay to let images load before printing
+  setTimeout(function(){window.print();},300);
 }
 
 function rPO(){
@@ -3452,6 +3478,10 @@ function toggleSB(){
     <!-- Fabric -->
     <label style="display:block;font-size:10px;color:#888;margin-bottom:5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Fabric / Material Name <span style="color:#e74c3c">*</span></label>
     <input id="po-fabric" placeholder="e.g. Cotton Lawn, Silk Chiffon..." style="width:100%;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:14px">
+
+    <!-- Customer -->
+    <label style="display:block;font-size:10px;color:#888;margin-bottom:5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Customer / Buyer Name</label>
+    <input id="po-customer" placeholder="e.g. Sahibas by Mirza, Wholesale Buyer..." style="width:100%;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:14px">
 
     <!-- Ordered Qty + Size Breakdown -->
     <div style="background:#222;border:1px solid #333;border-radius:10px;padding:14px;margin-bottom:14px">
