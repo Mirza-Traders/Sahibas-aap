@@ -9,7 +9,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#c8a96e;--gold2:#a07030;--dk:#1a1a1a;--red:#c0392b;--green:#27ae60;--blue:#2980b9;--orange:#d4944a;--bg:#f5f5f5}
-body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--dk);font-size:12px}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--dk);font-size:14px;zoom:1.15}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
 #cs-scroll::-webkit-scrollbar{height:12px}#cs-scroll::-webkit-scrollbar-track{background:#f0ede8;border-radius:6px}#cs-scroll::-webkit-scrollbar-thumb{background:#c8a96e;border-radius:6px;border:2px solid #f0ede8}#cs-scroll::-webkit-scrollbar-thumb:hover{background:#a07030}
 
@@ -79,7 +79,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--dk
 #sb-tog:hover{opacity:1}
 #main-area{flex:1;min-width:0}
 .sb-section{padding:12px 0 4px}
-.sb-head{font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;padding:0 12px 5px;white-space:nowrap}
+.sb-head{font-size:7.5px;font-weight:700;letter-spacing:.14em;color:#666;text-transform:uppercase;padding:0 12px 5px;white-space:nowrap}
 .sb-item{display:flex;align-items:center;gap:8px;padding:7px 12px 7px 10px;font-size:11px;color:#b8b4ae;cursor:pointer;transition:color .12s,background .12s;border-left:3px solid transparent;font-weight:500;white-space:nowrap}
 .sb-item:hover{color:#e8e4dc;background:#1e1e1e;border-left-color:#555}
 .sb-item.on{color:var(--gold);background:#1d1a11;border-left-color:var(--gold);font-weight:700}
@@ -88,8 +88,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--dk
 .pnl{display:none;padding:12px 14px}.pnl.on{display:block}
 
 /* Tables */
-.tw{border:1px solid #e8e4dc;border-radius:6px;overflow:hidden;overflow-x:auto;max-height:68vh}
-table{width:100%;border-collapse:collapse;font-size:12px;background:#fff}
+.tw{border:1px solid #e8e4dc;border-radius:6px;overflow:hidden;overflow-x:auto;max-height:calc(100vh - 160px)}
+table{width:100%;border-collapse:collapse;font-size:11px;background:#fff}
 thead{position:sticky;top:0;z-index:5}
 th{background:#f8f6f2;padding:7px 9px;text-align:left;font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #e8e4dc;white-space:nowrap;font-weight:700;cursor:pointer;user-select:none}
 th:hover{color:var(--gold);background:#faf8f4}
@@ -160,83 +160,6 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
   #sidebar{width:140px}.sb-item{font-size:10px;padding:5px 9px 5px 7px}
   th,td{padding:5px 7px;font-size:10px}
   .pnl{padding:10px 10px}
-}
-
-/* ─── PRODUCTION ORDER STYLES ─── */
-.po-card{background:#fff;border:1px solid #e8e4dc;border-radius:10px;padding:14px 16px;margin-bottom:10px}
-.po-card.po-urgent{border-left:4px solid var(--red)}
-.po-badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:9px;font-weight:700;white-space:nowrap}
-.po-badge.pending-approval{background:#fff3e0;color:#e67e22}
-.po-badge.approved{background:#e8f0fb;color:#2980b9}
-.po-badge.fabric-pending{background:#f3e8ff;color:#8e44ad}
-.po-badge.fabric-review{background:#fffde7;color:#f9a825}
-.po-badge.in-production{background:#e8f8ee;color:#27ae60}
-.po-badge.completed{background:#c8e6c9;color:#1b5e20}
-.po-badge.rejected{background:#fdeaea;color:#c0392b}
-.po-badge.overdue{background:#c0392b;color:#fff;animation:po-blink 1.5s infinite}
-.po-badge.urgent-req{background:#fdeaea;color:#c0392b;border:1px solid #f5bcbc}
-.po-badge.routine-req{background:#f5f5f5;color:#888;border:1px solid #ddd}
-@keyframes po-blink{0%,100%{opacity:1}50%{opacity:.6}}
-.po-stepper{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 6px}
-.po-phase-btn{border-radius:20px;padding:5px 13px;font-size:11px;cursor:pointer;font-weight:600;white-space:nowrap;line-height:1.3;transition:all .2s}
-.po-phase-btn.done{background:#27ae60;color:#fff;border:2px solid #1e8449}
-.po-phase-btn.pending{background:#f5f5f5;color:#888;border:2px dashed #ddd}
-.po-phase-btn.active{background:#fff3e0;color:#d4944a;border:2px solid #d4944a}
-.po-thumb{width:50px;height:50px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid #e8e4dc}
-.po-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}
-.po-toolbar input,.po-toolbar select{border:1px solid #e0dcd4;border-radius:4px;padding:5px 8px;font-size:11px;outline:none;background:#fff}
-.po-toolbar select{cursor:pointer}
-.po-toolbar .po-tbtn{background:var(--gold);color:#111;border:none;border-radius:6px;padding:7px 16px;font-size:11px;font-weight:700;cursor:pointer}
-.po-toolbar .po-tbtn:hover{background:var(--gold2)}
-.po-toolbar .po-tbtn.sec{background:#fff;color:#888;border:1px solid #e0dcd4}
-.po-toolbar .po-tbtn.sec:hover{border-color:var(--gold);color:var(--gold)}
-.po-act-btn{background:none;border:1px solid #e0dcd4;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;margin:2px 3px 2px 0;font-weight:600}
-.po-act-btn:hover{border-color:var(--gold);color:var(--gold)}
-.po-act-btn.approve{color:#27ae60;border-color:#b8e8c8}
-.po-act-btn.approve:hover{background:#e8f8ee}
-.po-act-btn.reject{color:#c0392b;border-color:#f5bcbc}
-.po-act-btn.reject:hover{background:#fdeaea}
-.po-act-btn.edit{color:var(--blue);border-color:#b8d0f0}
-.po-dup-alert{background:#fff3e0;border:1px solid #e67e22;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:11px;color:#e67e22}
-/* PO modals */
-.po-mdl-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9000;align-items:center;justify-content:center}
-.po-mdl-overlay.open{display:flex}
-.po-mdl-box{background:#1e1e1e;border-radius:14px;padding:26px;width:min(560px,94vw);max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-.po-mdl-box.wide{width:min(700px,94vw)}
-.po-mdl-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
-.po-mdl-title{color:#fff;font-size:16px;font-weight:700}
-.po-mdl-x{background:none;border:none;color:#666;font-size:20px;cursor:pointer;line-height:1;padding:2px 6px}
-.po-lbl{display:block;font-size:11px;color:#aaa;margin-bottom:5px;font-weight:600;letter-spacing:.04em}
-.po-inp{width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:10px;font-family:inherit}
-.po-inp:focus{border-color:var(--gold)}
-.po-inp-sm{width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:8px 6px;font-size:14px;text-align:center;outline:none;box-sizing:border-box}
-.po-req{color:#e74c3c;margin-left:2px}
-.po-btn-row{display:flex;gap:10px;margin-top:18px}
-.po-btn-primary{flex:1;background:var(--gold);color:#111;border:none;border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.02em}
-.po-btn-primary:hover{background:var(--gold2)}
-.po-btn-cancel{background:#2a2a2a;color:#888;border:1px solid #444;border-radius:8px;padding:12px 18px;font-size:13px;cursor:pointer}
-.po-img-preview{width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid #444;margin-bottom:10px}
-/* Image viewer */
-#po-img-viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;align-items:center;justify-content:center;cursor:pointer;padding:20px}
-#po-img-viewer.open{display:flex}
-#po-img-viewer img{max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
-/* Customer management modal */
-.cust-list{max-height:300px;overflow-y:auto;margin:10px 0}
-.cust-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #333;color:#ccc;font-size:12px}
-.cust-item:hover{background:#252525}
-.cust-del{background:none;border:none;color:#c0392b;cursor:pointer;font-size:14px;padding:2px 6px}
-/* Log modal */
-.po-log-entry{padding:8px 0;border-bottom:1px solid #333;font-size:11px;color:#ccc}
-.po-log-entry:last-child{border-bottom:none}
-.po-log-action{color:var(--gold);font-weight:700}
-.po-log-date{color:#666;font-size:10px;float:right}
-/* Print styles for PO export */
-@media print{
-  body>*{display:none!important}
-  #po-print-area{display:block!important;padding:20px}
-  #po-print-area table{width:100%;border-collapse:collapse;font-size:10px}
-  #po-print-area th,#po-print-area td{border:1px solid #ccc;padding:6px 8px;text-align:left}
-  #po-print-area th{background:#f0f0f0;font-weight:700}
 }
 
 /* Cost alert modal */
@@ -392,41 +315,24 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
       <div class="sb-head">Management</div>
       <div class="sb-item on" data-id="ov" onclick="doST('ov')"><span class="sb-ico">🏠</span>Overview</div>
       <div class="sb-item" data-id="cs" onclick="doST('cs')"><span class="sb-ico">📋</span>Summary</div>
-      <div class="sb-item" data-id="in" onclick="doST('in')"><span class="sb-ico">🎯</span>Insights</div>
       <div class="sb-item" data-id="pl" onclick="doST('pl')"><span class="sb-ico">💸</span>P&amp;L</div>
     </div>
     <div class="sb-divider"></div>
     <div class="sb-section">
       <div class="sb-head">Sales</div>
-      <div class="sb-item" data-id="sz" onclick="doST('sz')"><span class="sb-ico">📐</span>Sizes</div>
-      <div class="sb-item" data-id="vl" onclick="doST('vl')"><span class="sb-ico">⚡</span>Velocity</div>
       <div class="sb-item" data-id="st" onclick="doST('st')"><span class="sb-ico">📑</span>Order Status</div>
       <div class="sb-item" data-id="dr" onclick="doST('dr')"><span class="sb-ico">📄</span>Detail Report</div>
-      <div class="sb-item" data-id="al" onclick="doST('al')"><span class="sb-ico">🔒</span>Allocated</div>
     </div>
     <div class="sb-divider"></div>
     <div class="sb-section">
       <div class="sb-head">Production</div>
-      <div class="sb-item" data-id="pp" onclick="doST('pp')"><span class="sb-ico">🏭</span>Analytics</div>
       <div class="sb-item" data-id="po" onclick="doST('po')"><span class="sb-ico">📦</span>Orders</div>
     </div>
     <div class="sb-divider"></div>
     <div class="sb-section">
       <div class="sb-head">Stock &amp; Ops</div>
-      <div class="sb-item" id="sb-sk" data-id="sk" onclick="doST('sk')" style="display:none"><span class="sb-ico">📦</span>Stock Alert</div>
-      <div class="sb-item" id="sb-dp" data-id="dp" onclick="doST('dp')"><span class="sb-ico">⚡</span>Dispatch Now</div>
       <div class="sb-item" data-id="ec" onclick="doST('ec')"><span class="sb-ico">💰</span>Excess Comm</div>
       <div class="sb-item" data-id="rc" onclick="doST('rc')"><span class="sb-ico">⚖️</span>Recon</div>
-    </div>
-    <div class="sb-divider"></div>
-    <div class="sb-section">
-      <div class="sb-head">Pricing</div>
-      <div class="sb-item" data-id="pr" onclick="doST('pr')"><span class="sb-ico">💰</span>Pricing</div>
-    </div>
-    <div class="sb-divider"></div>
-    <div class="sb-section">
-      <div class="sb-head">Finance</div>
-      <div class="sb-item" data-id="rf" onclick="doST('rf')"><span class="sb-ico">↩</span>Refunds</div>
     </div>
     <div class="sb-divider"></div>
     <div class="sb-section">
@@ -635,54 +541,49 @@ function parseD(v){
   try{var d=new Date(s);if(!isNaN(d.getTime()))return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}catch(e){}
   return null;
 }
-function colV(row,names){
-  for(var i=0;i<names.length;i++){var v=row[names[i]];if(v!==undefined&&v!==null&&v!=='')return v;}
-  var keys=Object.keys(row);
-  for(var i=0;i<names.length;i++){var nl=names[i].toLowerCase();
-    for(var j=0;j<keys.length;j++){if(keys[j].toLowerCase()===nl){var v=row[keys[j]];if(v!==undefined&&v!==null&&v!=='')return v;}}}
-  return '';
-}
-var STAT_MAP={fulfilled:'delivered',shipped:'delivered',deliver:'delivered',
-  open:'open',pending:'pending',processing:'pending'};
 function parseSales(txt,cm){
   var data=Array.isArray(txt)?txt:Papa.parse(txt,{header:true,skipEmptyLines:true}).data;
   var rows=[];
   data.forEach(function(row){
-    var prd=String(colV(row,['Product Name','product_name','ProductName'])).trim();
+    var prd=(row['Product Name']||'').trim();
     if(!prd||prd.toLowerCase()==='product name')return;
-    var ret=parseFloat(colV(row,['Retail Price','retail_price','RetailPrice'])||0)||0;
-    var cpct=parseFloat(colV(row,['Commission Percentage','commission_percentage','Commission'])||0)||0;
+    var ret=parseFloat(row['Retail Price']||0)||0;
+    var cpct=parseFloat(row['Commission Percentage']||0)||0;
     if(cpct>0&&cpct<1)cpct=cpct*100;
-    var stat=String(colV(row,['Item Status','item_status','ItemStatus'])).toLowerCase().replace(/ /g,'_').replace(/-/g,'_');
-    stat=STAT_MAP[stat]||stat;
-    var pf=String(colV(row,['Platform','platform'])||'MARKETPLACE').toUpperCase();
-    var dst=String(colV(row,['Destination','destination'])||'LOCAL').toUpperCase();
-    var sz=String(colV(row,['Variant','variant','Size','size']));
-    var sku=String(colV(row,['SKU','sku','Sku']));
-    var dp=parseInt(colV(row,['Days Pending','days_pending','DaysPending'])||0)||0;
-    var onum=String(colV(row,['Order ID','order_id','OrderID','Order Number']));
-    var pay=String(colV(row,['Payment Status','payment_status','PaymentStatus'])).toUpperCase();
-    var dt=parseD(colV(row,['Creation Date','creation_date','CreationDate','Order Date']));
+    var stat=(row['Item Status']||'').toLowerCase().replace(/ /g,'_').replace(/-/g,'_');
+    if(stat==='fulfilled')stat='delivered';
+    var pf=(row['Platform']||'MARKETPLACE').toUpperCase();
+    var dst=(row['Destination']||'LOCAL').toUpperCase();
+    var sz=row['Variant']||'';
+    var sku=row['SKU']||'';
+    var dp=parseInt(row['Days Pending']||0)||0;
+    var onum=String(row['Order Number']||row['Order ID']||row['Item Id']||'');
+    var conum=String(row['Channel Order Number']||row['channel_order_number']||'');
+    var pay=(row['Payment Status']||'').toUpperCase();
+    var dt=parseD(row['Creation Date']);
     var mk=dt?dt.substring(0,7):'?';
     var cost=getCost(prd,cm);
     var comm=ret*cpct/100;
-    var tax=ret*(dst==='INTERNATIONAL'?0.02:0.06);
+    var taxpct=dst==='INTERNATIONAL'?2:6;
+    var tax=ret*taxpct/100;
     var gp=ret-cost-comm;
     var pat=gp-tax;
     var cr=RATES[pf+'|'+dst]||15;
     var cc=ret*cr/100;
     var isX=comm>cc+1;
     var xa=Math.max(0,comm-cc);
-    var ov=parseFloat(String(colV(row,['Original Value','Original Price','original_value','Actual Price'])).replace(/,/g,''))||0;
-    var av=parseFloat(String(colV(row,['Actual Price','Updated Value','actual_price'])).replace(/,/g,''))||0;
-    var rfd=String(colV(row,['Refund Date','Refund date','Refunded Date','refund_date'])).trim();
+    var ov=parseFloat(String(row['Original Value']||row['Original Price']||'').replace(/,/g,''))||0;
+    var av=parseFloat(String(row['Actual Price']||row['Updated Value']||'').replace(/,/g,''))||0;
+    var rfd=(row['Refund Date']||row['Refund date']||row['Refunded Date']||'').trim();
     // [0]date [1]prd [2]sku [3]sz [4]stat [5]pf [6]dst [7]pay [8]dp
     // [9]ret [10]cost [11]cpct [12]comm [13]tax [14]gp [15]pat
     // [16]isX [17]xa [18]onum [19]mk [20]gross(orig) [21]actualPrice [22]isRefunded
+    // [23]conum(channel order#) [24]taxpct
     rows.push([dt||'',prd,sku,sz,stat,pf,dst,pay,dp,
       Math.round(ret),Math.round(cost),Math.round(cpct*10)/10,
       Math.round(comm),Math.round(tax),Math.round(gp),Math.round(pat),
-      isX,Math.round(xa),onum,mk,Math.round(ov),Math.round(av),rfd?1:0]);
+      isX,Math.round(xa),onum,mk,Math.round(ov),Math.round(av),rfd?1:0,
+      conum,taxpct]);
   });
   return rows;
 }
@@ -1106,7 +1007,7 @@ function csSelAll(){var allC=document.querySelectorAll('#pcs-tbody input[type=ch
 function csSort(el){var c=el.getAttribute('data-c');if(_csSortCol===c)_csSortAsc=!_csSortAsc;else{_csSortCol=c;_csSortAsc=false;}rendered.cs=false;doR('cs');}
 function csRender(){rendered.cs=false;doR('cs');}
 function csApplyFilter(el){var k=el.getAttribute('data-k'),v=el.value;if(k==='min10d'||k==='minStk')_csFilters[k]=parseInt(v)||0;else if(k==='minRate')_csFilters[k]=parseFloat(v)||0;else _csFilters[k]=v;csRender();}
-function csExpRows(rows,fname){csvDL(rows.map(function(p){return[p.name,p.sellingPrice||'',p.discount!=null?p.discount+'%':'',p.avgRet,p.shopPrice||'',p.priceDiff!=null?p.priceDiff:'',p.cost,p.gpUnit||'',p.gpPct!=null?p.gpPct+'%':'',p.rev,p.pat,p.marPct+'%',p.orders,p.delivered,p.pending,p.cr+'%',p.szS,p.szM,p.szL,p.szXL,p.laamTotal||'',p.shopStock!=null?p.shopStock:'',p.poOnOrder||'',p.poEta||'',p.stockStatus,p.statusDiff||'',p.shopStatus||'',p.v10i,p.v10l,p.v10o,p.total10,p.total30,p.daily];}),['Product','GrossPrice','Discount%','RetailPrice(Laam)','RetailPrice(Shopify)','PriceDiff','Cost','Profit/Unit','Profit%','Revenue','NetPAT','NetMargin%','Orders','Delivered','Pending','Cancel%','SoldS','SoldM','SoldL','SoldXL','LaamStock','ShopifyStock','OnOrder','PO_ETA','LaamStatus','StatusDiff','ShopifyStatus','10dINT','10dLCL','10dOCT','Total10d','30d','Daily'],fname);}
+function csExpRows(rows,fname){csvDL(rows.map(function(p){return[p.name,p.sellingPrice||'',p.discount!=null?p.discount+'%':'',p.avgRet,p.shopPrice||'',p.priceDiff!=null?p.priceDiff:'',p.cost,p.gpUnit||'',p.gpPct!=null?p.gpPct+'%':'',p.rev,p.pat,p.marPct+'%',p.orders,p.delivered,p.open,p.cancelled,p.refunded,p.szS,p.szM,p.szL,p.szXL,p.laamTotal||'',p.shopStock!=null?p.shopStock:'',p.stockStatus,p.statusDiff||'',p.shopStatus||'',p.v10i,p.v10l,p.v10o,p.total10,p.total30,p.daily];}),['Product','GrossPrice','Discount%','RetailPrice(Laam)','RetailPrice(Shopify)','PriceDiff','Cost','Profit/Unit','Profit%','Revenue','NetPAT','NetMargin%','AllOrders','Delivered','Open','Cancelled','Refunded','SoldS','SoldM','SoldL','SoldXL','LaamStock','ShopifyStock','LaamStatus','StatusDiff','ShopifyStatus','10dINT','10dLCL','10dOCT','Total10d','30d','Daily'],fname);}
 function csExpSel(){csExpRows((window._csArr||[]).filter(function(p){return _csSelProds.has(p.name);}),'selected.csv');}
 function csExpAll(){csExpRows(window._csArr||[],'all_products.csv');}
 
@@ -1118,18 +1019,20 @@ function rCS(){
   DETAIL.forEach(function(r){
     if(f.from&&r[0]<f.from)return;if(f.to&&r[0]>f.to)return;
     if(f.pf&&r[5]!==f.pf)return;if(f.dst&&r[6]!==f.dst)return;
-    var n=r[1];if(!pm[n])pm[n]={name:n,cost:0,orders:0,delivered:0,cancelled:0,pending:0,rev:0,pat:0,szS:0,szM:0,szL:0,szXL:0,v10i:0,v10l:0,v10o:0,v20i:0,v20l:0,v20o:0,v30i:0,v30l:0,v30o:0};
+    var n=r[1];if(!pm[n])pm[n]={name:n,cost:0,orders:0,delivered:0,cancelled:0,open:0,refunded:0,pending:0,rev:0,pat:0,szS:0,szM:0,szL:0,szXL:0,v10i:0,v10l:0,v10o:0,v20i:0,v20l:0,v20o:0,v30i:0,v30l:0,v30o:0};
     var p=pm[n];p.orders++;
     if(r[10]>0)p.cost=r[10];
     if(['allocated','pending','delayed','undelivered'].indexOf(r[4])>=0)p.pending++;
     if(r[4]==='cancelled')p.cancelled++;
-    if(r[4]==='delivered'){
-      p.delivered++;p.rev+=r[9];p.pat+=r[15];
+    if(r[4]==='delivered')p.delivered++;
+    if(r[4]==='open'||r[4]==='allocated'||r[4]==='pending'||r[4]==='delayed'||r[4]==='undelivered')p.open++;
+    if(r[4]==='refunded')p.refunded++;
+    if(f.stats.length===0||f.stats.includes(r[4])){
+      p.rev+=r[9];p.pat+=r[15];
       var sz=r[3];if(sz==='S')p.szS++;else if(sz==='M')p.szM++;else if(sz==='L')p.szL++;else if(sz==='XL')p.szXL++;
     }
-    // Velocity (10d/20d/30d): use status filter if set, else delivered only
-    var velStats=f.stats.length>0?f.stats:['delivered'];
-    if(velStats.includes(r[4])){
+    // Velocity (10d/20d/30d): use status filter if set, else count all statuses
+    if(f.stats.length===0||f.stats.includes(r[4])){
       var isI=r[6]==='INTERNATIONAL',isL=r[6]==='LOCAL',isM=r[5]==='MARKETPLACE',isO=r[5]==='OCTANE';
       if(r[0]>=s10){if(isM&&isI)p.v10i++;else if(isM&&isL)p.v10l++;else if(isO)p.v10o++;}
       if(r[0]>=s20){if(isM&&isI)p.v20i++;else if(isM&&isL)p.v20l++;else if(isO)p.v20o++;}
@@ -1144,7 +1047,7 @@ function rCS(){
       if(!pmLower.has(k)){
         var sp=STOCK_PRODS[k];
         if((sp.total||0)>0||(sp.saTotal||0)>0){
-          pm[sp.title]={name:sp.title,cost:0,orders:0,delivered:0,cancelled:0,pending:0,rev:0,pat:0,szS:0,szM:0,szL:0,szXL:0,v10i:0,v10l:0,v10o:0,v20i:0,v20l:0,v20o:0,v30i:0,v30l:0,v30o:0};
+          pm[sp.title]={name:sp.title,cost:0,orders:0,delivered:0,cancelled:0,open:0,refunded:0,pending:0,rev:0,pat:0,szS:0,szM:0,szL:0,szXL:0,v10i:0,v10l:0,v10o:0,v20i:0,v20l:0,v20o:0,v30i:0,v30l:0,v30o:0};
         }
       }
     });
@@ -1164,15 +1067,13 @@ function rCS(){
     var netPatPct=retailPrice>0&&netPat>0?Math.round(netPat/retailPrice*100):0;
     return Object.assign(p,{
       sp:sp,img:(sp&&sp.img)?sp.img:findImg(k),grossPrice:grossPrice,retailPrice:retailPrice,shopPrice:SHOP_PRICE[k]||null,priceDiff:(retailPrice>0&&SHOP_PRICE[k]>0)?retailPrice-SHOP_PRICE[k]:null,stockStatus:sp?sp.status:'ACTIVE',shopStatus:SHOP_STATUS[k]||'',statusDiff:(function(){var ls=sp?sp.status:'ACTIVE';var ss=SHOP_STATUS[k]||'';if(!ss)return '';if(ls===ss)return 'SAME';return ls+'/'+ss;})(),shopStock:SHOP_STOCK[k]!=null?SHOP_STOCK[k]:null,createdAt:sp?sp.createdAt||'':'',createdAtTs:sp&&sp.createdAt?(new Date(sp.createdAt).getTime()||0):0,
-      laamS:sp?sp.S:0,laamM:sp?sp.M:0,laamL:sp?sp.L:0,laamXL:sp?sp.XL:0,laamTotal:sp?sp.total:null,saS:sp?sp.saS:0,saM:sp?sp.saM:0,saL:sp?sp.saL:0,saXL:sp?sp.saXL:0,saTotal:sp?sp.saTotal:null,
+      laamS:sp?sp.S:0,laamM:sp?sp.M:0,laamL:sp?sp.L:0,laamXL:sp?sp.XL:0,laamTotal:sp?sp.total:null,stockDiff:(sp?sp.total:0)-(SHOP_STOCK[k]!=null?SHOP_STOCK[k]:0),saS:sp?sp.saS:0,saM:sp?sp.saM:0,saL:sp?sp.saL:0,saXL:sp?sp.saXL:0,saTotal:sp?sp.saTotal:null,
       total10:t10,total20:t20,total30:t30,daily:Math.round(t30/30*10)/10,
       marPct:p.rev>0?Math.round(p.pat/p.rev*100):0,
       cr:p.orders>0?Math.round(p.cancelled/p.orders*100):0,
       avgRet:avgRet,gpUnit:gpUnit,gpPct:gpPct,discountPct:discountPct,discountAmt:discountAmt,
       commission:commission,netPat:netPat,netPatPct:netPatPct,
       szTotal:p.szS+p.szM+p.szL+p.szXL,
-      poOnOrder:(function(){var ao=poGetActiveForProduct(p.name);return ao.reduce(function(a,o){return a+(o.qty||0);},0);}()),
-      poEta:(function(){var ao=poGetActiveForProduct(p.name);var best='';ao.forEach(function(o){if(o.eta&&(!best||o.eta<best))best=o.eta;});return best;}()),
     });
   }).filter(function(p){
     var cf=_csFilters;
@@ -1200,6 +1101,8 @@ function rCS(){
   var totOrders=arr.reduce(function(a,r){return a+r.orders;},0);
   var totDel=arr.reduce(function(a,r){return a+r.delivered;},0);
   var totCancelled=arr.reduce(function(a,r){return a+(r.cancelled||0);},0);
+  var totOpen=arr.reduce(function(a,r){return a+(r.open||0);},0);
+  var totRefunded=arr.reduce(function(a,r){return a+(r.refunded||0);},0);
   var totSzS=arr.reduce(function(a,r){return a+r.szS;},0),totSzM=arr.reduce(function(a,r){return a+r.szM;},0),totSzL=arr.reduce(function(a,r){return a+r.szL;},0),totSzXL=arr.reduce(function(a,r){return a+r.szXL;},0);
   var totLaamS=arr.reduce(function(a,r){return a+(r.laamS||0);},0),totLaamM=arr.reduce(function(a,r){return a+(r.laamM||0);},0),totLaamL=arr.reduce(function(a,r){return a+(r.laamL||0);},0),totLaamXL=arr.reduce(function(a,r){return a+(r.laamXL||0);},0);
   var totSaS=arr.reduce(function(a,r){return a+(r.saS||0);},0),totSaM=arr.reduce(function(a,r){return a+(r.saM||0);},0),totSaL=arr.reduce(function(a,r){return a+(r.saL||0);},0),totSaXL=arr.reduce(function(a,r){return a+(r.saXL||0);},0),totSa=arr.reduce(function(a,r){return a+(r.saTotal||0);},0);
@@ -1233,8 +1136,8 @@ function rCS(){
   // ── KPI bar ──
   var kh='<div class="krow">'
    +'<div class="kpi b"><div class="kl">Products</div><div class="kv">'+arr.length+'</div><div class="ks">'+actives+' active</div></div>'
-   +'<div class="kpi g"><div class="kl">Revenue</div><div class="kv">PKR '+N(totRev)+'</div><div class="ks">Delivered</div></div>'
-   +'<div class="kpi e"><div class="kl">Net PAT</div><div class="kv">PKR '+N(totPat)+'</div><div class="ks">'+P(totRev?totPat/totRev*100:0)+' margin</div></div>'
+   +'<div class="kpi '+(totLaam-totShopStock>0?'r':'g')+'"><div class="kl">Stock Diff</div><div class="kv">'+NF(totLaam-totShopStock)+'</div><div class="ks">LAAM − Shopify</div></div>'
+   +'<div class="kpi w"><div class="kl">Mismatched</div><div class="kv">'+arr.filter(function(r){return r.laamTotal!=null&&r.shopStock!=null&&r.laamTotal!==r.shopStock;}).length+'</div><div class="ks">Products with stock diff</div></div>'
    +'<div class="kpi w"><div class="kl">Pending</div><div class="kv">'+NF(totPend)+'</div><div class="ks">Dispatch needed</div></div>'
    +(hasStock?'<div class="kpi e"><div class="kl">Laam Stock</div><div class="kv">'+NF(totLaam)+'</div><div class="ks">Units at Laam</div></div>':'')
    +(totShopStock>0?'<div class="kpi b"><div class="kl">Shopify Stock</div><div class="kv">'+NF(totShopStock)+'</div><div class="ks">Units on Shopify</div></div>':'')
@@ -1276,13 +1179,13 @@ function rCS(){
   gRow+='<th colspan="3" style="background:#f0fff4;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #b8e8d0">Net P&amp;L</th>';
   gRow+='<th colspan="'+(G.s_sales?5:1)+'" style="background:#e8f8f5;color:#16a085;text-align:center;padding:3px;border-bottom:2px solid #16a085">📊 Sales Qty</th>';
   if(G.totals){gRow+='<th colspan="2" style="background:#fff5e8;color:#e67e22;text-align:center;padding:3px;border-bottom:1px solid #f0c080">Revenue Detail</th>';}
-  gRow+='<th colspan="'+(G.orders?4:1)+'" style="background:#f0ede8;border-bottom:1px solid #e0dcd4"></th>';
+  gRow+='<th colspan="5" style="background:#f0ede8;border-bottom:1px solid #e0dcd4"></th>';
   if(hasStock){
     gRow+='<th colspan="'+(G.s_stock?5:1)+'" style="background:#eeeaff;color:#5050b0;text-align:center;padding:3px;border-bottom:2px solid #8080d0">⏩ Sell Ahead</th>';
     gRow+='<th colspan="'+(G.s_stock?5:1)+'" style="background:#e4eef8;color:#2980b9;text-align:center;padding:3px;border-bottom:2px solid #2980b9">📦 Stock Qty</th>';
   }
-  gRow+='<th style="background:#dce8f8;color:#2471a3;text-align:center;padding:3px;border-bottom:2px solid #2471a3">🛍 Shopify</th>';
-  gRow+='<th colspan="2" style="background:#f0e8ff;color:#8e44ad;text-align:center;padding:3px;border-bottom:2px solid #8e44ad">🏭 Production</th>';
+  gRow+='<th style="background:#dce8f8;color:#2471a3;text-align:center;padding:3px;border-bottom:2px solid #2471a3">🛍 Shopify Stock</th>';
+  gRow+='<th style="background:#fce4ec;color:#c0392b;text-align:center;padding:3px;border-bottom:2px solid #c0392b">Diff</th>';
   gRow+='<th colspan="'+(G.vel20?3:1)+'" style="background:#fffdf0;color:#8a6800;text-align:center;padding:3px;border-bottom:1px solid #e8e0b0">MP-INT</th>';
   gRow+='<th colspan="'+(G.vel20?3:1)+'" style="background:#fffdf0;color:#8a6800;text-align:center;padding:3px;border-bottom:1px solid #e8e0b0">MP-LCL</th>';
   gRow+='<th colspan="'+(G.vel20?3:1)+'" style="background:#fffdf0;color:#8a6800;text-align:center;padding:3px;border-bottom:1px solid #e8e0b0">OCT</th>';
@@ -1320,9 +1223,11 @@ function rCS(){
     cRow+=mkTH('Total Revenue','rev','#fff5e8','right',85);
     cRow+=mkTH('Total Net PAT','pat','#fff5e8','right',85);
   }
-  if(G.orders)cRow+=mkTH('Orders','orders',hbg,'right',65);
+  cRow+=mkTH('All Orders','orders',hbg,'right',75);
   cRow+=mkTH('Delivered','delivered',hbg,'right',70);
-  if(G.orders){cRow+=mkTH('Pending','pending',hbg,'right',60)+mkTH('Cancel%','cr',hbg,'right',60);}
+  cRow+=mkTH('Open','open',hbg,'right',55);
+  cRow+=mkTH('Cancelled','cancelled',hbg,'right',70);
+  cRow+=mkTH('Refunded','refunded',hbg,'right',65);
   if(hasStock){
     if(G.s_stock){cRow+=mkTH('S','saS','#f2f0ff','right',38)+mkTH('M','saM','#f2f0ff','right',38)+mkTH('L','saL','#f2f0ff','right',38)+mkTH('XL','saXL','#f2f0ff','right',38);}
     cRow+=mkTH('Sell Ahead','saTotal','#f2f0ff','right',85);
@@ -1330,8 +1235,7 @@ function rCS(){
     cRow+=mkTH('Total Stock','laamTotal','#e4eef8','right',80);
   }
   cRow+=mkTH('Shopify Stock','shopStock','#dce8f8','right',85);
-  cRow+=mkTH('On Order','poOnOrder','#f0e8ff','right',70);
-  cRow+=mkTH('PO ETA','poEta','#f0e8ff','left',75);
+  cRow+=mkTH('Stock Diff','stockDiff','#fce4ec','right',70);
   cRow+=mkTH('10d','v10i','#fffdf0','right',55);
   if(G.vel20){cRow+=mkTH('20d','v20i','#fffdf0','right',55);cRow+=mkTH('30d','v30i','#fffdf0','right',55);}
   cRow+=mkTH('10d','v10l','#fffdf0','right',55);
@@ -1363,12 +1267,11 @@ function rCS(){
    +(G.s_sales?tdc(NF(totSzS),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzM),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzL),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzXL),'background:#e8f8f5;color:#16a085'):'')
    +tdc(NF(totSzS+totSzM+totSzL+totSzXL),'background:#e8f8f5;color:#16a085;font-weight:800')
    +(G.totals?tdc(N(totRev),'color:#c8a96e;background:#fff5e8')+tdc(N(totPat),'color:#27ae60;background:#fff5e8'):'')
-   +(G.orders?tdc(NF(totOrders),''):'')+tdc(NF(totDel),'')+( G.orders?tdc(totPend>0?NF(totPend):'—',totPend>0?'color:#d4944a':'')+tdc(totCr+'%',''):'')
+   +tdc(NF(totOrders),'font-weight:800')+tdc(NF(totDel),'color:#27ae60')+tdc(totOpen>0?NF(totOpen):'—',totOpen>0?'color:#d4944a':'')+tdc(NF(totCancelled),'color:#c0392b')+tdc(NF(totRefunded),'color:#8e44ad')
    +(hasStock?((G.s_stock?tdc(NF(totSaS),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaM),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaL),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaXL),'background:#f2f0ff;color:#5050b0'):'')+tdc(NF(totSa),'background:#f2f0ff;color:#5050b0;font-weight:800')):'')
    +(hasStock?((G.s_stock?tdc(NF(totLaamS),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamM),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamL),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamXL),'background:#e4eef8;color:#2980b9'):'')+tdc(NF(totLaam),'background:#e4eef8;color:var(--gold2);font-weight:800')):'')
    +tdc(totShopStock>0?NF(totShopStock):'—','background:#dce8f8;color:#2471a3;font-weight:800')
-   +tdc((function(){var t=arr.reduce(function(a,r){return a+(r.poOnOrder||0);},0);return t>0?NF(t):'—';}()),'background:#f0e8ff;color:#8e44ad;font-weight:800')
-   +tdc('—','background:#f0e8ff;color:#bbb')
+   +tdc(NF(totLaam-totShopStock),'background:#fce4ec;color:#c0392b;font-weight:800')
    +tdc(NF(tot10i),'background:#fffdf0')+(G.vel20?tdc(NF(tot20i),'background:#fffdf0')+tdc(NF(tot30i),'background:#fffdf0'):'')
    +tdc(NF(tot10l),'background:#fffdf0')+(G.vel20?tdc(NF(tot20l),'background:#fffdf0')+tdc(NF(tot30l),'background:#fffdf0'):'')
    +tdc(NF(tot10o),'background:#fffdf0')+(G.vel20?tdc(NF(tot20o),'background:#fffdf0')+tdc(NF(tot30o),'background:#fffdf0'):'')
@@ -1418,14 +1321,15 @@ function rCS(){
      +'<td style="padding:6px 8px;text-align:right;background:#e8f8f5;font-weight:700;color:#16a085">'+(p.szTotal||'-')+'</td>'
      +(G.totals?'<td style="padding:6px 8px;text-align:right;background:#fff5e8;color:#c8a96e;font-weight:600">'+NF(p.rev)+'</td>':'')
      +(G.totals?'<td style="padding:6px 8px;text-align:right;background:#fff5e8;color:#27ae60">'+NF(p.pat)+'</td>':'')
-     +(G.orders?'<td style="padding:6px 8px;text-align:right">'+NF(p.orders)+'</td>':'')
-     +'<td style="padding:6px 8px;text-align:right;font-weight:600">'+NF(p.delivered)+'</td>'
-     +(G.orders?'<td style="padding:6px 8px;text-align:right;'+(p.pending>0?'color:#d4944a;font-weight:700':'color:#bbb')+'">'+(p.pending||'-')+'</td>'+'<td style="padding:6px 8px;text-align:right;'+cc+'">'+p.cr+'%</td>':'')
+     +'<td style="padding:6px 8px;text-align:right;font-weight:700">'+NF(p.orders)+'</td>'
+     +'<td style="padding:6px 8px;text-align:right;color:#27ae60;font-weight:600">'+NF(p.delivered)+'</td>'
+     +'<td style="padding:6px 8px;text-align:right;'+(p.open>0?'color:#d4944a;font-weight:700':'color:#bbb')+'">'+(p.open||'-')+'</td>'
+     +'<td style="padding:6px 8px;text-align:right;'+(p.cancelled>0?'color:#c0392b;font-weight:700':'color:#bbb')+'">'+(p.cancelled||'-')+'</td>'
+     +'<td style="padding:6px 8px;text-align:right;'+(p.refunded>0?'color:#8e44ad;font-weight:700':'color:#bbb')+'">'+(p.refunded||'-')+'</td>'
      +(hasStock?((G.s_stock?'<td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saS||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saM||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saL||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#f2f0ff">'+(p.saXL||'-')+'</td>':'')+'<td style="padding:6px 8px;text-align:right;background:#f2f0ff;'+saSt+'">'+(p.saTotal!==null?NF(p.saTotal):'-')+'</td>'):'')
      +(hasStock?((G.s_stock?'<td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamS||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamM||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamL||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamXL||'-')+'</td>':'')+'<td style="padding:6px 8px;text-align:right;background:#e4eef8;'+lSt+'">'+(p.laamTotal!==null?NF(p.laamTotal):'-')+'</td>'):'')
      +'<td style="padding:6px 8px;text-align:right;background:#dce8f8;'+(p.shopStock!=null?(p.shopStock>=10?'color:#2471a3;font-weight:700':p.shopStock>0?'color:#d4944a;font-weight:700':'color:#c0392b;font-weight:700'):'color:#bbb')+'">'+(p.shopStock!=null?NF(p.shopStock):'-')+'</td>'
-     +'<td style="padding:6px 8px;text-align:right;background:#f0e8ff;'+(p.poOnOrder>0?'color:#8e44ad;font-weight:700':'color:#bbb')+'">'+(p.poOnOrder>0?NF(p.poOnOrder):'-')+'</td>'
-     +'<td style="padding:6px 8px;text-align:left;background:#f0e8ff;color:'+(p.poEta?'#8e44ad':'#bbb')+';font-size:10px">'+(p.poEta?fmtD(p.poEta):'-')+'</td>'
+     +(function(){var d=(p.laamTotal||0)-(p.shopStock||0);var c=d===0?'color:#bbb':d>0?'color:#c0392b;font-weight:700':'color:#2471a3;font-weight:700';return '<td data-v="'+d+'" style="padding:6px 8px;text-align:right;background:#fce4ec;'+c+'">'+(p.laamTotal!=null&&p.shopStock!=null?(d>0?'+':'')+NF(d):'-')+'</td>';})()
      +'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v10i||'-')+'</td>'
      +(G.vel20?'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v20i||'-')+'</td>'+'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v30i||'-')+'</td>':'')
      +'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v10l||'-')+'</td>'
@@ -1434,13 +1338,13 @@ function rCS(){
      +(G.vel20?'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v20o||'-')+'</td>'+'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v30o||'-')+'</td>':'')
      +'<td style="padding:6px 8px;text-align:right;background:#e8f8ee;'+vc+'">'+(p.total10||'-')+'</td>'
      +'<td style="padding:4px 4px;text-align:center;background:'+bg+';position:sticky;right:'+(sdW+stW)+'px;z-index:3;border-left:2px solid #c8d8f0;width:'+stW+'px;min-width:'+stW+'px;max-width:'+stW+'px"><span style="'+laamBg+';padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700">'+p.stockStatus+'</span></td>'
-     +'<td style="padding:4px 4px;text-align:center;background:'+(p.statusDiff&&p.statusDiff!=='SAME'?'#fff0f0':bg)+';position:sticky;right:'+stW+'px;z-index:3;font-size:8px;font-weight:700;width:'+sdW+'px;min-width:'+sdW+'px;max-width:'+sdW+'px;'+(p.statusDiff==='SAME'?'color:#27ae60':'color:#c0392b')+'">'+(p.statusDiff?(p.statusDiff==='SAME'?'✓':p.statusDiff):'-')+'</td>'
+     +'<td style="padding:4px 4px;text-align:center;background:'+(p.statusDiff&&p.statusDiff!=='SAME'?'#fff0f0':bg)+';position:sticky;right:'+stW+'px;z-index:3;font-size:7px;font-weight:700;line-height:1.4;width:'+sdW+'px;min-width:'+sdW+'px;max-width:'+sdW+'px;'+(p.statusDiff==='SAME'?'color:#27ae60':'color:#c0392b')+'">'+(p.statusDiff?(p.statusDiff==='SAME'?'✓':p.statusDiff.replace('/','<br>')):'-')+'</td>'
      +'<td style="padding:4px 4px;text-align:center;background:'+bg+';position:sticky;right:0;z-index:3;width:'+stW+'px;min-width:'+stW+'px;max-width:'+stW+'px">'+(p.shopStatus?'<span style="'+shopBg+';padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700">'+p.shopStatus+'</span>':'-')+'</td>'
      +'</tr>';
   });
   tbody+='</tbody>';
 
-  el.innerHTML=kh+fh+'<div id="cs-scroll" style="overflow:auto;border:1px solid #e8e4dc;border-radius:6px;height:calc(100vh - 290px);min-height:300px"><table style="border-collapse:separate;border-spacing:0;font-size:11px;background:#fff;min-width:1400px">'+thead+tbody+'</table></div>';
+  el.innerHTML=kh+fh+'<div id="cs-scroll" style="overflow:auto;border:1px solid #e8e4dc;border-radius:6px;height:calc(100vh - 170px);min-height:300px"><table style="border-collapse:separate;border-spacing:0;font-size:11px;background:#fff;min-width:1400px">'+thead+tbody+'</table></div>';
   if(_csFilters.search){var _si=el.querySelector('[data-k="search"]');if(_si){var _sv=_si.value.length;_si.focus();_si.setSelectionRange(_sv,_sv);}}
   if(_csActiveRow>=0){var _tb=document.getElementById('pcs-tbody');if(_tb){var _rs=_tb.querySelectorAll('tr');if(_rs[_csActiveRow])_rs[_csActiveRow].classList.add('cs-kr');}}
   csFixFreeze();
@@ -1630,7 +1534,7 @@ var _drRows=[], _drFiltered=[], _drRH=34, _drVis=0;
 var _drSel=new Set(), _drSelProds=new Set();
 var _drSortAsc=true; // date sort direction
 var _drFilters={stat:'',pf:'',dst:'',pay:'',sz:'',cpct:''};
-var DR_W={chk:34,onum:88,date:95,prd:160,sku:108,sz:46,stat:86,pf:96,dst:86,pay:115,days:50,ret:66,cost:78,cpct:60,comm:66,tax:56,gp:64,pat:64,exc:72};
+var DR_W={chk:34,conum:100,onum:88,date:95,prd:160,sz:46,stat:86,pf:96,dst:86,pay:115,days:50,ret:70,cost:78,cpct:60,comm:70,taxpct:48,tax:60,gp:68,pat:68,exc:72};
 var DR_TOT=Object.values(DR_W).reduce(function(a,b){return a+b;},0);
 
 // Date format helper: YYYY-MM-DD → DD-MM-YYYY
@@ -1654,8 +1558,16 @@ function applyDrFilters(){
   drSortRows();
   _drSel.clear(); updDrSelBtn();
   renderDrVirtual();
+  updDrSubtotals();
   var cnt=document.getElementById('dr-cnt');
   if(cnt)cnt.textContent=_drFiltered.length.toLocaleString()+' rows shown';
+}
+
+function updDrSubtotals(){
+  var sRet=0,sCost=0,sComm=0,sTax=0,sGp=0,sPat=0,sExc=0;
+  _drFiltered.forEach(function(r){sRet+=r[9];sCost+=r[10];sComm+=r[12];sTax+=r[13];sGp+=r[14];sPat+=r[15];sExc+=r[17];});
+  var u=function(id,v){var el=document.getElementById(id);if(el)el.textContent=NF(v);};
+  u('dr-st-ret',sRet);u('dr-st-cost',sCost);u('dr-st-comm',sComm);u('dr-st-tax',sTax);u('dr-st-gp',sGp);u('dr-st-pat',sPat);u('dr-st-exc',sExc);
 }
 
 function drSortRows(){
@@ -1688,10 +1600,10 @@ function renderDrVirtual(){
     var pc=r[7]==='PAID'?'color:#27ae60;font-weight:600':r[7]==='PENDING'?'color:#d4944a;font-weight:600':r[7]==='PARTIALLY_PAID'?'color:#e67e22;font-weight:600':'color:#888';
     h+='<tr style="height:'+_drRH+'px;background:'+bg+';'+lb+';cursor:pointer" onclick="drToggle('+i+')">';
     h+=drCell(DR_W.chk,'text-align:center','<input type="checkbox" '+(sel?'checked':'')+' onclick="event.stopPropagation();drToggle('+i+')" style="cursor:pointer;accent-color:var(--gold)">');
-    h+=drCell(DR_W.onum,'font-family:monospace;font-size:9px;color:#bbb',r[18]);
+    h+=drCell(DR_W.conum,'font-family:monospace;font-size:11px;color:#444',r[23]||'-');
+    h+=drCell(DR_W.onum,'font-family:monospace;font-size:11px;color:#444',r[18]);
     h+=drCell(DR_W.date,'color:#555;font-weight:500',fmtD(r[0]));
     h+=drCell(DR_W.prd,'font-weight:700',r[1]);
-    h+=drCell(DR_W.sku,'font-family:monospace;font-size:9px;color:#aaa',r[2]);
     h+=drCell(DR_W.sz,'text-align:center;font-weight:600',r[3]);
     h+=drCell(DR_W.stat,'text-align:center',sBadge(r[4]));
     h+=drCell(DR_W.pf,'text-align:center',pBadge(r[5]));
@@ -1703,6 +1615,7 @@ function renderDrVirtual(){
          :drCell(DR_W.cost,'text-align:right;color:#c0392b',NF(r[10]));
     h+=drCell(DR_W.cpct,'text-align:right;color:#888',r[11]+'%');
     h+=drCell(DR_W.comm,'text-align:right;color:#d4944a',NF(r[12]));
+    h+=drCell(DR_W.taxpct,'text-align:right;color:#888',r[24]+'%');
     h+=drCell(DR_W.tax,'text-align:right;color:#888',NF(r[13]));
     h+=drCell(DR_W.gp,'text-align:right;color:#27ae60;font-weight:600',NF(r[14]));
     h+=drCell(DR_W.pat,'text-align:right;color:#c8a96e;font-weight:700',NF(r[15]));
@@ -1773,25 +1686,39 @@ function rDR(){
   // Fix open/close toggle
   prdDropdown = prdDropdown.replace("display:none;position", "display:none").replace("display:none", "position:absolute").replace("position:absolute", "display:none;position:absolute");
 
+  // Subtotals
+  function stc(w,id,val,clr){return '<td id="'+id+'" style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:5px 6px;text-align:right;background:#f0ede8;font-weight:800;font-size:11px;border-bottom:2px solid var(--gold);color:'+(clr||'#1a1a1a')+'">'+NF(val)+'</td>';}
+  function ste(w){return '<td style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:5px 6px;background:#f0ede8;border-bottom:2px solid var(--gold)"></td>';}
+  var sRet=0,sCost=0,sComm=0,sTax=0,sGp=0,sPat=0,sExc=0;
+  _drFiltered.forEach(function(r){sRet+=r[9];sCost+=r[10];sComm+=r[12];sTax+=r[13];sGp+=r[14];sPat+=r[15];sExc+=r[17];});
+
   var hdr='<table style="table-layout:fixed;width:'+T+'px;border-collapse:collapse;background:#f8f6f2"><thead>'
     +'<tr>'
     +'<th style="width:'+W.chk+'px;min-width:'+W.chk+'px;padding:7px 6px;text-align:center;background:#f8f6f2;border-bottom:2px solid #e8e4dc"><input type="checkbox" id="dr-all-cb" onclick="drSelAll()" style="cursor:pointer;accent-color:var(--gold)"></th>'
+    +th(W.conum,'Ch.Order#')
     +th(W.onum,'Order#')
     +'<th id="dr-date-sort" onclick="drToggleSort()" style="width:'+W.date+'px;min-width:'+W.date+'px;padding:7px 6px;text-align:left;font-size:9px;color:var(--gold2);text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc;white-space:nowrap;cursor:pointer;user-select:none">Date ↑</th>'
-    +th(W.prd,'Product')+th(W.sku,'SKU')+th(W.sz,'Sz','center')
+    +th(W.prd,'Product')+th(W.sz,'Sz','center')
     +th(W.stat,'Status','center')+th(W.pf,'Platform','center')+th(W.dst,'Dest','center')+th(W.pay,'Payment','center')
     +th(W.days,'Days','right')+th(W.ret,'Retail','right')
     +'<th style="width:'+W.cost+'px;min-width:'+W.cost+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Cost 🟠</th>'
     +'<th style="width:'+W.cpct+'px;min-width:'+W.cpct+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Comm%</th>'
-    +th(W.comm,'Comm','right')+th(W.tax,'Tax','right')+th(W.gp,'GP','right')+th(W.pat,'PAT','right')
+    +th(W.comm,'Comm','right')+th(W.taxpct,'Tax%','right')+th(W.tax,'Tax','right')+th(W.gp,'GP','right')+th(W.pat,'PAT','right')
     +'<th style="width:'+W.exc+'px;min-width:'+W.exc+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Excess 🔴</th>'
+    +'</tr>'
+    +'<tr style="background:#f0ede8;font-weight:800">'
+    +ste(W.chk)+ste(W.conum)+ste(W.onum)
+    +'<td style="width:'+W.date+'px;min-width:'+W.date+'px;max-width:'+W.date+'px;padding:5px 6px;background:#f0ede8;border-bottom:2px solid var(--gold);font-size:9px;color:var(--gold2);font-weight:800">SUBTOTAL</td>'
+    +ste(W.prd)+ste(W.sz)+ste(W.stat)+ste(W.pf)+ste(W.dst)+ste(W.pay)+ste(W.days)
+    +stc(W.ret,'dr-st-ret',sRet,'#1a1a1a')+stc(W.cost,'dr-st-cost',sCost,'#c0392b')+ste(W.cpct)+stc(W.comm,'dr-st-comm',sComm,'#d4944a')+ste(W.taxpct)+stc(W.tax,'dr-st-tax',sTax,'#888')+stc(W.gp,'dr-st-gp',sGp,'#27ae60')+stc(W.pat,'dr-st-pat',sPat,'#c8a96e')
+    +stc(W.exc,'dr-st-exc',sExc,'#e74c3c')
     +'</tr>'
     +'<tr style="background:#fafafa">'
     +fempty(W.chk)
+    +fempty(W.conum)
     +fempty(W.onum)
     +fempty(W.date)
     +fcell(W.prd, prdDropdown)
-    +fempty(W.sku)
     +fcell(W.sz, fsel('sz',['S','M','L','XL']))
     +fcell(W.stat, fsel('stat',sts))
     +fcell(W.pf, fsel('pf',pfs))
@@ -1802,6 +1729,7 @@ function rDR(){
     +fempty(W.cost)
     +fcell(W.cpct, fsel('cpct',cpcts))
     +fempty(W.comm)
+    +fempty(W.taxpct)
     +fempty(W.tax)
     +fempty(W.gp)
     +fempty(W.pat)
@@ -1905,9 +1833,8 @@ function bizStats(){
     if(r[4]==='delivered'){
       p.del++;p.rev+=r[9];p.pat+=r[15];p.taxSum+=r[13];p.xa+=(r[17]||0);
     }
-    // Velocity (10d/20d/30d): use status filter if set, else delivered only
-    var velStats=f.stats.length>0?f.stats:['delivered'];
-    if(velStats.includes(r[4])){
+    // Velocity (10d/20d/30d): use status filter if set, else count all statuses
+    if(f.stats.length===0||f.stats.includes(r[4])){
       var isI=r[6]==='INTERNATIONAL',isM=r[5]==='MARKETPLACE',isO=r[5]==='OCTANE';
       if(r[0]>=s10){if(isM&&isI)p.v10i++;else if(isM)p.v10l++;else if(isO)p.v10o++;}
       if(r[0]>=s20){if(isM&&isI)p.v20i++;else if(isM)p.v20l++;else if(isO)p.v20o++;}
@@ -2287,731 +2214,222 @@ document.addEventListener('keydown',function(e){
   }
 });
 
-function expDR(){csvDL(_drFiltered.map(function(r){return[r[18],fmtD(r[0]),r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12],r[13],r[14],r[15],r[16],r[17]];}),['Order#','Date','Product','SKU','Size','Status','Platform','Dest','Payment','Days','Retail','Cost','Comm%','Commission','Tax','GP','PAT','IsExcess','ExcessAmt'],'detail_report.csv');}
-function expDRSel(){var rows=Array.from(_drSel).sort(function(a,b){return a-b;}).map(function(i){return _drFiltered[i];});csvDL(rows.map(function(r){return[r[18],fmtD(r[0]),r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12],r[13],r[14],r[15],r[16],r[17]];}),['Order#','Date','Product','SKU','Size','Status','Platform','Dest','Payment','Days','Retail','Cost','Comm%','Commission','Tax','GP','PAT','IsExcess','ExcessAmt'],'selected_rows.csv');}
+function expDR(){csvDL(_drFiltered.map(function(r){return[r[23],r[18],fmtD(r[0]),r[1],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12],r[24],r[13],r[14],r[15],r[16],r[17]];}),['ChOrderNo','Order#','Date','Product','Size','Status','Platform','Dest','Payment','Days','Retail','Cost','Comm%','Commission','Tax%','Tax','GP','PAT','IsExcess','ExcessAmt'],'detail_report.csv');}
+function expDRSel(){var rows=Array.from(_drSel).sort(function(a,b){return a-b;}).map(function(i){return _drFiltered[i];});csvDL(rows.map(function(r){return[r[23],r[18],fmtD(r[0]),r[1],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12],r[24],r[13],r[14],r[15],r[16],r[17]];}),['ChOrderNo','Order#','Date','Product','Size','Status','Platform','Dest','Payment','Days','Retail','Cost','Comm%','Commission','Tax%','Tax','GP','PAT','IsExcess','ExcessAmt'],'selected_rows.csv');}
 
 
 // ── PASSWORD PERSISTENCE ──
 function savePW(email,np){try{var s=JSON.parse(localStorage.getItem('sbm_pw')||'{}');s[email]=np;localStorage.setItem('sbm_pw',JSON.stringify(s));}catch(e){}}
 
 // ── PRODUCTION ORDERS ──
-function loadPO(){
-  try{
-    var arr=JSON.parse(localStorage.getItem('sbm_prod_orders')||'[]');
-    // Backwards compatibility: map old fields to new
-    arr.forEach(function(o){
-      if(o.total&&!o.qty)o.qty=o.total;
-      if(!o.qty)o.qty=(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
-      if(!o.customer)o.customer='';
-      if(!o.fabric)o.fabric='';
-      if(!o.requirement)o.requirement='ROUTINE';
-      if(!o.sizeChart)o.sizeChart=null;
-      if(!o.fabricSwatch)o.fabricSwatch=null;
-      if(o.fabricSwatchApproved===undefined)o.fabricSwatchApproved=false;
-      if(!o.log)o.log=[];
-      if(!o.eta)o.eta=o.targetDate||'';
-      // Migrate old 5-phase to 4-phase
-      if(o.phases){
-        if(o.phases.print&&!o.phases.printing){o.phases.printing=o.phases.print;delete o.phases.print;}
-        if(o.phases.finishing)delete o.phases.finishing;
-        if(!o.phases.cutting)o.phases.cutting={done:false,date:null,by:null,startDate:null};
-        if(!o.phases.embroidery)o.phases.embroidery={done:false,date:null,by:null,startDate:null};
-        if(!o.phases.printing)o.phases.printing={done:false,date:null,by:null,startDate:null};
-        if(!o.phases.stitching)o.phases.stitching={done:false,date:null,by:null,startDate:null};
-      }
-      // Map old statuses
-      if(o.status==='Pending')o.status='Pending Approval';
-      if(o.status==='In Progress')o.status='In Production';
-    });
-    return arr;
-  }catch(e){return[];}
-}
+function loadPO(){try{return JSON.parse(localStorage.getItem('sbm_prod_orders')||'[]');}catch(e){return[];}}
 function savePO(arr){try{localStorage.setItem('sbm_prod_orders',JSON.stringify(arr));}catch(e){}}
-var DEFAULT_CUSTOMERS=['Laam','Sahibas by Mirza','Stock Build'];
-function loadCustomers(){
-  try{var c=JSON.parse(localStorage.getItem('sbm_customers')||'null');
-  if(!c){c=DEFAULT_CUSTOMERS.slice();localStorage.setItem('sbm_customers',JSON.stringify(c));}
-  return c;}catch(e){return DEFAULT_CUSTOMERS.slice();}
-}
-function saveCustomers(arr){try{localStorage.setItem('sbm_customers',JSON.stringify(arr));}catch(e){}}
 
-// PO filter state
-var _poSearch='',_poStatusF='',_poReqF='';
-
-// ── Image compression utility ──
-function compressImage(file,maxW,callback){
-  var reader=new FileReader();
-  reader.onload=function(e){
-    var img=new Image();
-    img.onload=function(){
-      var w=img.width,h=img.height;
-      if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
-      var c=document.createElement('canvas');c.width=w;c.height=h;
-      var ctx=c.getContext('2d');ctx.drawImage(img,0,0,w,h);
-      callback(c.toDataURL('image/jpeg',0.6));
-    };
-    img.src=e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-// ── Image viewer ──
-function poViewImg(src){
-  var v=document.getElementById('po-img-viewer');
-  v.querySelector('img').src=src;
-  v.classList.add('open');
-}
-function poCloseImg(){document.getElementById('po-img-viewer').classList.remove('open');}
-
-// ── Customer management modal ──
-function openCustMgr(){
-  var custs=loadCustomers();
-  var el=document.getElementById('cust-mgr');
-  renderCustList(custs);
-  el.classList.add('open');
-}
-function closeCustMgr(){document.getElementById('cust-mgr').classList.remove('open');}
-function renderCustList(custs){
-  var h='';
-  custs.forEach(function(c,i){
-    h+='<div class="cust-item"><span>'+c+'</span><button class="cust-del" onclick="removeCust('+i+')" title="Remove">&#10005;</button></div>';
-  });
-  if(!custs.length)h='<div style="text-align:center;padding:20px;color:#666;font-size:12px">No customers added yet.</div>';
-  document.getElementById('cust-list-body').innerHTML=h;
-}
-function addCust(){
-  var inp=document.getElementById('cust-add-inp');
-  var name=inp.value.trim();
-  if(!name){showToast('Enter a customer name.');return;}
-  var custs=loadCustomers();
-  if(custs.indexOf(name)>=0){showToast('Customer already exists.');return;}
-  custs.push(name);custs.sort();
-  saveCustomers(custs);renderCustList(custs);inp.value='';
-  showToast('Customer "'+name+'" added.');
-}
-function removeCust(idx){
-  var custs=loadCustomers();
-  var name=custs[idx];
-  if(!confirm('Remove customer "'+name+'"?'))return;
-  custs.splice(idx,1);
-  saveCustomers(custs);renderCustList(custs);
-  showToast('Customer removed.');
-}
-
-// ── Open new PO modal ──
 function openNewPO(name){
-  // Populate product datalist
   var dl=document.getElementById('po-prodlist');
   dl.innerHTML='';
   var seen={};
   DETAIL.forEach(function(r){if(!seen[r[1]]){seen[r[1]]=1;var o=document.createElement('option');o.value=r[1];dl.appendChild(o);}});
-  // Populate customer dropdown
-  var csel=document.getElementById('po-customer');
-  var custs=loadCustomers();
-  csel.innerHTML='<option value="">-- Select Customer --</option>';
-  custs.forEach(function(c){csel.innerHTML+='<option value="'+c+'">'+c+'</option>';});
-  // Reset fields
   document.getElementById('po-prod').value=name||'';
-  document.getElementById('po-qty').value='';
-  document.getElementById('po-rs').value='';
-  document.getElementById('po-rm').value='';
-  document.getElementById('po-rl').value='';
-  document.getElementById('po-rxl').value='';
   document.getElementById('po-s').value='';
   document.getElementById('po-m').value='';
   document.getElementById('po-l').value='';
   document.getElementById('po-xl').value='';
-  document.getElementById('po-size-sum').innerHTML='';
   document.getElementById('po-notes').value='';
-  document.getElementById('po-fabric').value='';
-  document.getElementById('po-requirement').value='ROUTINE';
-  document.getElementById('po-sizechart').value='';
+  var td=new Date();td.setDate(td.getDate()+45);
+  document.getElementById('po-target').value=td.toISOString().split('T')[0];
   document.getElementById('po-stkhint').innerHTML='';
-  document.getElementById('po-dup-alert').innerHTML='';
-  document.getElementById('po-prod-img').style.display='none';
-  document.getElementById('po-sizechart-preview').style.display='none';
-  document.getElementById('po-date-display').textContent=new Date().toISOString().split('T')[0];
-  if(name)poProdHint(name);
-  document.getElementById('po-modal').classList.add('open');
-  document.getElementById('po-modal').querySelector('.po-mdl-box').scrollTop=0;
-  setTimeout(function(){document.getElementById(name?'po-prod':'po-customer').focus();},80);
+  if(name){poProdHint(name);}
+  document.getElementById('po-modal').style.display='flex';
+  setTimeout(function(){document.getElementById('po-prod').focus();},80);
 }
 
 function poProdHint(name){
   var k=name.toLowerCase().trim();
   var sp=STOCK_PRODS[k]||null;
-  var hint=document.getElementById('po-stkhint');
-  if(!hint)return;
-  // Show product image
-  var img=findImg(k);
-  var imgEl=document.getElementById('po-prod-img');
-  if(img){imgEl.src=img+(img.indexOf('?')>=0?'&width=120':'?width=120');imgEl.style.display='block';}
-  else{imgEl.style.display='none';}
-  if(!k||!sp){hint.innerHTML='';document.getElementById('po-dup-alert').innerHTML='';return;}
-
-  // Gather data
-  var stkS=sp.S||0,stkM=sp.M||0,stkL=sp.L||0,stkXL=sp.XL||0,stkT=sp.total||0;
-  var saS=sp.saS||0,saM=sp.saM||0,saL=sp.saL||0,saXL=sp.saXL||0,saT=sp.saTotal||0;
-
-  // Pending production orders
-  var orders=loadPO();
-  var actPO=orders.filter(function(o){return o.product&&o.product.toLowerCase().trim()===k&&o.status!=='Completed'&&o.status!=='Rejected'&&o.status!=='Cancelled';});
-  var poS=0,poM=0,poL=0,poXL=0,poT=0;
-  actPO.forEach(function(o){poS+=(o.S||0);poM+=(o.M||0);poL+=(o.L||0);poXL+=(o.XL||0);poT+=(o.qty||0);});
-
-  // Net stock after production
-  var netS=stkS+poS,netM=stkM+poM,netL=stkL+poL,netXL=stkXL+poXL,netT=stkT+poT;
-
-  // Sales data — delivered orders, size-wise
-  var pName=sp.title;
-  var delAll=DETAIL.filter(function(r){return r[1]===pName&&r[4]==='delivered';});
-  var totDel=delAll.length;
-  var dS=0,dM=0,dL=0,dXL=0;
-  delAll.forEach(function(r){var sz=r[3];if(sz==='S')dS++;else if(sz==='M')dM++;else if(sz==='L')dL++;else if(sz==='XL')dXL++;});
-
-  // 30d sales
-  var refD=META.max_date||new Date().toISOString().split('T')[0];
-  var s30=new Date(refD);s30.setDate(s30.getDate()-30);var s30s=s30.toISOString().split('T')[0];
-  var del30=delAll.filter(function(r){return r[0]>=s30s;});
-  var d30=del30.length,d30S=0,d30M=0,d30L=0,d30XL=0;
-  del30.forEach(function(r){var sz=r[3];if(sz==='S')d30S++;else if(sz==='M')d30M++;else if(sz==='L')d30L++;else if(sz==='XL')d30XL++;});
-  var daily=Math.round(d30/30*10)/10;
-
-  // Days of cover per size
-  var dRateS=d30S/30,dRateM=d30M/30,dRateL=d30L/30,dRateXL=d30XL/30;
-  function covD(stk,rate){return rate>0?Math.round(stk/rate)+'d':'—';}
-  function covC(stk,rate){return rate>0&&stk/rate<7?'color:#e74c3c;font-weight:700':rate>0&&stk/rate<15?'color:#d4944a;font-weight:700':'color:#27ae60';}
-
-  // Size ratio from sales
-  var ratioS=totDel>0?Math.round(dS/totDel*100):0;
-  var ratioM=totDel>0?Math.round(dM/totDel*100):0;
-  var ratioL=totDel>0?Math.round(dL/totDel*100):0;
-  var ratioXL=totDel>0?Math.round(dXL/totDel*100):0;
-  // Simplify ratio to smallest integers
-  function simplifyRatio(a,b,c,d){
-    if(!a&&!b&&!c&&!d)return'—';
-    var g=gcd(gcd(a||1,b||1),gcd(c||1,d||1));
-    if(g<1)g=1;
-    return Math.round(a/g)+':'+Math.round(b/g)+':'+Math.round(c/g)+':'+Math.round(d/g);
-  }
-  function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b){var t=b;b=a%b;a=t;}return a;}
-  var sRatio=simplifyRatio(dS,dM,dL,dXL);
-  // Normalized ratio for apply button
-  var rSum=dS+dM+dL+dXL;
-  var nrS=rSum>0?Math.round(dS/rSum*10):0,nrM=rSum>0?Math.round(dM/rSum*10):0,nrL=rSum>0?Math.round(dL/rSum*10):0,nrXL=rSum>0?Math.round(dXL/rSum*10):0;
-
-  var tb='border:1px solid #3a3a3a;padding:4px 7px;font-size:10px;text-align:right;';
-  var th='border:1px solid #3a3a3a;padding:4px 7px;font-size:9px;text-align:center;color:#aaa;background:#252525;font-weight:700;';
-  var tl=tb+'text-align:left;color:#aaa;font-weight:600;font-size:9px;';
-  var card='<div style="background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:10px;margin:6px 0 8px">';
-  // Stock Position
-  card+='<div style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:.06em;margin-bottom:5px">STOCK POSITION</div>';
-  card+='<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tr><td style="'+th+'"></td><td style="'+th+'">Total</td><td style="'+th+'">S</td><td style="'+th+'">M</td><td style="'+th+'">L</td><td style="'+th+'">XL</td></tr>';
-  card+='<tr><td style="'+tl+'">On Hand (Laam)</td><td style="'+tb+'font-weight:700;color:#fff">'+stkT+'</td><td style="'+tb+'color:#ccc">'+stkS+'</td><td style="'+tb+'color:#ccc">'+stkM+'</td><td style="'+tb+'color:#ccc">'+stkL+'</td><td style="'+tb+'color:#ccc">'+stkXL+'</td></tr>';
-  card+='<tr><td style="'+tl+'">Sell Ahead</td><td style="'+tb+'color:#e67e22">'+saT+'</td><td style="'+tb+'color:#e67e22">'+saS+'</td><td style="'+tb+'color:#e67e22">'+saM+'</td><td style="'+tb+'color:#e67e22">'+saL+'</td><td style="'+tb+'color:#e67e22">'+saXL+'</td></tr>';
-  if(poT>0){card+='<tr><td style="'+tl+'">Pending Orders</td><td style="'+tb+'color:#2980b9">'+poT+'</td><td style="'+tb+'color:#2980b9">'+poS+'</td><td style="'+tb+'color:#2980b9">'+poM+'</td><td style="'+tb+'color:#2980b9">'+poL+'</td><td style="'+tb+'color:#2980b9">'+poXL+'</td></tr>';}
-  card+='<tr style="background:#222"><td style="'+tl+'font-weight:700;color:var(--gold)">Net Stock'+(poT>0?' (after prod)':'')+'</td><td style="'+tb+'font-weight:700;color:var(--gold)">'+netT+'</td><td style="'+tb+'color:var(--gold)">'+netS+'</td><td style="'+tb+'color:var(--gold)">'+netM+'</td><td style="'+tb+'color:var(--gold)">'+netL+'</td><td style="'+tb+'color:var(--gold)">'+netXL+'</td></tr>';
-  card+='<tr><td style="'+tl+'">Days of Cover</td><td style="'+tb+covC(stkT,daily)+'">'+covD(stkT,daily)+'</td><td style="'+tb+covC(stkS,dRateS)+'">'+covD(stkS,dRateS)+'</td><td style="'+tb+covC(stkM,dRateM)+'">'+covD(stkM,dRateM)+'</td><td style="'+tb+covC(stkL,dRateL)+'">'+covD(stkL,dRateL)+'</td><td style="'+tb+covC(stkXL,dRateXL)+'">'+covD(stkXL,dRateXL)+'</td></tr>';
-  card+='</table>';
-  // Sales
-  card+='<div style="font-size:9px;color:#27ae60;font-weight:700;letter-spacing:.06em;margin-bottom:5px">SALES PERFORMANCE</div>';
-  card+='<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tr><td style="'+th+'"></td><td style="'+th+'">Total</td><td style="'+th+'">S</td><td style="'+th+'">M</td><td style="'+th+'">L</td><td style="'+th+'">XL</td></tr>';
-  card+='<tr><td style="'+tl+'">Total Delivered</td><td style="'+tb+'font-weight:700;color:#fff">'+NF(totDel)+'</td><td style="'+tb+'color:#ccc">'+NF(dS)+'</td><td style="'+tb+'color:#ccc">'+NF(dM)+'</td><td style="'+tb+'color:#ccc">'+NF(dL)+'</td><td style="'+tb+'color:#ccc">'+NF(dXL)+'</td></tr>';
-  card+='<tr><td style="'+tl+'">30d Sales</td><td style="'+tb+'color:#2980b9;font-weight:700">'+d30+'</td><td style="'+tb+'color:#2980b9">'+d30S+'</td><td style="'+tb+'color:#2980b9">'+d30M+'</td><td style="'+tb+'color:#2980b9">'+d30L+'</td><td style="'+tb+'color:#2980b9">'+d30XL+'</td></tr>';
-  card+='<tr><td style="'+tl+'">Daily Rate</td><td style="'+tb+'color:#888">'+daily+'/d</td><td colspan="4" style="'+tb+'color:#555;text-align:center;font-size:9px">'+Math.round(dRateS*10)/10+'/d · '+Math.round(dRateM*10)/10+'/d · '+Math.round(dRateL*10)/10+'/d · '+Math.round(dRateXL*10)/10+'/d</td></tr>';
-  card+='<tr style="background:#222"><td style="'+tl+'font-weight:700;color:#27ae60">Size Ratio</td><td style="'+tb+'font-weight:700;color:#27ae60">'+sRatio+'</td><td style="'+tb+'color:#27ae60">'+ratioS+'%</td><td style="'+tb+'color:#27ae60">'+ratioM+'%</td><td style="'+tb+'color:#27ae60">'+ratioL+'%</td><td style="'+tb+'color:#27ae60">'+ratioXL+'%</td></tr>';
-  card+='</table>';
-  // Suggest ratio button
-  if(rSum>0){
-    card+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:10px;color:#aaa">Suggested ratio from sales:</span><b style="color:var(--gold);font-size:11px">'+sRatio+'</b>';
-    card+='<button onclick="poSetRatio('+nrS+','+nrM+','+nrL+','+nrXL+')" style="background:var(--gold);color:#111;border:none;border-radius:4px;padding:3px 12px;font-size:10px;font-weight:700;cursor:pointer">Apply</button></div>';
-  }
-  card+='</div>';
-  hint.innerHTML=card;
-
-  // Duplicate order alert
-  var dupEl=document.getElementById('po-dup-alert');
-  if(actPO.length){
-    var dh='<div class="po-dup-alert"><b>Warning:</b> Active production order(s) exist for this product:<br>';
-    actPO.forEach(function(d){dh+='<span style="display:inline-block;margin:3px 0">'+d.id+' — Customer: '+(d.customer||'N/A')+', Qty: '+(d.qty||d.total||0)+', Status: '+d.status+(d.eta?', ETA: '+fmtD(d.eta):'')+'</span><br>';});
-    dh+='</div>';dupEl.innerHTML=dh;
-  }else{dupEl.innerHTML='';}
+  var h=document.getElementById('po-stkhint');
+  if(!h)return;
+  if(sp){h.innerHTML='<span style="font-size:10px;color:#aaa">Current stock → S:<b style="color:#fff"> '+(sp.S||0)+'</b> M:<b style="color:#fff"> '+(sp.M||0)+'</b> L:<b style="color:#fff"> '+(sp.L||0)+'</b> XL:<b style="color:#fff"> '+(sp.XL||0)+'</b> | Total: <b style="color:var(--gold)"> '+(sp.total||0)+'</b></span>';}
+  else{h.innerHTML='';}
 }
 
-function poCalcFromRatio(){
-  var qty=parseInt(document.getElementById('po-qty').value)||0;
-  var rs=parseInt(document.getElementById('po-rs').value)||0;
-  var rm=parseInt(document.getElementById('po-rm').value)||0;
-  var rl=parseInt(document.getElementById('po-rl').value)||0;
-  var rxl=parseInt(document.getElementById('po-rxl').value)||0;
-  var tot=rs+rm+rl+rxl;
-  if(tot>0&&qty>0){
-    var sQ=Math.round(qty*rs/tot);
-    var mQ=Math.round(qty*rm/tot);
-    var lQ=Math.round(qty*rl/tot);
-    var xlQ=qty-sQ-mQ-lQ;
-    document.getElementById('po-s').value=sQ||'';
-    document.getElementById('po-m').value=mQ||'';
-    document.getElementById('po-l').value=lQ||'';
-    document.getElementById('po-xl').value=xlQ||'';
-  }
-  poUpdateSizeSum();
-}
-function poSetRatio(s,m,l,xl){
-  document.getElementById('po-rs').value=s||'';
-  document.getElementById('po-rm').value=m||'';
-  document.getElementById('po-rl').value=l||'';
-  document.getElementById('po-rxl').value=xl||'';
-  poCalcFromRatio();
-}
-function poSizeManualEdit(){poUpdateSizeSum();}
-function poUpdateSizeSum(){
-  var s=parseInt(document.getElementById('po-s').value)||0;
-  var m=parseInt(document.getElementById('po-m').value)||0;
-  var l=parseInt(document.getElementById('po-l').value)||0;
-  var xl=parseInt(document.getElementById('po-xl').value)||0;
-  var sum=s+m+l+xl;
-  var qty=parseInt(document.getElementById('po-qty').value)||0;
-  var el=document.getElementById('po-size-sum');
-  if(sum>0){
-    var match=sum===qty;
-    el.innerHTML='S:'+s+' + M:'+m+' + L:'+l+' + XL:'+xl+' = <b style="color:'+(match?'#27ae60':'#e74c3c')+'">'+sum+(match?' ✓':' ≠ '+qty)+'</b>';
-  }else{el.innerHTML='';}
-}
-
-function poSizeChartPreview(inp){
-  var prev=document.getElementById('po-sizechart-preview');
-  if(inp.files&&inp.files[0]){
-    compressImage(inp.files[0],600,function(b64){
-      prev.src=b64;prev.style.display='block';
-      prev.setAttribute('data-b64',b64);
-    });
-  }else{prev.style.display='none';}
-}
-
-function closePO(){document.getElementById('po-modal').classList.remove('open');}
+function closePO(){document.getElementById('po-modal').style.display='none';}
 
 function submitPO(){
-  var customer=document.getElementById('po-customer').value;
-  if(!customer){showToast('Select a customer.');return;}
   var prod=document.getElementById('po-prod').value.trim();
   if(!prod){showToast('Enter a product name.');return;}
-  var qty=parseInt(document.getElementById('po-qty').value)||0;
-  if(!qty){showToast('Enter ordered quantity.');return;}
-  var fabric=document.getElementById('po-fabric').value.trim();
-  if(!fabric){showToast('Enter fabric/material name.');return;}
-  var requirement=document.getElementById('po-requirement').value;
-  if(!requirement){showToast('Select requirement type.');return;}
-  // Size chart
-  var scPrev=document.getElementById('po-sizechart-preview');
-  var sizeChart=scPrev.getAttribute('data-b64')||null;
-  if(!sizeChart){showToast('Attach a size chart image.');return;}
   var s=parseInt(document.getElementById('po-s').value)||0;
   var m=parseInt(document.getElementById('po-m').value)||0;
   var l=parseInt(document.getElementById('po-l').value)||0;
   var xl=parseInt(document.getElementById('po-xl').value)||0;
-  var sizeSum=s+m+l+xl;
-  if(sizeSum>0&&sizeSum!==qty){showToast('Size breakdown ('+sizeSum+') does not match ordered qty ('+qty+').');return;}
+  var tot=s+m+l+xl;
+  if(!tot){showToast('Enter at least one size quantity.');return;}
   var orders=loadPO();
-  // Generate next ID
-  var maxNum=0;
-  orders.forEach(function(o){var n=parseInt(o.id.replace('PO-',''));if(n>maxNum)maxNum=n;});
-  var id='PO-'+String(maxNum+1).padStart(3,'0');
+  var id='PO-'+String(orders.length+1).padStart(3,'0');
   var today=new Date().toISOString().split('T')[0];
   var img=findImg(prod.toLowerCase().trim());
-  var newOrder={
-    id:id,date:today,customer:customer,product:prod,img:img,
-    qty:qty,S:s,M:m,L:l,XL:xl,
-    sizeChart:sizeChart,fabric:fabric,requirement:requirement,
+  orders.unshift({id:id,date:today,product:prod,img:img,S:s,M:m,L:l,XL:xl,total:tot,
     notes:document.getElementById('po-notes').value.trim(),
+    targetDate:document.getElementById('po-target').value||'',
     placedBy:CU?CU.name:'',
-    status:'Pending Approval',
-    fabricSwatch:null,fabricSwatchApproved:false,
-    phases:{
-      cutting:{done:false,date:null,by:null,startDate:null},
-      embroidery:{done:false,date:null,by:null,startDate:null},
-      printing:{done:false,date:null,by:null,startDate:null},
-      stitching:{done:false,date:null,by:null,startDate:null}
-    },
-    eta:'',
-    log:[{action:'Created',by:CU?CU.name:'',date:today,detail:'Qty '+qty+' for '+customer}]
-  };
-  orders.unshift(newOrder);
+    phases:{cutting:{done:false,date:null,by:null},print:{done:false,date:null,by:null},embroidery:{done:false,date:null,by:null},stitching:{done:false,date:null,by:null},finishing:{done:false,date:null,by:null}},
+    status:'Pending'});
   savePO(orders);closePO();rendered.po=false;doR('po');
-  showToast(id+' placed for '+prod+' ('+customer+')');
+  showToast('✓ '+id+' placed for '+prod);
 }
 
-// ── Approve / Reject order ──
-function poApprove(oid){
-  var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});
-  if(!o)return;
-  o.status='Approved';
-  o.log.push({action:'Approved',by:CU?CU.name:'',date:new Date().toISOString().split('T')[0],detail:'Order approved by admin'});
-  savePO(orders);rendered.po=false;doR('po');
-  showToast(oid+' approved.');
-}
-function poReject(oid){
-  if(!confirm('Reject order '+oid+'?'))return;
-  var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});
-  if(!o)return;
-  o.status='Rejected';
-  o.log.push({action:'Rejected',by:CU?CU.name:'',date:new Date().toISOString().split('T')[0],detail:'Order rejected by admin'});
-  savePO(orders);rendered.po=false;doR('po');
-  showToast(oid+' rejected.');
-}
-
-// ── Upload fabric swatch ──
-function poUploadSwatch(oid){
-  var inp=document.createElement('input');inp.type='file';inp.accept='image/*';
-  inp.onchange=function(){
-    if(!inp.files||!inp.files[0])return;
-    compressImage(inp.files[0],600,function(b64){
-      var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});
-      if(!o)return;
-      o.fabricSwatch=b64;
-      o.status='Fabric Review';
-      o.log.push({action:'Fabric Swatch Uploaded',by:CU?CU.name:'',date:new Date().toISOString().split('T')[0],detail:'Fabric swatch uploaded for review'});
-      savePO(orders);rendered.po=false;doR('po');
-      showToast('Fabric swatch uploaded for '+oid);
-    });
-  };
-  inp.click();
-}
-
-// ── Approve fabric swatch ──
-function poApproveSwatch(oid){
-  var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});
-  if(!o)return;
-  o.fabricSwatchApproved=true;
-  o.status='In Production';
-  o.log.push({action:'Swatch Approved',by:CU?CU.name:'',date:new Date().toISOString().split('T')[0],detail:'Fabric swatch approved, order moved to production'});
-  savePO(orders);rendered.po=false;doR('po');
-  showToast(oid+' swatch approved, now in production.');
-}
-
-// ── Toggle phase ──
 function togglePoPhase(oid,ph){
   var orders=loadPO();
   var o=orders.find(function(x){return x.id===oid;});
-  if(!o||!o.phases||!o.phases[ph])return;
-  if(o.status!=='In Production')return;
-  var p=o.phases[ph];
-  var today=new Date().toISOString().split('T')[0];
-  p.done=!p.done;
-  p.date=p.done?today:null;
+  if(!o)return;
+  var p=o.phases[ph];p.done=!p.done;
+  p.date=p.done?new Date().toISOString().split('T')[0]:null;
   p.by=p.done&&CU?CU.name:null;
-  if(p.done&&!p.startDate)p.startDate=today;
-  // Log
-  o.log.push({action:p.done?'Phase Completed':'Phase Undone',by:CU?CU.name:'',date:today,detail:ph+(p.done?' marked complete':' unmarked')});
-  // Auto-complete if all 4 phases done
-  var ks=['cutting','embroidery','printing','stitching'];
+  var ks=['cutting','print','embroidery','stitching','finishing'];
   var cnt=ks.filter(function(k){return o.phases[k]&&o.phases[k].done;}).length;
-  if(cnt===ks.length){
-    o.status='Completed';
-    o.log.push({action:'Completed',by:CU?CU.name:'',date:today,detail:'All phases completed'});
-  }
+  o.status=cnt===0?'Pending':cnt===ks.length?'Completed':'In Progress';
   savePO(orders);rendered.po=false;doR('po');
 }
 
-// ── Update ETA ──
-function poSetEta(oid){
-  var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});
-  if(!o)return;
-  var inp=document.createElement('input');inp.type='date';inp.value=o.eta||'';
-  inp.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99999;font-size:18px;padding:12px 16px;border:2px solid var(--gold);border-radius:8px;background:#1e1e1e;color:#fff;outline:none;box-shadow:0 10px 40px rgba(0,0,0,.6)';
-  var bg=document.createElement('div');bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99998';
-  bg.onclick=function(){bg.remove();inp.remove();};
-  document.body.appendChild(bg);document.body.appendChild(inp);
-  inp.focus();inp.showPicker&&inp.showPicker();
-  inp.onchange=function(){
-    var val=inp.value;bg.remove();inp.remove();
-    if(!val)return;
-    var oldEta=o.eta;o.eta=val;
-    o.log.push({action:'ETA Updated',by:CU?CU.name:'',date:new Date().toISOString().split('T')[0],detail:'ETA changed from '+(oldEta?fmtD(oldEta):'none')+' to '+fmtD(val)});
-    savePO(orders);rendered.po=false;doR('po');
-    showToast('ETA updated for '+oid);
-  };
-}
-
-// ── Cancel order ──
 function cancelPO(oid){
   if(!confirm('Cancel order '+oid+'?'))return;
   var orders=loadPO();
   var o=orders.find(function(x){return x.id===oid;});
-  if(!o)return;
-  o.status='Cancelled';
-  o.log.push({action:'Cancelled',by:CU?CU.name:'',date:new Date().toISOString().split('T')[0],detail:'Order cancelled'});
+  if(o)o.status='Cancelled';
   savePO(orders);rendered.po=false;doR('po');
   showToast(oid+' cancelled.');
-}
-
-// ── View order log ──
-function poViewLog(oid){
-  var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});
-  if(!o)return;
-  var h='<div class="po-mdl-hd"><div class="po-mdl-title">Audit Log — '+oid+'</div><button class="po-mdl-x" onclick="document.getElementById(\'po-log-modal\').classList.remove(\'open\')">&#10005;</button></div>';
-  h+='<div style="max-height:400px;overflow-y:auto">';
-  if(o.log&&o.log.length){
-    o.log.slice().reverse().forEach(function(e){
-      h+='<div class="po-log-entry"><span class="po-log-action">'+e.action+'</span> by <b>'+e.by+'</b><span class="po-log-date">'+fmtD(e.date)+'</span><br><span style="color:#888">'+e.detail+'</span></div>';
-    });
-  }else{h+='<div style="color:#666;padding:20px;text-align:center">No log entries.</div>';}
-  h+='</div>';
-  var el=document.getElementById('po-log-modal');
-  el.querySelector('.po-mdl-box').innerHTML=h;
-  el.classList.add('open');
-}
-
-// ── Edit order (Owner only) ──
-function poOpenEdit(oid){
-  var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});
-  if(!o)return;
-  var custs=loadCustomers();
-  var custOpts='<option value="">-- Select --</option>';
-  custs.forEach(function(c){custOpts+='<option value="'+c+'"'+(c===o.customer?' selected':'')+'>'+c+'</option>';});
-  // Populate product datalist for edit
-  var dlHtml='';var seen={};
-  DETAIL.forEach(function(r){if(!seen[r[1]]){seen[r[1]]=1;dlHtml+='<option value="'+r[1]+'">';}});
-  var statOpts=['Pending Approval','Approved','Fabric Pending','Fabric Review','In Production','Completed','Rejected','Cancelled'];
-  var statSel='';
-  statOpts.forEach(function(s){statSel+='<option value="'+s+'"'+(s===o.status?' selected':'')+'>'+s+'</option>';});
-  var h='<div class="po-mdl-hd"><div class="po-mdl-title">Edit Order — '+oid+'</div><button class="po-mdl-x" onclick="document.getElementById(\'po-edit-modal\').classList.remove(\'open\')">&#10005;</button></div>';
-  h+='<label class="po-lbl">Customer<span class="po-req">*</span></label><select id="poe-customer" class="po-inp">'+custOpts+'</select>';
-  h+='<label class="po-lbl">Product<span class="po-req">*</span></label><input id="poe-prod" list="poe-prodlist" class="po-inp" value="'+o.product+'"><datalist id="poe-prodlist">'+dlHtml+'</datalist>';
-  h+='<label class="po-lbl">Ordered Qty<span class="po-req">*</span></label><input id="poe-qty" type="number" class="po-inp" value="'+(o.qty||0)+'">';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">';
-  h+='<div><div style="font-size:10px;color:#aaa;text-align:center;margin-bottom:4px">S</div><input id="poe-s" type="number" class="po-inp-sm" value="'+(o.S||0)+'"></div>';
-  h+='<div><div style="font-size:10px;color:#aaa;text-align:center;margin-bottom:4px">M</div><input id="poe-m" type="number" class="po-inp-sm" value="'+(o.M||0)+'"></div>';
-  h+='<div><div style="font-size:10px;color:#aaa;text-align:center;margin-bottom:4px">L</div><input id="poe-l" type="number" class="po-inp-sm" value="'+(o.L||0)+'"></div>';
-  h+='<div><div style="font-size:10px;color:#aaa;text-align:center;margin-bottom:4px">XL</div><input id="poe-xl" type="number" class="po-inp-sm" value="'+(o.XL||0)+'"></div>';
-  h+='</div>';
-  h+='<label class="po-lbl">Fabric/Material<span class="po-req">*</span></label><input id="poe-fabric" class="po-inp" value="'+(o.fabric||'')+'">';
-  h+='<label class="po-lbl">Requirement</label><select id="poe-req" class="po-inp"><option value="URGENT"'+(o.requirement==='URGENT'?' selected':'')+'>URGENT</option><option value="ROUTINE"'+(o.requirement==='ROUTINE'?' selected':'')+'>ROUTINE</option></select>';
-  h+='<label class="po-lbl">ETA</label><input id="poe-eta" type="date" class="po-inp" value="'+(o.eta||'')+'">';
-  h+='<label class="po-lbl">Status</label><select id="poe-status" class="po-inp">'+statSel+'</select>';
-  h+='<label class="po-lbl">Notes</label><textarea id="poe-notes" rows="2" class="po-inp" style="resize:vertical">'+(o.notes||'')+'</textarea>';
-  h+='<div class="po-btn-row"><button class="po-btn-primary" onclick="poSaveEdit(\''+oid+'\')">Save Changes</button><button class="po-btn-cancel" onclick="document.getElementById(\'po-edit-modal\').classList.remove(\'open\')">Cancel</button></div>';
-  var el=document.getElementById('po-edit-modal');
-  el.querySelector('.po-mdl-box').innerHTML=h;
-  el.classList.add('open');
-}
-function poSaveEdit(oid){
-  var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});
-  if(!o)return;
-  var today=new Date().toISOString().split('T')[0];
-  var changes=[];
-  var nc=document.getElementById('poe-customer').value;
-  if(nc!==o.customer){changes.push('customer: '+o.customer+' -> '+nc);o.customer=nc;}
-  var np=document.getElementById('poe-prod').value.trim();
-  if(np!==o.product){changes.push('product: '+o.product+' -> '+np);o.product=np;o.img=findImg(np.toLowerCase().trim());}
-  var nq=parseInt(document.getElementById('poe-qty').value)||0;
-  if(nq!==o.qty){changes.push('qty: '+o.qty+' -> '+nq);o.qty=nq;}
-  var ns=parseInt(document.getElementById('poe-s').value)||0;if(ns!==o.S){changes.push('S: '+o.S+' -> '+ns);o.S=ns;}
-  var nm=parseInt(document.getElementById('poe-m').value)||0;if(nm!==o.M){changes.push('M: '+o.M+' -> '+nm);o.M=nm;}
-  var nl=parseInt(document.getElementById('poe-l').value)||0;if(nl!==o.L){changes.push('L: '+o.L+' -> '+nl);o.L=nl;}
-  var nxl=parseInt(document.getElementById('poe-xl').value)||0;if(nxl!==o.XL){changes.push('XL: '+o.XL+' -> '+nxl);o.XL=nxl;}
-  var nf=document.getElementById('poe-fabric').value.trim();if(nf!==o.fabric){changes.push('fabric: '+(o.fabric||'none')+' -> '+nf);o.fabric=nf;}
-  var nr=document.getElementById('poe-req').value;if(nr!==o.requirement){changes.push('requirement: '+o.requirement+' -> '+nr);o.requirement=nr;}
-  var ne=document.getElementById('poe-eta').value;if(ne!==o.eta){changes.push('eta: '+(o.eta||'none')+' -> '+ne);o.eta=ne;}
-  var nst=document.getElementById('poe-status').value;if(nst!==o.status){changes.push('status: '+o.status+' -> '+nst);o.status=nst;}
-  var nn=document.getElementById('poe-notes').value.trim();if(nn!==o.notes){changes.push('notes updated');o.notes=nn;}
-  if(changes.length){
-    o.log.push({action:'Edited',by:CU?CU.name:'',date:today,detail:'Changed '+changes.join('; ')});
-    savePO(orders);rendered.po=false;doR('po');
-    showToast(oid+' updated.');
-  }
-  document.getElementById('po-edit-modal').classList.remove('open');
-}
-
-// ── CSV Export ──
-function poExportCSV(){
-  var orders=loadPO();
-  var PHASES=['cutting','embroidery','printing','stitching'];
-  var rows=orders.map(function(o){
-    return [o.id,o.date,o.customer,o.product,o.qty,o.S,o.M,o.L,o.XL,o.fabric,o.requirement,o.status,o.eta,o.placedBy,o.notes,
-      PHASES.map(function(p){return p+':'+(o.phases[p]&&o.phases[p].done?'Done':'Pending');}).join(' | ')];
-  });
-  rows.unshift(['ID','Date','Customer','Product','Qty','S','M','L','XL','Fabric','Requirement','Status','ETA','Placed By','Notes','Phases']);
-  var csv=rows.map(function(r){return r.map(function(c){return '"'+String(c||'').replace(/"/g,'""')+'"';}).join(',');}).join('\n');
-  var blob=new Blob([csv],{type:'text/csv'});
-  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='production_orders.csv';a.click();
-}
-
-// ── PDF Export (print) ──
-function poExportPDF(){
-  var orders=loadPO().filter(function(o){return o.status!=='Cancelled';});
-  var PHASES=['cutting','embroidery','printing','stitching'];
-  var h='<div id="po-print-area" style="display:block"><h2 style="margin-bottom:12px">Production Orders Report — '+new Date().toISOString().split('T')[0]+'</h2>';
-  h+='<table><thead><tr><th>ID</th><th>Date</th><th>Customer</th><th>Product</th><th>Qty</th><th>Sizes</th><th>Fabric</th><th>Req</th><th>Status</th><th>ETA</th><th>Phases</th></tr></thead><tbody>';
-  orders.forEach(function(o){
-    h+='<tr><td>'+o.id+'</td><td>'+o.date+'</td><td>'+(o.customer||'')+'</td><td>'+o.product+'</td><td>'+(o.qty||0)+'</td>';
-    h+='<td>S:'+(o.S||0)+' M:'+(o.M||0)+' L:'+(o.L||0)+' XL:'+(o.XL||0)+'</td>';
-    h+='<td>'+(o.fabric||'')+'</td><td>'+(o.requirement||'')+'</td><td>'+o.status+'</td><td>'+(o.eta||'-')+'</td>';
-    h+='<td>'+PHASES.map(function(p){return p.charAt(0).toUpperCase()+':'+(o.phases[p]&&o.phases[p].done?'Y':'N');}).join(' ')+'</td></tr>';
-  });
-  h+='</tbody></table></div>';
-  // Create temporary print div
-  var d=document.createElement('div');d.id='po-print-area';d.innerHTML=h;d.style.display='none';
-  document.body.appendChild(d);
-  d.style.display='block';
-  window.print();
-  setTimeout(function(){document.body.removeChild(d);},1000);
-}
-
-// ── Get active production order data for a product ──
-function poGetActiveForProduct(prodName){
-  var k=prodName.toLowerCase().trim();
-  var orders=loadPO();
-  return orders.filter(function(o){return o.product&&o.product.toLowerCase().trim()===k&&o.status!=='Completed'&&o.status!=='Rejected'&&o.status!=='Cancelled';});
 }
 
 function rPO(){
   var el=document.getElementById('ppo');
   var orders=loadPO();
-  var today=new Date().toISOString().split('T')[0];
-  var thisMonth=today.substring(0,7);
-  var isOwner=CU&&CU.role==='Owner';
+  var active=orders.filter(function(o){return o.status!=='Cancelled';});
+  var cancelled=orders.filter(function(o){return o.status==='Cancelled';});
+  var inProg=active.filter(function(o){return o.status==='In Progress';}).length;
+  var comp=active.filter(function(o){return o.status==='Completed';}).length;
+  var totQty=active.reduce(function(a,o){return a+o.total;},0);
   var canPlace=CU&&(CU.role==='Owner'||CU.role==='Editor');
-  var PHASES=[['cutting','Cutting'],['embroidery','Embroidery'],['printing','Printing'],['stitching','Stitching']];
-  var PHASE_ICO={cutting:'&#9986;',embroidery:'&#127800;',printing:'&#128424;',stitching:'&#129525;'};
-
-  // Apply filters
-  var filtered=orders.filter(function(o){
-    if(o.status==='Cancelled')return false;
-    if(_poSearch){var s=_poSearch.toLowerCase();if((o.id||'').toLowerCase().indexOf(s)<0&&(o.product||'').toLowerCase().indexOf(s)<0&&(o.customer||'').toLowerCase().indexOf(s)<0)return false;}
-    if(_poStatusF&&o.status!==_poStatusF)return false;
-    if(_poReqF&&o.requirement!==_poReqF)return false;
-    return true;
-  });
-
-  // KPI counts
-  var allActive=orders.filter(function(o){return o.status!=='Cancelled'&&o.status!=='Rejected';});
-  var pendApp=allActive.filter(function(o){return o.status==='Pending Approval';}).length;
-  var inProd=allActive.filter(function(o){return o.status==='In Production';}).length;
-  var compMonth=allActive.filter(function(o){return o.status==='Completed'&&o.date&&o.date.substring(0,7)===thisMonth;}).length;
-  var overdue=allActive.filter(function(o){return o.status!=='Completed'&&o.eta&&o.eta<today;}).length;
+  var PHASES=[['cutting','✂️ Cutting'],['print','🖨️ Print'],['embroidery','🌸 Embroidery'],['stitching','🧵 Stitching'],['finishing','✨ Finishing']];
 
   var kh='<div class="krow">'
-   +'<div class="kpi b"><div class="kl">Total Orders</div><div class="kv">'+allActive.length+'</div><div class="ks">Active orders</div></div>'
-   +'<div class="kpi w"><div class="kl">Pending Approval</div><div class="kv">'+pendApp+'</div><div class="ks">Awaiting admin</div></div>'
-   +'<div class="kpi g"><div class="kl">In Production</div><div class="kv">'+inProd+'</div><div class="ks">Being produced</div></div>'
-   +(overdue?'<div class="kpi r"><div class="kl">Overdue</div><div class="kv">'+overdue+'</div><div class="ks">Past ETA</div></div>':'')
-   +'<div class="kpi e"><div class="kl">Completed (Month)</div><div class="kv">'+compMonth+'</div><div class="ks">'+thisMonth+'</div></div>'
+   +'<div class="kpi b"><div class="kl">Total Orders</div><div class="kv">'+active.length+'</div><div class="ks">'+comp+' completed</div></div>'
+   +'<div class="kpi w"><div class="kl">In Progress</div><div class="kv">'+inProg+'</div><div class="ks">Being produced</div></div>'
+   +'<div class="kpi g"><div class="kl">Units in Pipeline</div><div class="kv">'+NF(totQty)+'</div><div class="ks">Total ordered qty</div></div>'
+   +(cancelled.length?'<div class="kpi r"><div class="kl">Cancelled</div><div class="kv">'+cancelled.length+'</div><div class="ks">This session</div></div>':'')
    +'</div>';
 
-  // Toolbar
-  var tb='<div class="po-toolbar">'
-   +'<input type="text" placeholder="Search orders..." value="'+(_poSearch||'')+'" oninput="_poSearch=this.value;rendered.po=false;doR(\'po\')" style="min-width:150px">'
-   +'<select onchange="_poStatusF=this.value;rendered.po=false;doR(\'po\')">'
-   +'<option value="">All Status</option>'
-   +'<option value="Pending Approval"'+(_poStatusF==='Pending Approval'?' selected':'')+'>Pending Approval</option>'
-   +'<option value="Approved"'+(_poStatusF==='Approved'?' selected':'')+'>Approved</option>'
-   +'<option value="Fabric Review"'+(_poStatusF==='Fabric Review'?' selected':'')+'>Fabric Review</option>'
-   +'<option value="In Production"'+(_poStatusF==='In Production'?' selected':'')+'>In Production</option>'
-   +'<option value="Completed"'+(_poStatusF==='Completed'?' selected':'')+'>Completed</option>'
-   +'<option value="Rejected"'+(_poStatusF==='Rejected'?' selected':'')+'>Rejected</option>'
-   +'</select>'
-   +'<select onchange="_poReqF=this.value;rendered.po=false;doR(\'po\')">'
-   +'<option value="">All Requirement</option>'
-   +'<option value="URGENT"'+(_poReqF==='URGENT'?' selected':'')+'>URGENT</option>'
-   +'<option value="ROUTINE"'+(_poReqF==='ROUTINE'?' selected':'')+'>ROUTINE</option>'
-   +'</select>'
-   +'<button class="po-tbtn sec" onclick="poExportCSV()">CSV</button>'
-   +'<button class="po-tbtn sec" onclick="poExportPDF()">PDF</button>'
-   +(canPlace?'<button class="po-tbtn" onclick="openNewPO()">+ New Order</button>':'')
-   +(isOwner?'<button class="po-tbtn sec" onclick="openCustMgr()">Manage Customers</button>':'')
+  var hdr='<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px">'
+   +'<div style="font-size:14px;font-weight:700">📋 Active Production Orders</div>'
+   +(canPlace?'<button onclick="openNewPO()" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">+ New Order</button>':'')
    +'</div>';
 
-  // Compact order table
   var ordHtml='';
-  if(filtered.length===0){
-    ordHtml='<div style="text-align:center;padding:36px;color:#bbb;background:#fff;border:1px solid #e8e4dc;border-radius:10px;font-size:13px">No orders match your filters.</div>';
+  if(active.length===0){
+    ordHtml='<div style="text-align:center;padding:36px;color:#bbb;background:#fff;border:1px solid #e8e4dc;border-radius:10px;font-size:13px">No active production orders.<br><span style="font-size:11px">Place one via "+ New Order" or from the suggestions below.</span></div>';
   } else {
-    ordHtml='<div class="tw" style="max-height:none"><table style="border-collapse:collapse;width:100%;font-size:12px;background:#fff">';
-    ordHtml+='<thead><tr style="background:#f8f6f2">'
-     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc;width:30px">#</th>'
-     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc;min-width:60px">ID</th>'
-     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">Date</th>'
-     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">Customer</th>'
-     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">Product</th>'
-     +'<th style="padding:7px 8px;text-align:right;border-bottom:2px solid #e8e4dc">Qty</th>'
-     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc">Sizes</th>'
-     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">Fabric</th>'
-     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc">Req</th>'
-     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc">Status</th>'
-     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc">Progress</th>'
-     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">ETA</th>'
-     +'<th style="padding:7px 8px;text-align:left;border-bottom:2px solid #e8e4dc">By</th>'
-     +'<th style="padding:7px 8px;text-align:center;border-bottom:2px solid #e8e4dc">Actions</th>'
-     +'</tr></thead><tbody>';
-    filtered.forEach(function(o,idx){
-      var stClass=o.status==='Pending Approval'?'pending-approval':o.status==='Approved'?'approved':o.status==='Fabric Review'?'fabric-review':o.status==='In Production'?'in-production':o.status==='Completed'?'completed':o.status==='Rejected'?'rejected':'';
-      var isOverdue=o.status!=='Completed'&&o.status!=='Rejected'&&o.eta&&o.eta<today;
+    active.forEach(function(o){
+      var stBg=o.status==='Completed'?'background:#e8f8ee;color:#27ae60':o.status==='In Progress'?'background:#fff3e0;color:#d4944a':'background:#f5f5f5;color:#888';
       var cnt=PHASES.filter(function(p){return o.phases[p[0]]&&o.phases[p[0]].done;}).length;
       var pct=Math.round(cnt/PHASES.length*100);
-      var szStr=(o.S||0)+'/'+(o.M||0)+'/'+(o.L||0)+'/'+(o.XL||0);
-      var bg=idx%2===0?'#fff':'#fafaf8';
-
-      // Compact actions
-      var acts='';
-      if(isOwner&&o.status==='Pending Approval'){
-        acts+='<button onclick="poApprove(\''+o.id+'\')" style="background:#27ae60;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Approve">&#10003;</button>';
-        acts+='<button onclick="poReject(\''+o.id+'\')" style="background:#c0392b;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Reject">&#10007;</button>';
-      }
-      if(isOwner&&o.status==='Fabric Review'){
-        acts+='<button onclick="poApproveSwatch(\''+o.id+'\')" style="background:#27ae60;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Approve Swatch">Swatch &#10003;</button>';
-      }
-      if(o.status==='Approved'){
-        acts+='<button onclick="poUploadSwatch(\''+o.id+'\')" style="background:#8e44ad;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Upload Fabric Swatch">Swatch</button>';
-      }
-      if(isOwner&&o.status!=='Completed'&&o.status!=='Rejected'){
-        acts+='<button onclick="poOpenEdit(\''+o.id+'\')" style="background:#2980b9;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Edit">&#9998;</button>';
-      }
-      if(o.status==='In Production'||o.status==='Approved'){
-        acts+='<button onclick="poSetEta(\''+o.id+'\')" style="background:#e67e22;color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;font-weight:700;margin:1px" title="Set ETA">ETA</button>';
-      }
-      acts+='<button onclick="poViewLog(\''+o.id+'\')" style="background:#f5f5f5;border:1px solid #ddd;color:#888;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;margin:1px" title="View Log">Log</button>';
-      if(canPlace&&o.status!=='Completed'&&o.status!=='Rejected'){
-        acts+='<button onclick="cancelPO(\''+o.id+'\')" style="background:none;border:1px solid #eee;color:#c0392b;border-radius:3px;padding:2px 6px;font-size:9px;cursor:pointer;margin:1px" title="Cancel">&#10007;</button>';
-      }
-
-      // Progress bar or phase buttons
-      var progHtml='';
-      if(o.status==='In Production'||o.status==='Completed'){
-        progHtml='<div style="display:flex;gap:2px;align-items:center">';
-        PHASES.forEach(function(p){
-          var pd=o.phases[p[0]]||{};var done=pd.done;
-          var bg2=done?'#27ae60':'#eee';var fg=done?'#fff':'#aaa';
-          var canToggle=(o.status==='In Production');
-          var tip=p[1]+(done?' ✓ '+(pd.date?fmtD(pd.date):''):'');
-          progHtml+='<button '+(canToggle?'onclick="togglePoPhase(\''+o.id+'\',\''+p[0]+'\')"':'')+' title="'+tip+'" style="background:'+bg2+';color:'+fg+';border:none;border-radius:3px;padding:2px 5px;font-size:8px;cursor:'+(canToggle?'pointer':'default')+';font-weight:700;line-height:1.2">'+p[1].substring(0,3)+(done?' ✓':'')+'</button>';
-        });
-        progHtml+='</div>';
-      } else {
-        progHtml='<span style="font-size:10px;color:#aaa">—</span>';
-      }
-
-      ordHtml+='<tr style="background:'+bg+';border-bottom:1px solid #f0ede8'+(isOverdue?';border-left:3px solid #c0392b':'')+'">'
-       +'<td style="padding:6px 8px;text-align:center;color:#bbb;font-size:10px">'+(idx+1)+'</td>'
-       +'<td style="padding:6px 8px;font-weight:700;font-size:10px;color:#888">'+o.id+'</td>'
-       +'<td style="padding:6px 8px;font-size:11px;white-space:nowrap">'+fmtD(o.date)+'</td>'
-       +'<td style="padding:6px 8px;font-weight:600">'+( o.customer||'—')+'</td>'
-       +'<td style="padding:6px 8px;font-weight:600">'+o.product+'</td>'
-       +'<td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--gold2)">'+(o.qty||0)+'</td>'
-       +'<td style="padding:6px 8px;text-align:center;font-size:10px;color:#888">'+szStr+'</td>'
-       +'<td style="padding:6px 8px;font-size:11px">'+(o.fabric||'—')+'</td>'
-       +'<td style="padding:6px 8px;text-align:center"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;'+(o.requirement==='URGENT'?'background:#fdeaea;color:#c0392b':'background:#f5f5f5;color:#888')+'">'+o.requirement+'</span></td>'
-       +'<td style="padding:6px 8px;text-align:center"><span class="po-badge '+stClass+'" style="font-size:9px">'+o.status.toUpperCase()+'</span>'+(isOverdue?'<br><span class="po-badge overdue" style="font-size:8px;margin-top:2px">OVERDUE</span>':'')+'</td>'
-       +'<td style="padding:6px 8px;text-align:center">'+progHtml+'</td>'
-       +'<td style="padding:6px 8px;font-size:11px;white-space:nowrap;'+(isOverdue?'color:#c0392b;font-weight:700':'color:#2980b9')+'">'+(o.eta?fmtD(o.eta):'—')+'</td>'
-       +'<td style="padding:6px 8px;font-size:10px;color:#aaa;white-space:nowrap">'+(o.placedBy||'—')+'</td>'
-       +'<td style="padding:6px 8px;text-align:center;white-space:nowrap">'+acts+'</td>'
-       +'</tr>';
+      var simg=o.img&&o.img.startsWith('http')?o.img+'?width=100':'';
+      var stepper='<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 6px">';
+      PHASES.forEach(function(p){
+        var pd=o.phases[p[0]]||{};var done=pd.done;
+        var st=done?'background:#27ae60;color:#fff;border:2px solid #1e8449':'background:#f5f5f5;color:#888;border:2px dashed #ddd';
+        var tip=done?'Done'+(pd.by?' by '+pd.by:'')+(pd.date?' on '+fmtD(pd.date):''):'Click to mark done';
+        stepper+='<button onclick="togglePoPhase(\''+o.id+'\',\''+p[0]+'\')" title="'+tip+'" style="'+st+';border-radius:20px;padding:5px 13px;font-size:11px;cursor:pointer;font-weight:600;white-space:nowrap;line-height:1.3">'+p[1]+(done?' ✓':'')+'</button>';
+      });
+      stepper+='</div>';
+      var bar='<div style="background:#f0ede8;border-radius:4px;height:5px;margin:4px 0 2px">'
+       +'<div style="background:linear-gradient(90deg,var(--gold),#27ae60);height:5px;border-radius:4px;width:'+pct+'%;transition:width .4s"></div></div>';
+      ordHtml+='<div style="background:#fff;border:1px solid #e8e4dc;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start">'
+       +(simg?'<img src="'+simg+'" style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0" onerror="this.style.display=\'none\'">':'')
+       +'<div style="flex:1;min-width:0">'
+       +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">'
+       +'<span style="font-size:10px;color:#888;font-weight:700;background:#f5f5f5;padding:2px 8px;border-radius:4px">'+o.id+'</span>'
+       +'<span style="font-weight:700;font-size:13px">'+o.product+'</span>'
+       +'<span style="'+stBg+';font-size:9px;font-weight:700;padding:2px 9px;border-radius:10px">'+o.status.toUpperCase()+'</span>'
+       +'<span style="margin-left:auto;font-size:10px;color:#bbb">'+fmtD(o.date)+' · '+o.placedBy+'</span>'
+       +'</div>'
+       +'<div style="display:flex;gap:12px;font-size:11px;color:#888;flex-wrap:wrap;margin-bottom:4px">'
+       +'<span>S: <b style="color:#1a1a1a">'+(o.S||'-')+'</b></span>'
+       +'<span>M: <b style="color:#1a1a1a">'+(o.M||'-')+'</b></span>'
+       +'<span>L: <b style="color:#1a1a1a">'+(o.L||'-')+'</b></span>'
+       +'<span>XL: <b style="color:#1a1a1a">'+(o.XL||'-')+'</b></span>'
+       +'<span style="color:var(--gold2);font-weight:700">Total: '+o.total+'</span>'
+       +(o.targetDate?'<span style="margin-left:auto;color:#2980b9">🎯 Due: '+fmtD(o.targetDate)+'</span>':'')
+       +'</div>'
+       +(o.notes?'<div style="font-size:11px;color:#999;font-style:italic;margin-bottom:4px">📝 '+o.notes+'</div>':'')
+       +bar
+       +'<div style="font-size:10px;color:#aaa;margin-bottom:2px">'+pct+'% complete &nbsp;('+cnt+'/'+PHASES.length+' phases done)</div>'
+       +stepper
+       +(canPlace&&o.status!=='Completed'?'<button onclick="cancelPO(\''+o.id+'\')" style="background:none;border:1px solid #eee;color:#c0392b;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;margin-top:2px">Cancel Order</button>':'')
+       +'</div></div>';
     });
-    ordHtml+='</tbody></table></div>';
   }
 
-  el.innerHTML=kh+tb+'<div>'+ordHtml+'</div>';
+  // Suggestions
+  var sugHtml='';
+  if(STOCK_PRODS&&Object.keys(STOCK_PRODS).length&&DETAIL.length){
+    var refD=META.max_date||new Date().toISOString().split('T')[0];
+    var s30=new Date(refD);s30.setDate(s30.getDate()-30);var s30s=s30.toISOString().split('T')[0];
+    var s10=new Date(refD);s10.setDate(s10.getDate()-10);var s10s=s10.toISOString().split('T')[0];
+    var vel30={},vel10={};
+    DETAIL.forEach(function(r){if(r[4]==='delivered'){if(r[0]>=s30s)vel30[r[1]]=(vel30[r[1]]||0)+1;if(r[0]>=s10s)vel10[r[1]]=(vel10[r[1]]||0)+1;}});
+    var sugs=Object.keys(STOCK_PRODS).map(function(k){
+      var sp=STOCK_PRODS[k];var v30=vel30[sp.title]||0;var v10=vel10[sp.title]||0;
+      var rate=Math.round(v30/30*10)/10;
+      var days=rate>0?Math.round(sp.total/rate):9999;
+      var sug=Math.max(0,Math.round(rate*60)-sp.total);
+      var urg=sp.total===0&&v30>0?0:days<7&&v30>0?1:days<21&&v30>0?2:days<45&&v30>0?3:4;
+      return{k:k,sp:sp,v30:v30,v10:v10,rate:rate,days:days,sug:sug,urg:urg};
+    }).filter(function(x){return x.urg<4&&x.v30>0;}).sort(function(a,b){return a.urg-b.urg||a.days-b.days;}).slice(0,40);
+
+    if(sugs.length){
+      sugHtml='<div style="margin-top:22px">'
+       +'<div style="font-size:14px;font-weight:700;margin-bottom:8px">💡 Reorder Suggestions <span style="font-size:10px;color:#bbb;font-weight:400">sorted by urgency · based on 30-day velocity</span></div>'
+       +'<div style="overflow:auto;border:1px solid #e8e4dc;border-radius:8px"><table style="border-collapse:collapse;font-size:11px;background:#fff;width:100%;min-width:820px">'
+       +'<thead><tr style="background:#f8f6f2">'
+       +'<th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e8e4dc;min-width:160px">Product</th>'
+       +'<th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e8e4dc">Urgency</th>'
+       +'<th style="padding:8px 8px;text-align:right;border-bottom:2px solid #e8e4dc">Stock</th>'
+       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">S</th>'
+       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">M</th>'
+       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">L</th>'
+       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">XL</th>'
+       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">30d Sales</th>'
+       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">Last 10d</th>'
+       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">Daily Rate</th>'
+       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">Days Left</th>'
+       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc;background:#fdf8f0">Suggest (60d)</th>'
+       +(canPlace?'<th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e8e4dc">Order</th>':'')
+       +'</tr></thead><tbody>';
+      sugs.forEach(function(x,i){
+        var sp=x.sp;
+        var urg=x.urg===0?'🔴 OUT':x.urg===1?'🟠 CRITICAL':x.urg===2?'🟡 LOW':'🟢 SOON';
+        var dc=x.urg<=1?'color:#c0392b;font-weight:700':x.urg===2?'color:#d4944a;font-weight:700':'color:#27ae60;font-weight:600';
+        var bg=i%2===0?'#fff':'#fafaf8';
+        sugHtml+='<tr style="background:'+bg+';border-bottom:1px solid #f2efe9">'
+         +'<td style="padding:7px 10px;font-weight:600">'+sp.title+'</td>'
+         +'<td style="padding:7px 10px;text-align:center">'+urg+'</td>'
+         +'<td style="padding:7px 8px;text-align:right;font-weight:700">'+NF(sp.total)+'</td>'
+         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.S||'-')+'</td>'
+         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.M||'-')+'</td>'
+         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.L||'-')+'</td>'
+         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.XL||'-')+'</td>'
+         +'<td style="padding:7px 10px;text-align:right">'+NF(x.v30)+'</td>'
+         +'<td style="padding:7px 10px;text-align:right;color:#2980b9;font-weight:600">'+NF(x.v10)+'</td>'
+         +'<td style="padding:7px 10px;text-align:right;color:#888">'+x.rate+'/d</td>'
+         +'<td style="padding:7px 10px;text-align:right;'+dc+'">'+(x.days<9999?x.days+'d':'-')+'</td>'
+         +'<td style="padding:7px 10px;text-align:right;background:#fdf8f0;color:var(--gold2);font-weight:700">'+(x.sug>0?NF(x.sug):'-')+'</td>'
+         +(canPlace?'<td style="padding:7px 10px;text-align:center"><button onclick="openNewPO(\''+sp.title.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\')" style="background:var(--gold);color:#111;border:none;border-radius:5px;padding:4px 12px;font-size:10px;font-weight:700;cursor:pointer">+ Order</button></td>':'')
+         +'</tr>';
+      });
+      sugHtml+='</tbody></table></div></div>';
+    }
+  }
+
+  el.innerHTML=kh+hdr+'<div>'+ordHtml+'</div>'+sugHtml;
 }
 
 // ── CHANGE PASSWORD (self-service) ──
@@ -3330,7 +2748,7 @@ function rcGetSales(){
   // .aS/.aM/.aL/.aXL = adds back to Laam stock (cancelled,refunded)
   var map={};
   var f=filters;
-  var RED=['delivered','undelivered','in_transit','intransit','in transit','allocated','open','pending'];
+  var RED=['delivered','undelivered','in_transit','intransit','in transit','allocated'];
   var ADD=['cancelled','canceled','refunded'];
   DETAIL.forEach(function(r){
     var dt=r[0];
@@ -3687,108 +3105,44 @@ function toggleSB(){
 </div>
 
 <!-- ── PRODUCTION ORDER MODAL ── -->
-<div id="po-modal" class="po-mdl-overlay">
-  <div class="po-mdl-box">
-    <div class="po-mdl-hd">
-      <div class="po-mdl-title">New Production Order</div>
-      <button class="po-mdl-x" onclick="closePO()">&#10005;</button>
+<div id="po-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#1e1e1e;border-radius:14px;padding:26px;width:min(480px,94vw);max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div style="color:#fff;font-size:16px;font-weight:700">📋 New Production Order</div>
+      <button onclick="closePO()" style="background:none;border:none;color:#666;font-size:20px;cursor:pointer;line-height:1;padding:2px 6px">✕</button>
     </div>
-    <label class="po-lbl">CUSTOMER NAME<span class="po-req">*</span></label>
-    <select id="po-customer" class="po-inp"><option value="">-- Select Customer --</option></select>
-
-    <label class="po-lbl">PRODUCT NAME<span class="po-req">*</span></label>
-    <input id="po-prod" list="po-prodlist" autocomplete="off" oninput="poProdHint(this.value)" placeholder="Type or select product..." class="po-inp" style="margin-bottom:4px">
+    <label style="display:block;font-size:11px;color:#aaa;margin-bottom:5px;font-weight:600;letter-spacing:.04em">PRODUCT NAME</label>
+    <input id="po-prod" list="po-prodlist" autocomplete="off" oninput="poProdHint(this.value)" placeholder="Type or select product..." style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:6px">
     <datalist id="po-prodlist"></datalist>
-    <img id="po-prod-img" class="po-img-preview" style="display:none" onerror="this.style.display='none'">
-    <div id="po-stkhint" style="min-height:18px;margin-bottom:6px"></div>
-    <div id="po-dup-alert"></div>
-
-    <label class="po-lbl">ORDERED QTY<span class="po-req">*</span></label>
-    <input id="po-qty" type="number" min="1" placeholder="Total quantity" class="po-inp" oninput="poCalcFromRatio()">
-
-    <label class="po-lbl">SIZE BREAKDOWN (optional)</label>
-    <div style="font-size:10px;color:#777;margin-bottom:6px">Fill ratio row — qty auto-calculates to match ordered qty</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:4px">
-      <div style="text-align:center"><div style="font-size:9px;color:#888;margin-bottom:2px">S</div></div>
-      <div style="text-align:center"><div style="font-size:9px;color:#888;margin-bottom:2px">M</div></div>
-      <div style="text-align:center"><div style="font-size:9px;color:#888;margin-bottom:2px">L</div></div>
-      <div style="text-align:center"><div style="font-size:9px;color:#888;margin-bottom:2px">XL</div></div>
+    <div id="po-stkhint" style="min-height:18px;margin-bottom:10px"></div>
+    <label style="display:block;font-size:11px;color:#aaa;margin-bottom:6px;font-weight:600;letter-spacing:.04em">ORDER QUANTITY BY SIZE</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="text-align:center">
+        <div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">S</div>
+        <input id="po-s" type="number" min="0" placeholder="0" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">M</div>
+        <input id="po-m" type="number" min="0" placeholder="0" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">L</div>
+        <input id="po-l" type="number" min="0" placeholder="0" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:10px;color:#aaa;margin-bottom:4px;font-weight:700">XL</div>
+        <input id="po-xl" type="number" min="0" placeholder="0" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 6px;font-size:15px;text-align:center;outline:none;box-sizing:border-box">
+      </div>
     </div>
-    <div style="display:grid;grid-template-columns:40px 1fr 1fr 1fr 1fr;gap:8px;align-items:center;margin-bottom:4px">
-      <div style="font-size:9px;color:#aaa;font-weight:700;text-align:right">Ratio:</div>
-      <input id="po-rs" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poCalcFromRatio()">
-      <input id="po-rm" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poCalcFromRatio()">
-      <input id="po-rl" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poCalcFromRatio()">
-      <input id="po-rxl" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poCalcFromRatio()">
-    </div>
-    <div style="display:grid;grid-template-columns:40px 1fr 1fr 1fr 1fr;gap:8px;align-items:center;margin-bottom:4px">
-      <div style="font-size:9px;color:#aaa;font-weight:700;text-align:right">Qty:</div>
-      <input id="po-s" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poSizeManualEdit()">
-      <input id="po-m" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poSizeManualEdit()">
-      <input id="po-l" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poSizeManualEdit()">
-      <input id="po-xl" type="number" min="0" placeholder="0" class="po-inp-sm" oninput="poSizeManualEdit()">
-    </div>
-    <div id="po-size-sum" style="text-align:right;font-size:10px;color:#aaa;margin-bottom:4px"></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-      <button type="button" onclick="poSetRatio(1,2,2,1)" style="background:#333;border:1px solid #555;color:#ccc;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;font-weight:600">1:2:2:1</button>
-      <button type="button" onclick="poSetRatio(1,3,3,1)" style="background:#333;border:1px solid #555;color:#ccc;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;font-weight:600">1:3:3:1</button>
-      <button type="button" onclick="poSetRatio(1,1,1,1)" style="background:#333;border:1px solid #555;color:#ccc;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;font-weight:600">1:1:1:1</button>
-      <button type="button" onclick="poSetRatio(1,2,1,0)" style="background:#333;border:1px solid #555;color:#ccc;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;font-weight:600">1:2:1:0</button>
-    </div>
-
-    <label class="po-lbl">SIZE CHART ATTACHMENT<span class="po-req">*</span></label>
-    <input id="po-sizechart" type="file" accept="image/*" onchange="poSizeChartPreview(this)" style="color:#aaa;font-size:11px;margin-bottom:6px">
-    <img id="po-sizechart-preview" class="po-img-preview" style="display:none" data-b64="">
-
-    <label class="po-lbl">FABRIC / MATERIAL NAME<span class="po-req">*</span></label>
-    <input id="po-fabric" type="text" placeholder="e.g. Cotton Lawn, Silk Chiffon..." class="po-inp">
-
-    <label class="po-lbl">REQUIREMENT<span class="po-req">*</span></label>
-    <select id="po-requirement" class="po-inp">
-      <option value="ROUTINE">ROUTINE</option>
-      <option value="URGENT">URGENT</option>
-    </select>
-
-    <label class="po-lbl">REMARKS (optional)</label>
-    <textarea id="po-notes" rows="2" placeholder="Priority, reference style, special instructions..." class="po-inp" style="resize:vertical"></textarea>
-
-    <div style="font-size:11px;color:#666;margin-bottom:12px">Order Date: <b id="po-date-display" style="color:#fff"></b></div>
-
-    <div class="po-btn-row">
-      <button class="po-btn-primary" onclick="submitPO()">Place Order &#8594;</button>
-      <button class="po-btn-cancel" onclick="closePO()">Cancel</button>
+    <label style="display:block;font-size:11px;color:#aaa;margin-bottom:5px;font-weight:600;letter-spacing:.04em">TARGET COMPLETION DATE</label>
+    <input id="po-target" type="date" style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:14px">
+    <label style="display:block;font-size:11px;color:#aaa;margin-bottom:5px;font-weight:600;letter-spacing:.04em">NOTES</label>
+    <textarea id="po-notes" rows="2" placeholder="Fabric type, color, priority, reference style..." style="width:100%;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:8px;padding:10px 13px;font-size:12px;outline:none;box-sizing:border-box;resize:vertical;margin-bottom:18px;font-family:inherit;color:#ccc"></textarea>
+    <div style="display:flex;gap:10px">
+      <button onclick="submitPO()" style="flex:1;background:var(--gold);color:#111;border:none;border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.02em">Place Order →</button>
+      <button onclick="closePO()" style="background:#2a2a2a;color:#888;border:1px solid #444;border-radius:8px;padding:12px 18px;font-size:13px;cursor:pointer">Cancel</button>
     </div>
   </div>
-</div>
-
-<!-- ── CUSTOMER MANAGEMENT MODAL ── -->
-<div id="cust-mgr" class="po-mdl-overlay">
-  <div class="po-mdl-box" style="width:min(400px,94vw)">
-    <div class="po-mdl-hd">
-      <div class="po-mdl-title">Manage Customers</div>
-      <button class="po-mdl-x" onclick="closeCustMgr()">&#10005;</button>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:10px">
-      <input id="cust-add-inp" type="text" placeholder="Customer name..." class="po-inp" style="margin-bottom:0;flex:1" onkeydown="if(event.key==='Enter')addCust()">
-      <button class="po-btn-primary" style="flex:none;padding:10px 18px" onclick="addCust()">Add</button>
-    </div>
-    <div id="cust-list-body" class="cust-list"></div>
-  </div>
-</div>
-
-<!-- ── ORDER EDIT MODAL ── -->
-<div id="po-edit-modal" class="po-mdl-overlay">
-  <div class="po-mdl-box wide"></div>
-</div>
-
-<!-- ── ORDER LOG MODAL ── -->
-<div id="po-log-modal" class="po-mdl-overlay">
-  <div class="po-mdl-box"></div>
-</div>
-
-<!-- ── IMAGE VIEWER ── -->
-<div id="po-img-viewer" onclick="poCloseImg()">
-  <img src="" alt="Preview">
 </div>
 
 <!-- ── TOAST ── -->
