@@ -2554,7 +2554,7 @@ function printPO(oid){
     doPrintPO(o,'');
   }
 }
-function doPrintPO(o,imgSrc){
+function buildPOPrintHtml(o,imgSrc){
   var realTotal=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
   var hasSizes=(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0)>0;
   var urgColor=o.urgency==='URGENT'?'#c0392b':o.urgency==='SAMPLE'?'#8e44ad':'#333';
@@ -2653,191 +2653,253 @@ function doPrintPO(o,imgSrc){
    +(o.notes?'<span style="color:#555;font-weight:400;font-size:12px;margin-left:6px">'+o.notes+'</span>':'')
    +'</div>'
    +'</div>';
+  return html;
+}
+function doPrintPO(o,imgSrc){
   var pf=document.getElementById('po-print-frame');
-  pf.innerHTML=html;
-  var ot=document.title;
-  document.title=' ';
+  pf.innerHTML=buildPOPrintHtml(o,imgSrc);
+  var ot=document.title;document.title=' ';
   setTimeout(function(){window.print();setTimeout(function(){document.title=ot;},800);},100);
+}
+
+// ── PO TABLE helpers ──────────────────────────────────────────────
+function togglePoFlt(field,val){
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};
+  var arr=window._poFlt[field];
+  if(!Array.isArray(arr)){window._poFlt[field]=[val];rendered.po=false;doR('po');return;}
+  var idx=arr.indexOf(val);if(idx>=0)arr.splice(idx,1);else arr.push(val);
+  rendered.po=false;doR('po');
+}
+function setPoFlt(field,val){
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};
+  window._poFlt[field]=val;rendered.po=false;doR('po');
+}
+function clearPoFlt(){window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};rendered.po=false;doR('po');}
+function clearPoFltField(field){if(window._poFlt)window._poFlt[field]=[];rendered.po=false;doR('po');}
+function togglePoDrop(id){window._poDrop=(window._poDrop===id?'':id);rendered.po=false;doR('po');}
+function togglePoSel(id){if(!window._poSel)window._poSel={};window._poSel[id]=!window._poSel[id];rendered.po=false;doR('po');}
+function togglePoSelAll(ids){
+  var sel=window._poSel||{};
+  var allSel=ids.every(function(i){return sel[i];});
+  ids.forEach(function(i){sel[i]=!allSel;});
+  window._poSel=sel;rendered.po=false;doR('po');
+}
+function exportPOCSV(){
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};
+  var orders=loadPO();var f=window._poFlt;
+  var rows=orders.filter(function(o){
+    if(o.status==='Cancelled')return false;
+    if(f.from&&o.date<f.from)return false;if(f.to&&o.date>f.to)return false;
+    if(f.ono){var s=f.ono.toLowerCase();if(o.id.toLowerCase().indexOf(s)<0&&o.product.toLowerCase().indexOf(s)<0)return false;}
+    if(f.prods&&f.prods.length&&f.prods.indexOf(o.product)<0)return false;
+    if(f.fabs&&f.fabs.length&&f.fabs.indexOf(o.fabric||'')<0)return false;
+    return true;
+  });
+  var sel=window._poSel||{};var selIds=Object.keys(sel).filter(function(k){return sel[k];});
+  if(selIds.length)rows=rows.filter(function(o){return sel[o.id];});
+  if(!rows.length){showToast('No orders to export.');return;}
+  function ph(o,k){return o.phases&&o.phases[k]&&o.phases[k].done?'Done':'';}
+  var hdr=['Date','Order No','Product','Fabric','Customer','Ordered Qty','S','M','L','XL','Status','Cutting','Embroidery','Printing','Stitching','Finishing','ETA','Placed By','Approved By'];
+  var csv=hdr.join(',')+'\n'+rows.map(function(o){
+    var rt=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
+    return [fmtDMY(o.date),o.id,o.product,o.fabric||'',o.customer||'',rt,o.S||0,o.M||0,o.L||0,o.XL||0,o.status,ph(o,'cutting'),ph(o,'embroidery'),ph(o,'print'),ph(o,'stitching'),ph(o,'finishing'),fmtDMY(o.targetDate),o.placedBy||'',o.approvedBy||'']
+    .map(function(v){return '"'+String(v||'').replace(/"/g,'""')+'"';}).join(',');
+  }).join('\n');
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='production-orders-'+new Date().toISOString().split('T')[0]+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  showToast('CSV exported — '+rows.length+' order'+(rows.length!==1?'s':''));
+}
+function printSelectedPO(){
+  var sel=window._poSel||{};var selIds=Object.keys(sel).filter(function(k){return sel[k];});
+  if(!selIds.length){showToast('Select orders using the checkboxes first.');return;}
+  var orders=loadPO();
+  var rows=orders.filter(function(o){return sel[o.id];});
+  var html=rows.map(function(o,i){
+    var imgSrc=o.img&&o.img.startsWith('http')?o.img:'';
+    return (i>0?'<div style="page-break-before:always"></div>':'')+buildPOPrintHtml(o,imgSrc);
+  }).join('');
+  var pf=document.getElementById('po-print-frame');pf.innerHTML=html;
+  var ot=document.title;document.title=' ';
+  showToast('Printing '+rows.length+' order'+(rows.length!==1?'s':'')+'…');
+  setTimeout(function(){window.print();setTimeout(function(){document.title=ot;},800);},200);
 }
 
 function rPO(){
   var el=document.getElementById('ppo');
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};
+  if(!window._poSel)window._poSel={};
+  if(!window._poDrop)window._poDrop='';
   var orders=loadPO();
-  var active=orders.filter(function(o){return o.status!=='Cancelled';});
-  var cancelled=orders.filter(function(o){return o.status==='Cancelled';});
-  var inProg=active.filter(function(o){return o.status==='In Progress';}).length;
-  var comp=active.filter(function(o){return o.status==='Completed';}).length;
-  var pending=active.filter(function(o){return o.status==='Pending Approval';}).length;
-  var totQty=active.reduce(function(a,o){return a+(o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0));},0);
+  var f=window._poFlt;
+  var allActive=orders.filter(function(o){return o.status!=='Cancelled';});
+  var active=allActive.filter(function(o){
+    if(f.from&&o.date<f.from)return false;if(f.to&&o.date>f.to)return false;
+    if(f.ono){var s=f.ono.toLowerCase();if(o.id.toLowerCase().indexOf(s)<0&&o.product.toLowerCase().indexOf(s)<0)return false;}
+    if(f.prods&&f.prods.length&&f.prods.indexOf(o.product)<0)return false;
+    if(f.fabs&&f.fabs.length&&f.fabs.indexOf(o.fabric||'')<0)return false;
+    return true;
+  });
   var canPlace=CU&&(CU.role==='Owner'||CU.role==='Editor');
   var isOwner=CU&&CU.role==='Owner';
   var isProdUser=CU&&CU.role==='Production';
-  var PHASES=[['cutting','✂️ Cutting'],['print','🖨️ Print'],['embroidery','🌸 Embroidery'],['stitching','🧵 Stitching'],['finishing','✨ Finishing']];
-
+  var sel=window._poSel;
+  var inProg=allActive.filter(function(o){return o.status==='In Progress';}).length;
+  var comp=allActive.filter(function(o){return o.status==='Completed';}).length;
+  var pending=allActive.filter(function(o){return o.status==='Pending Approval';}).length;
+  var totQty=allActive.reduce(function(a,o){return a+(o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0));},0);
   var kh='<div class="krow">'
-   +'<div class="kpi b"><div class="kl">Total Orders</div><div class="kv">'+active.length+'</div><div class="ks">'+comp+' completed</div></div>'
+   +'<div class="kpi b"><div class="kl">Total Orders</div><div class="kv">'+allActive.length+'</div><div class="ks">'+comp+' completed</div></div>'
    +'<div class="kpi w"><div class="kl">In Progress</div><div class="kv">'+inProg+'</div><div class="ks">Being produced</div></div>'
    +(pending?'<div class="kpi" style="background:#fff8e0;border:1px solid #f0d060"><div class="kl" style="color:#a07030">Pending Approval</div><div class="kv" style="color:#d4944a">'+pending+'</div><div class="ks">Awaiting your review</div></div>':'')
    +'<div class="kpi g"><div class="kl">Units in Pipeline</div><div class="kv">'+NF(totQty)+'</div><div class="ks">Total ordered qty</div></div>'
-   +(cancelled.length?'<div class="kpi r"><div class="kl">Cancelled</div><div class="kv">'+cancelled.length+'</div><div class="ks">This session</div></div>':'')
    +'</div>';
-
-  var hdr='<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px">'
-   +'<div style="font-size:14px;font-weight:700">📋 Active Production Orders</div>'
-   +(canPlace?'<button onclick="openNewPO()" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">+ New Order</button>':'')
-   +'</div>';
-
-  var ST_BADGE={
-    'Pending Approval':'background:#fff8e0;color:#a07030;border:1px solid #e8c84a',
-    'In Progress':'background:#e8f8ee;color:#1e8449;border:1px solid #a0d8b0',
-    'Completed':'background:#e8eef8;color:#2471a3;border:1px solid #a0c0e0',
-    'Rejected':'background:#fde8e8;color:#c0392b;border:1px solid #f0a0a0',
-    'Cancelled':'background:#f5f5f5;color:#aaa;border:1px solid #ddd'
-  };
-  var ordHtml='';
+  // Filter options from all active orders
+  var allProds=allActive.map(function(o){return o.product;}).filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
+  var allFabs=allActive.map(function(o){return o.fabric||'';}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).sort();
+  var hasFilter=f.from||f.to||f.ono||(f.prods&&f.prods.length)||(f.fabs&&f.fabs.length);
+  // Multi-select dropdown builder
+  function mkDrop(id,label,opts,selArr){
+    var open=window._poDrop===id;var cnt=selArr?selArr.length:0;
+    var btnStyle='border:1px solid #ddd;border-radius:6px;padding:5px 11px;font-size:11px;cursor:pointer;font-weight:600;white-space:nowrap;background:'+(cnt>0?'var(--gold)':'#f5f5f5')+';color:'+(cnt>0?'#111':'#555');
+    var btn='<button onclick="event.stopPropagation();togglePoDrop(\''+id+'\')" style="'+btnStyle+'">'+label+(cnt>0?' ('+cnt+')':'')+' ▾</button>';
+    if(!open)return btn;
+    var dd='<div style="position:absolute;top:calc(100% + 4px);left:0;z-index:500;background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px;min-width:190px;max-height:220px;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,.15)">';
+    if(cnt>0)dd+='<div onclick="clearPoFltField(\''+id+'\')" style="font-size:10px;color:#c0392b;cursor:pointer;padding:2px 4px;margin-bottom:4px;border-radius:4px;background:#fff5f5">✕ Clear all</div>';
+    opts.forEach(function(opt){
+      var chk=(selArr||[]).indexOf(opt)>=0;
+      dd+='<label style="display:flex;align-items:center;gap:7px;padding:5px 6px;cursor:pointer;border-radius:4px;font-size:12px;white-space:nowrap;hover:background:#f5f5f5"><input type="checkbox" '+(chk?'checked':'')+' onchange="togglePoFlt(\''+id+'\',\''+opt.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\')" style="cursor:pointer;accent-color:var(--gold)">'+opt+'</label>';
+    });
+    dd+='</div>';
+    return '<div style="position:relative;display:inline-block">'+btn+dd+'</div>';
+  }
+  var selCount=Object.keys(sel).filter(function(k){return sel[k];}).length;
+  var allIds=active.map(function(o){return o.id;});
+  var allSelCheck=allIds.length>0&&allIds.every(function(id){return sel[id];});
+  // Filter + toolbar
+  var toolbar='<div style="background:#fafafa;border:1px solid #eee;border-radius:8px;padding:10px 14px;margin:12px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+   +'<span style="font-size:10px;color:#aaa;font-weight:700;letter-spacing:.06em">FILTERS</span>'
+   +'<input type="date" value="'+(f.from||'')+'" onchange="setPoFlt(\'from\',this.value)" title="From date" style="border:1px solid #ddd;border-radius:6px;padding:5px 8px;font-size:11px;background:#fff;color:#333">'
+   +'<span style="font-size:10px;color:#aaa">—</span>'
+   +'<input type="date" value="'+(f.to||'')+'" onchange="setPoFlt(\'to\',this.value)" title="To date" style="border:1px solid #ddd;border-radius:6px;padding:5px 8px;font-size:11px;background:#fff;color:#333">'
+   +'<input type="text" value="'+(f.ono||'')+'" placeholder="Order No / Product search…" oninput="setPoFlt(\'ono\',this.value)" style="border:1px solid #ddd;border-radius:6px;padding:5px 10px;font-size:11px;min-width:170px;background:#fff;color:#333">'
+   +mkDrop('prods','Product',allProds,f.prods)
+   +mkDrop('fabs','Fabric',allFabs,f.fabs)
+   +(hasFilter?'<button onclick="clearPoFlt()" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">✕ Clear</button>':'')
+   +'<div style="margin-left:auto;display:flex;gap:6px;align-items:center">'
+   +'<button onclick="exportPOCSV()" style="background:#fff;border:1px solid #27ae60;color:#27ae60;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer" title="Export filtered/selected rows as CSV">⬇ CSV</button>'
+   +'<button onclick="printSelectedPO()" style="background:#fff;border:1px solid #2980b9;color:#2980b9;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer" title="Print selected orders as PDF">🖨️ Print PDF</button>'
+   +(canPlace?'<button onclick="openNewPO()" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer">+ New Order</button>':'')
+   +'</div></div>'
+   +'<div style="font-size:11px;color:#888;margin-bottom:8px">'+active.length+' order'+(active.length!==1?'s':'')+' shown'+(hasFilter?' <span style="color:#c8a96e">(filtered)</span>':'')+(selCount?' &nbsp;·&nbsp; <b style="color:var(--gold)">'+selCount+' selected</b>':'')+'</div>';
+  // Totals
+  var tS=active.reduce(function(a,o){return a+(o.S||0);},0);
+  var tM=active.reduce(function(a,o){return a+(o.M||0);},0);
+  var tL=active.reduce(function(a,o){return a+(o.L||0);},0);
+  var tXL=active.reduce(function(a,o){return a+(o.XL||0);},0);
+  var tQ=active.reduce(function(a,o){return a+(o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0));},0);
+  // Style shorthands
+  var TH='padding:7px 9px;border:1px solid #d8d4cc;font-size:11px;font-weight:700;text-align:center;white-space:nowrap;';
+  var THL=TH+'text-align:left;';
+  var TD='padding:6px 8px;border:1px solid #eee;font-size:11px;text-align:center;vertical-align:middle;';
+  var TDL=TD+'text-align:left;';
+  var ST={'Pending Approval':'background:#fff8e0;color:#a07030','In Progress':'background:#e8f8ee;color:#1e8449','Completed':'background:#e8eef8;color:#2471a3','Rejected':'background:#fde8e8;color:#c0392b'};
+  // Table
+  var tbl='<div style="overflow-x:auto;overflow-y:auto;max-height:64vh;border:1px solid #e0dcd4;border-radius:8px">'
+   +'<table style="border-collapse:collapse;min-width:1300px;width:100%;background:#fff">'
+   +'<thead style="position:sticky;top:0;z-index:10">'
+   // Grouped header row
+   +'<tr style="background:#f0ece4">'
+   +'<th style="'+TH+'" rowspan="3"><input type="checkbox" '+(allSelCheck?'checked':'')+' onchange="togglePoSelAll(['+allIds.map(function(i){return'\''+i+'\'';}).join(',')+'])" style="cursor:pointer;accent-color:var(--gold)"></th>'
+   +'<th style="'+THL+'" rowspan="3">Date</th>'
+   +'<th style="'+TH+'" rowspan="3">Order No</th>'
+   +'<th style="'+THL+'" rowspan="3">Product Name</th>'
+   +'<th style="'+TH+'" rowspan="3">Fabric</th>'
+   +'<th style="'+TH+'" rowspan="3">Image</th>'
+   +'<th style="'+TH+'" rowspan="3">Size Chart</th>'
+   +'<th style="'+TH+'" rowspan="3">Fabric<br>Swatch</th>'
+   +'<th style="'+TH+'background:#fdf8f0" rowspan="3">Ordered<br>Qty</th>'
+   +'<th style="'+TH+'background:#fff8e0;color:#a07030;border-bottom:none" colspan="4">Size Ratio</th>'
+   +'<th style="'+TH+'background:#eef3fb;color:#2471a3;border-bottom:none" colspan="5">Production Phases</th>'
+   +'<th style="'+TH+'" rowspan="3">ETA</th>'
+   +'<th style="'+TH+'" rowspan="3">Actions</th>'
+   +'</tr>'
+   // Column names
+   +'<tr style="background:#f8f6f2">'
+   +'<th style="'+TH+'background:#fff8e0;color:#a07030">S</th><th style="'+TH+'background:#fff8e0;color:#a07030">M</th>'
+   +'<th style="'+TH+'background:#fff8e0;color:#a07030">L</th><th style="'+TH+'background:#fff8e0;color:#a07030">XL</th>'
+   +'<th style="'+TH+'background:#eef3fb;font-size:10px">✂️ Cut</th>'
+   +'<th style="'+TH+'background:#eef3fb;font-size:10px">🌸 Emb</th>'
+   +'<th style="'+TH+'background:#eef3fb;font-size:10px">🖨️ Print</th>'
+   +'<th style="'+TH+'background:#eef3fb;font-size:10px">🧵 Stitch</th>'
+   +'<th style="'+TH+'background:#eef3fb;font-size:10px">✨ Finish</th>'
+   +'</tr>'
+   // Totals row (sticky)
+   +'<tr style="background:#fdf8f0;border-top:2px solid #c8a96e">'
+   +'<td style="'+TDL+'font-size:10px;color:#888;font-weight:700" colspan="3">SUBTOTAL — '+active.length+' orders</td>'
+   +'<td style="'+TD+'"></td><td style="'+TD+'"></td><td style="'+TD+'"></td>'
+   +'<td style="'+TD+'font-weight:700;color:var(--gold2)">'+tQ+'</td>'
+   +'<td style="'+TD+'background:#fff8e0;font-weight:700">'+tS+'</td>'
+   +'<td style="'+TD+'background:#fff8e0;font-weight:700">'+tM+'</td>'
+   +'<td style="'+TD+'background:#fff8e0;font-weight:700">'+tL+'</td>'
+   +'<td style="'+TD+'background:#fff8e0;font-weight:700">'+tXL+'</td>'
+   +'<td style="'+TD+'background:#eef3fb" colspan="5"></td>'
+   +'<td style="'+TD+'"></td><td style="'+TD+'"></td>'
+   +'</tr>'
+   +'</thead><tbody>';
   if(active.length===0){
-    ordHtml='<div style="text-align:center;padding:36px;color:#bbb;background:#fff;border:1px solid #e8e4dc;border-radius:10px;font-size:13px">No active production orders.<br><span style="font-size:11px">Place one via "+ New Order" or from the suggestions below.</span></div>';
+    tbl+='<tr><td colspan="20" style="padding:40px;text-align:center;color:#bbb;font-size:13px">No orders match the current filter. <a href="#" onclick="clearPoFlt();return false" style="color:var(--gold)">Clear filters</a></td></tr>';
   } else {
-    active.forEach(function(o){
-      var realTotal=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
-      var stBadge=ST_BADGE[o.status]||'background:#f5f5f5;color:#888';
-      var cnt=PHASES.filter(function(p){return o.phases&&o.phases[p[0]]&&o.phases[p[0]].done;}).length;
-      var pct=Math.round(cnt/PHASES.length*100);
-      var simg=o.img&&o.img.startsWith('http')?o.img+'?width=100':'';
-      var isInitiator=CU&&(o.placedBy===CU.name||o.placedByEmail===CU.email);
-      var canPrint=(isOwner||isInitiator)&&(o.status==='In Progress'||o.status==='Completed');
-      var showPhases=(isOwner||isProdUser)&&(o.status==='In Progress'||o.status==='Completed');
-      // Phase stepper
-      var stepper='';
-      if(showPhases){
-        stepper='<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 6px">';
-        PHASES.forEach(function(p){
-          var pd=o.phases[p[0]]||{};var done=pd.done;
-          var st=done?'background:#27ae60;color:#fff;border:2px solid #1e8449':'background:#f5f5f5;color:#888;border:2px dashed #ddd';
-          var tip=done?'Done'+(pd.by?' by '+pd.by:'')+(pd.date?' on '+fmtD(pd.date):''):'Click to mark done';
-          stepper+='<button onclick="togglePoPhase(\''+o.id+'\',\''+p[0]+'\')" title="'+tip+'" style="'+st+';border-radius:20px;padding:5px 13px;font-size:11px;cursor:pointer;font-weight:600;white-space:nowrap;line-height:1.3">'+p[1]+(done?' ✓':'')+'</button>';
-        });
-        stepper+='</div>';
+    active.forEach(function(o,i){
+      var rt=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
+      var isSel=!!sel[o.id];
+      var isInit=CU&&(o.placedBy===CU.name||o.placedByEmail===CU.email);
+      var canPrint=(isOwner||isInit)&&(o.status==='In Progress'||o.status==='Completed');
+      var phActive=o.status==='In Progress'||o.status==='Completed';
+      var bg=isSel?'#fffbf0':i%2===0?'#fff':'#fafaf8';
+      var stBadge=(ST[o.status]||'background:#f5f5f5;color:#888')+';font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;display:inline-block;white-space:nowrap';
+      function phCell(key){
+        if(!phActive)return '<td style="'+TD+'color:#ccc">—</td>';
+        var ph=o.phases&&o.phases[key]||{};var done=!!ph.done;
+        var cs=TD+(done?'background:#e8f8ee;':'');
+        if(isProdUser||isOwner){
+          var tip=done?('Done'+(ph.by?' by '+ph.by:'')+(ph.date?' on '+fmtD(ph.date):'')):'Click to mark done';
+          return '<td style="'+cs+'"><button onclick="togglePoPhase(\''+o.id+'\',\''+key+'\')" title="'+tip+'" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:'+(done?'700':'400')+';color:'+(done?'#1e8449':'#ccc')+';padding:0;width:100%">'+(done?'✓ Done':'–')+'</button></td>';
+        }
+        return '<td style="'+cs+'">'+(done?'<span style="color:#1e8449;font-weight:700">✓</span>':'–')+'</td>';
       }
-      var bar=showPhases?'<div style="background:#f0ede8;border-radius:4px;height:5px;margin:8px 0 2px">'
-       +'<div style="background:linear-gradient(90deg,var(--gold),#27ae60);height:5px;border-radius:4px;width:'+pct+'%;transition:width .4s"></div></div>'
-       +'<div style="font-size:10px;color:#aaa;margin-bottom:4px">'+pct+'% complete &nbsp;('+cnt+'/'+PHASES.length+' phases done)</div>':'';
-      // Extra info row
-      var extraInfo='';
-      if(o.fabric||o.urgency||o.approvedBy){
-        extraInfo='<div style="display:flex;gap:14px;font-size:10px;color:#999;flex-wrap:wrap;margin-bottom:6px">';
-        if(o.fabric)extraInfo+='<span>🧵 <b style="color:#555;font-size:11px">'+o.fabric+'</b></span>';
-        if(o.urgency){var uc=o.urgency==='URGENT'?'#c0392b':o.urgency==='SAMPLE'?'#8e44ad':'#888';extraInfo+='<span>⚡ <b style="color:'+uc+';font-size:11px">'+o.urgency+'</b></span>';}
-        if(o.approvedBy)extraInfo+='<span>✓ Approved by <b style="color:#27ae60;font-size:11px">'+o.approvedBy+'</b>'+(o.approvedDate?' · '+fmtD(o.approvedDate):'')+'</span>';
-        extraInfo+='</div>';
-      }
-      // Fabric shade
-      var shadeHtml=o.fabricShade?'<div style="margin:8px 0"><div style="font-size:9px;color:#888;font-weight:600;letter-spacing:.06em;margin-bottom:4px">FABRIC SHADE</div><img src="'+o.fabricShade+'" style="max-height:80px;max-width:110px;border-radius:6px;border:1px solid #e0dcd4"></div>':'';
-      // Actions
-      var acts='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">';
+      var imgCell='<td style="'+TD+'">'+(o.img&&o.img.startsWith('http')?'<img src="'+o.img+'?width=60" style="width:38px;height:38px;object-fit:cover;border-radius:4px;border:1px solid #eee" onerror="this.style.display=\'none\'">':'–')+'</td>';
+      var scCell='<td style="'+TD+'">'+(o.sizeChart?'<img src="'+o.sizeChart+'" onclick="var w=window.open();w.document.write(\'<img src=\\\"'+o.sizeChart+'\\\" style=\\\"max-width:100%\\\">\');" style="width:38px;height:38px;object-fit:contain;border:1px solid #eee;cursor:pointer;border-radius:3px" title="Click to enlarge">':'–')+'</td>';
+      var fsCell='<td style="'+TD+'">'+(o.fabricShade?'<img src="'+o.fabricShade+'" onclick="var w=window.open();w.document.write(\'<img src=\\\"'+o.fabricShade+'\\\" style=\\\"max-width:100%\\\">\');" style="width:38px;height:38px;object-fit:cover;border:1px solid #eee;cursor:pointer;border-radius:3px" title="Click to enlarge">':(isProdUser&&o.status==='In Progress'?'<label style="font-size:10px;color:#8e44ad;cursor:pointer;background:#f5e8f8;border:1px solid #c0a0d0;border-radius:4px;padding:2px 5px;white-space:nowrap">📷<input type="file" accept="image/*" style="display:none" onchange="uploadFabricShade(\''+o.id+'\',this)"></label>':'–'))+'</td>';
+      var actCell='<td style="'+TD+'min-width:80px"><div style="display:flex;flex-direction:column;gap:3px;align-items:stretch">';
       if(o.status==='Pending Approval'&&isOwner){
-        acts+='<button onclick="approvePO(\''+o.id+'\')" style="background:#27ae60;color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.02em">✓ Approve</button>';
-        acts+='<button onclick="rejectPO(\''+o.id+'\')" style="background:#fff;border:1px solid #c0392b;color:#c0392b;border-radius:6px;padding:6px 14px;font-size:11px;cursor:pointer;font-weight:600">✗ Reject</button>';
+        actCell+='<button onclick="approvePO(\''+o.id+'\')" style="background:#27ae60;color:#fff;border:none;border-radius:4px;padding:3px 7px;font-size:10px;cursor:pointer;font-weight:700">✓ Approve</button>';
+        actCell+='<button onclick="rejectPO(\''+o.id+'\')" style="background:#fff;border:1px solid #c0392b;color:#c0392b;border-radius:4px;padding:3px 7px;font-size:10px;cursor:pointer">✗ Reject</button>';
       }
-      if(o.status==='Pending Approval'&&!isOwner){
-        acts+='<span style="font-size:10px;color:#a07030;background:#fff8e0;padding:4px 12px;border-radius:6px;border:1px solid #e8c84a">⏳ Awaiting approval</span>';
-      }
-      if(canPrint){
-        acts+='<button onclick="printPO(\''+o.id+'\')" style="background:#f0f5fb;border:1px solid #a0c0e0;color:#2471a3;border-radius:6px;padding:6px 14px;font-size:11px;cursor:pointer;font-weight:600">🖨️ Print PDF</button>';
-      }
-      if(isProdUser&&o.status==='In Progress'&&!o.fabricShade){
-        acts+='<label style="background:#f5e8f8;border:1px solid #c0a0d0;color:#8e44ad;border-radius:6px;padding:6px 14px;font-size:11px;cursor:pointer;font-weight:600">📷 Add Fabric Shade<input type="file" accept="image/*" style="display:none" onchange="uploadFabricShade(\''+o.id+'\',this)"></label>';
-      }
-      if((isOwner||isInitiator)&&o.status!=='Completed'&&o.status!=='Cancelled'&&o.status!=='Rejected'){
-        acts+='<button onclick="cancelPO(\''+o.id+'\')" style="margin-left:auto;background:none;border:1px solid #eee;color:#c0392b;border-radius:4px;padding:4px 10px;font-size:10px;cursor:pointer">Cancel Order</button>';
-      }
-      acts+='</div>';
-      ordHtml+='<div style="background:#fff;border:1px solid #e8e4dc;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start">'
-       +(simg?'<img src="'+simg+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0" onerror="this.style.display=\'none\'">':'')
-       +'<div style="flex:1;min-width:0">'
-       +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
-       +'<span style="font-size:10px;color:#888;font-weight:700;background:#f5f5f5;padding:2px 8px;border-radius:4px">'+o.id+'</span>'
-       +'<span style="font-weight:700;font-size:14px;color:#1a1a1a">'+o.product+'</span>'
-       +'<span style="'+stBadge+';font-size:9px;font-weight:700;padding:3px 10px;border-radius:10px">'+o.status.toUpperCase()+'</span>'
-       +'<span style="margin-left:auto;font-size:10px;color:#bbb">'+fmtD(o.date)+' · <b style="color:#999">'+o.placedBy+'</b></span>'
-       +'</div>'
-       +extraInfo
-       +'<div style="display:flex;gap:14px;font-size:12px;color:#555;flex-wrap:wrap;margin-bottom:4px">'
-       +'<span>S: <b style="color:#1a1a1a;font-size:14px">'+(o.S||0)+'</b></span>'
-       +'<span>M: <b style="color:#1a1a1a;font-size:14px">'+(o.M||0)+'</b></span>'
-       +'<span>L: <b style="color:#1a1a1a;font-size:14px">'+(o.L||0)+'</b></span>'
-       +'<span>XL: <b style="color:#1a1a1a;font-size:14px">'+(o.XL||0)+'</b></span>'
-       +'<span style="color:var(--gold2);font-weight:700;font-size:14px">Total: '+realTotal+'</span>'
-       +(o.targetDate?'<span style="margin-left:auto;color:#2980b9;font-size:11px">🎯 Due: '+fmtD(o.targetDate)+'</span>':'')
-       +'</div>'
-       +(o.notes?'<div style="font-size:11px;color:#888;font-style:italic;margin-bottom:4px">📝 '+o.notes+'</div>':'')
-       +bar+stepper+shadeHtml+acts
-       +'</div></div>';
+      if(canPrint)actCell+='<button onclick="printPO(\''+o.id+'\')" style="background:#f0f5fb;border:1px solid #a0c0e0;color:#2471a3;border-radius:4px;padding:3px 7px;font-size:10px;cursor:pointer;font-weight:600">🖨️ Print</button>';
+      if((isOwner||isInit)&&o.status!=='Completed'&&o.status!=='Cancelled'&&o.status!=='Rejected')actCell+='<button onclick="cancelPO(\''+o.id+'\')" style="background:none;border:1px solid #eee;color:#c0392b;border-radius:4px;padding:2px 5px;font-size:9px;cursor:pointer">Cancel</button>';
+      actCell+='</div></td>';
+      tbl+='<tr style="background:'+bg+'">'
+       +'<td style="'+TD+'"><input type="checkbox" '+(isSel?'checked':'')+' onchange="togglePoSel(\''+o.id+'\')" style="cursor:pointer;accent-color:var(--gold)"></td>'
+       +'<td style="'+TDL+'color:#888;white-space:nowrap">'+fmtDMY(o.date)+'</td>'
+       +'<td style="'+TD+'font-weight:700;color:var(--gold2)">'+o.id+'</td>'
+       +'<td style="'+TDL+'"><div style="font-weight:600;margin-bottom:2px">'+o.product+'</div><span style="'+stBadge+'">'+o.status+'</span></td>'
+       +'<td style="'+TD+'">'+  (o.fabric||'—')+'</td>'
+       +imgCell+scCell+fsCell
+       +'<td style="'+TD+'font-weight:700;background:#fdf8f0;color:var(--gold2)">'+rt+'</td>'
+       +'<td style="'+TD+'background:#fffbea">'+(o.S||0)+'</td>'
+       +'<td style="'+TD+'background:#fffbea">'+(o.M||0)+'</td>'
+       +'<td style="'+TD+'background:#fffbea">'+(o.L||0)+'</td>'
+       +'<td style="'+TD+'background:#fffbea">'+(o.XL||0)+'</td>'
+       +phCell('cutting')+phCell('embroidery')+phCell('print')+phCell('stitching')+phCell('finishing')
+       +'<td style="'+TD+'color:#2980b9;font-size:10px;white-space:nowrap">'+(o.targetDate?fmtDMY(o.targetDate):'—')+'</td>'
+       +actCell
+       +'</tr>';
     });
   }
-
-  // Suggestions
-  var sugHtml='';
-  if(STOCK_PRODS&&Object.keys(STOCK_PRODS).length&&DETAIL.length){
-    var refD=META.max_date||new Date().toISOString().split('T')[0];
-    var s30=new Date(refD);s30.setDate(s30.getDate()-30);var s30s=s30.toISOString().split('T')[0];
-    var s10=new Date(refD);s10.setDate(s10.getDate()-10);var s10s=s10.toISOString().split('T')[0];
-    var vel30={},vel10={};
-    DETAIL.forEach(function(r){if(r[4]==='delivered'){if(r[0]>=s30s)vel30[r[1]]=(vel30[r[1]]||0)+1;if(r[0]>=s10s)vel10[r[1]]=(vel10[r[1]]||0)+1;}});
-    var sugs=Object.keys(STOCK_PRODS).map(function(k){
-      var sp=STOCK_PRODS[k];var v30=vel30[sp.title]||0;var v10=vel10[sp.title]||0;
-      var rate=Math.round(v30/30*10)/10;
-      var days=rate>0?Math.round(sp.total/rate):9999;
-      var sug=Math.max(0,Math.round(rate*60)-sp.total);
-      var urg=sp.total===0&&v30>0?0:days<7&&v30>0?1:days<21&&v30>0?2:days<45&&v30>0?3:4;
-      return{k:k,sp:sp,v30:v30,v10:v10,rate:rate,days:days,sug:sug,urg:urg};
-    }).filter(function(x){return x.urg<4&&x.v30>0;}).sort(function(a,b){return a.urg-b.urg||a.days-b.days;}).slice(0,40);
-
-    if(sugs.length){
-      sugHtml='<div style="margin-top:22px">'
-       +'<div style="font-size:14px;font-weight:700;margin-bottom:8px">💡 Reorder Suggestions <span style="font-size:10px;color:#bbb;font-weight:400">sorted by urgency · based on 30-day velocity</span></div>'
-       +'<div style="overflow:auto;border:1px solid #e8e4dc;border-radius:8px"><table style="border-collapse:collapse;font-size:11px;background:#fff;width:100%;min-width:820px">'
-       +'<thead><tr style="background:#f8f6f2">'
-       +'<th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e8e4dc;min-width:160px">Product</th>'
-       +'<th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e8e4dc">Urgency</th>'
-       +'<th style="padding:8px 8px;text-align:right;border-bottom:2px solid #e8e4dc">Stock</th>'
-       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">S</th>'
-       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">M</th>'
-       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">L</th>'
-       +'<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e8e4dc;background:#e8f8f5">XL</th>'
-       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">30d Sales</th>'
-       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">Last 10d</th>'
-       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">Daily Rate</th>'
-       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc">Days Left</th>'
-       +'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #e8e4dc;background:#fdf8f0">Suggest (60d)</th>'
-       +(canPlace?'<th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e8e4dc">Order</th>':'')
-       +'</tr></thead><tbody>';
-      sugs.forEach(function(x,i){
-        var sp=x.sp;
-        var urg=x.urg===0?'🔴 OUT':x.urg===1?'🟠 CRITICAL':x.urg===2?'🟡 LOW':'🟢 SOON';
-        var dc=x.urg<=1?'color:#c0392b;font-weight:700':x.urg===2?'color:#d4944a;font-weight:700':'color:#27ae60;font-weight:600';
-        var bg=i%2===0?'#fff':'#fafaf8';
-        sugHtml+='<tr style="background:'+bg+';border-bottom:1px solid #f2efe9">'
-         +'<td style="padding:7px 10px;font-weight:600">'+sp.title+'</td>'
-         +'<td style="padding:7px 10px;text-align:center">'+urg+'</td>'
-         +'<td style="padding:7px 8px;text-align:right;font-weight:700">'+NF(sp.total)+'</td>'
-         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.S||'-')+'</td>'
-         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.M||'-')+'</td>'
-         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.L||'-')+'</td>'
-         +'<td style="padding:7px 6px;text-align:right;background:#f4fcf9;color:#888">'+(sp.XL||'-')+'</td>'
-         +'<td style="padding:7px 10px;text-align:right">'+NF(x.v30)+'</td>'
-         +'<td style="padding:7px 10px;text-align:right;color:#2980b9;font-weight:600">'+NF(x.v10)+'</td>'
-         +'<td style="padding:7px 10px;text-align:right;color:#888">'+x.rate+'/d</td>'
-         +'<td style="padding:7px 10px;text-align:right;'+dc+'">'+(x.days<9999?x.days+'d':'-')+'</td>'
-         +'<td style="padding:7px 10px;text-align:right;background:#fdf8f0;color:var(--gold2);font-weight:700">'+(x.sug>0?NF(x.sug):'-')+'</td>'
-         +(canPlace?'<td style="padding:7px 10px;text-align:center"><button onclick="openNewPO(\''+sp.title.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\')" style="background:var(--gold);color:#111;border:none;border-radius:5px;padding:4px 12px;font-size:10px;font-weight:700;cursor:pointer">+ Order</button></td>':'')
-         +'</tr>';
-      });
-      sugHtml+='</tbody></table></div></div>';
-    }
-  }
-
-  el.innerHTML=kh+hdr+'<div>'+ordHtml+'</div>'+sugHtml;
+  tbl+='</tbody></table></div>';
+  var overlay=window._poDrop?'<div onclick="togglePoDrop(\'\')" style="position:fixed;inset:0;z-index:499"></div>':'';
+  el.innerHTML=kh+overlay+toolbar+tbl;
 }
 
 // ── CHANGE PASSWORD (self-service) ──
@@ -3528,7 +3590,14 @@ function toggleSB(){
 
     <!-- Fabric -->
     <label style="display:block;font-size:10px;color:#888;margin-bottom:5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Fabric / Material Name <span style="color:#e74c3c">*</span></label>
-    <input id="po-fabric" placeholder="e.g. Cotton Lawn, Silk Chiffon..." style="width:100%;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:14px">
+    <input id="po-fabric" list="po-fabriclist" placeholder="Select or type fabric..." style="width:100%;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:14px">
+    <datalist id="po-fabriclist">
+      <option value="Lawn"><option value="Khaddar"><option value="Cambric">
+      <option value="Chiffon"><option value="Silk"><option value="Cotton">
+      <option value="Linen"><option value="Karandi"><option value="Organza">
+      <option value="Net"><option value="Velvet"><option value="Jacquard">
+      <option value="Raw Silk"><option value="Cotton Lawn"><option value="Silk Chiffon">
+    </datalist>
 
     <!-- Customer -->
     <label style="display:block;font-size:10px;color:#888;margin-bottom:5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Customer / Buyer Name <span style="color:#e74c3c">✱</span></label>
