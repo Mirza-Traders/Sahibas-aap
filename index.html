@@ -2545,15 +2545,11 @@ function printPO(oid){
   showToast('Preparing print…');
   var imgUrl=o.img&&o.img.startsWith('http')?o.img:'';
   if(imgUrl){
-    fetch(imgUrl)
-      .then(function(r){return r.blob();})
-      .then(function(blob){
-        var rd=new FileReader();
-        rd.onload=function(e){doPrintPO(o,e.target.result);};
-        rd.onerror=function(){doPrintPO(o,imgUrl);};
-        rd.readAsDataURL(blob);
-      })
-      .catch(function(){doPrintPO(o,imgUrl);});
+    // Preload image into browser cache via Image element (no CORS issues), then print
+    var preload=new Image();
+    preload.onload=function(){doPrintPO(o,imgUrl);};
+    preload.onerror=function(){doPrintPO(o,'');};
+    preload.src=imgUrl;
   } else {
     doPrintPO(o,'');
   }
