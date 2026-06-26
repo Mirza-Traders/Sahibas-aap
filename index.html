@@ -2816,7 +2816,6 @@ function rPO(){
    +'<th style="'+THL+'" rowspan="3">Product Name</th>'
    +'<th style="'+TH+'" rowspan="3">Fabric</th>'
    +'<th style="'+TH+'" rowspan="3">Image</th>'
-   +'<th style="'+TH+'" rowspan="3">Size Chart</th>'
    +'<th style="'+TH+'" rowspan="3">Fabric<br>Swatch</th>'
    +'<th style="'+TH+'background:#fdf8f0" rowspan="3">Ordered<br>Qty</th>'
    +'<th style="'+TH+'background:#fff8e0;color:#a07030;border-bottom:none" colspan="4">Size Ratio</th>'
@@ -2869,7 +2868,6 @@ function rPO(){
         return '<td style="'+cs+'">'+(done?'<span style="color:#1e8449;font-weight:700">✓</span>':'–')+'</td>';
       }
       var imgCell='<td style="'+TD+'">'+(o.img&&o.img.startsWith('http')?'<img src="'+o.img+'?width=60" style="width:38px;height:38px;object-fit:cover;border-radius:4px;border:1px solid #eee" onerror="this.style.display=\'none\'">':'–')+'</td>';
-      var scCell='<td style="'+TD+'">'+(o.sizeChart?'<img src="'+o.sizeChart+'" onclick="var w=window.open();w.document.write(\'<img src=\\\"'+o.sizeChart+'\\\" style=\\\"max-width:100%\\\">\');" style="width:38px;height:38px;object-fit:contain;border:1px solid #eee;cursor:pointer;border-radius:3px" title="Click to enlarge">':'–')+'</td>';
       var fsCell='<td style="'+TD+'">'+(o.fabricShade?'<img src="'+o.fabricShade+'" onclick="var w=window.open();w.document.write(\'<img src=\\\"'+o.fabricShade+'\\\" style=\\\"max-width:100%\\\">\');" style="width:38px;height:38px;object-fit:cover;border:1px solid #eee;cursor:pointer;border-radius:3px" title="Click to enlarge">':(isProdUser&&o.status==='In Progress'?'<label style="font-size:10px;color:#8e44ad;cursor:pointer;background:#f5e8f8;border:1px solid #c0a0d0;border-radius:4px;padding:2px 5px;white-space:nowrap">📷<input type="file" accept="image/*" style="display:none" onchange="uploadFabricShade(\''+o.id+'\',this)"></label>':'–'))+'</td>';
       var actCell='<td style="'+TD+'min-width:80px"><div style="display:flex;flex-direction:column;gap:3px;align-items:stretch">';
       if(o.status==='Pending Approval'&&isOwner){
@@ -2885,7 +2883,7 @@ function rPO(){
        +'<td style="'+TD+'font-weight:700;color:var(--gold2)">'+o.id+'</td>'
        +'<td style="'+TDL+'"><div style="font-weight:600;margin-bottom:2px">'+o.product+'</div><span style="'+stBadge+'">'+o.status+'</span></td>'
        +'<td style="'+TD+'">'+  (o.fabric||'—')+'</td>'
-       +imgCell+scCell+fsCell
+       +imgCell+fsCell
        +'<td style="'+TD+'font-weight:700;background:#fdf8f0;color:var(--gold2)">'+rt+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.S||0)+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.M||0)+'</td>'
