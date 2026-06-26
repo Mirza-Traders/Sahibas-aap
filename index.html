@@ -2433,7 +2433,8 @@ function openNewPO(name){
   document.getElementById('po-date-display').textContent=new Date().toISOString().split('T')[0];
   if(name)poProdHint(name);
   document.getElementById('po-modal').classList.add('open');
-  setTimeout(function(){document.getElementById(name?'po-qty':'po-prod').focus();},80);
+  document.getElementById('po-modal').querySelector('.po-mdl-box').scrollTop=0;
+  setTimeout(function(){document.getElementById(name?'po-prod':'po-customer').focus();},80);
 }
 
 function poProdHint(name){
