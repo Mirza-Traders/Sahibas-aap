@@ -994,10 +994,10 @@ function rST(){
   var PC='#2471a3'; // blue for % figures
   var TH='padding:7px 10px;font-size:11px;font-weight:700;border-bottom:2px solid #e8e4dc;white-space:nowrap;background:#f0ece4;';
   var TD='padding:5px 10px;font-size:11px;border-bottom:1px solid #f0ece4;';
-  // nav=39px + fbar≈38px = 77px — thead must stick at this offset from viewport top
-  var h='<div style="overflow-x:auto;border:1px solid #e8e4dc;border-radius:6px">'
-   +'<table id="tst" style="border-collapse:collapse;width:100%;background:#fff">'
-   +'<thead style="position:sticky;top:77px;z-index:10;background:#f0ece4;box-shadow:0 2px 6px rgba(0,0,0,0.08)"><tr>'
+  // No overflow wrapper — overflow-x:auto on any ancestor kills position:sticky on thead.
+  // Table fits ~1050px; 1366px screen minus 186px sidebar = ~1180px — no horizontal scroll needed.
+  var h='<table id="tst" style="border-collapse:collapse;width:100%;background:#fff;border:1px solid #e8e4dc;border-radius:6px">'
+   +'<thead style="position:sticky;top:77px;z-index:10;background:#f0ece4;box-shadow:0 2px 4px rgba(0,0,0,0.08)"><tr>'
    +'<th style="'+TH+'text-align:left">Platform</th>'
    +'<th style="'+TH+'text-align:left">Destination</th>'
    +'<th style="'+TH+'text-align:left">Status</th>'
@@ -1060,7 +1060,7 @@ function rST(){
     });
     h+='</tr>';
   });
-  h+='</tbody></table></div>';
+  h+='</tbody></table>';
   document.getElementById('pst').innerHTML=h;
 }
 
