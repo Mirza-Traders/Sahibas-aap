@@ -1062,6 +1062,10 @@ function rST(){
   });
   h+='</tbody></table>';
   document.getElementById('pst').innerHTML=h;
+  // Set sticky top dynamically — filter bar wraps on narrow screens so 77px is unreliable
+  var fbar=document.querySelector('.fbar');
+  var thead=document.querySelector('#tst thead');
+  if(fbar&&thead){thead.style.top=(39+fbar.offsetHeight)+'px';}
 }
 
 // ── PRODUCT SUMMARY — built from sales data ──
