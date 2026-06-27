@@ -971,15 +971,81 @@ function expVL(){if(window._vlArr)csvDL(window._vlArr.map(v=>[v.name,v.u10,v.u20
 // ── ORDER STATUS ──
 function rST(){
   var f=filters;
-  var rows=DETAIL.filter(r=>(!f.from||r[0]>=f.from)&&(!f.to||r[0]<=f.to));
-  var mx={};
-  rows.forEach(r=>{var k=r[5]+'|'+r[6]+'|'+r[4];var mk=r[0].substring(0,7);if(!mx[k])mx[k]={pf:r[5],dst:r[6],stat:r[4],t:0,m:{}};mx[k].t++;if(!mx[k].m[mk])mx[k].m[mk]=0;mx[k].m[mk]++;});
-  var cols=['Platform','Destination','Status','Total'].concat(MONTHS.map(mk=>{try{return new Date(mk+'-01').toLocaleString('en',{month:'short'});}catch(e){return mk;}}));
-  var h='<div class="tw"><table id="tst"><thead><tr>'+cols.map((c,i)=>'<th style="text-align:'+(i<3?'left':'right')+'">'+c+'</th>').join('')+'</tr></thead><tbody>';
-  Object.keys(mx).sort().forEach(k=>{var r=mx[k];var sc=r.stat==='delivered'?'s-del':r.stat==='cancelled'?'s-can':r.stat==='in_transit'?'s-tr':r.stat==='allocated'?'s-all':'s-oth';
-    h+='<tr><td>'+pBadge(r.pf)+'</td><td>'+dBadge(r.dst)+'</td><td><span class="bc '+sc+'">'+r.stat+'</span></td><td class="nr"><strong>'+NF(r.t)+'</strong></td>';
-    MONTHS.forEach(mk=>h+='<td class="nr">'+(r.m[mk]||'-')+'</td>');h+='</tr>';});
-  h+='</tbody></table></div>';document.getElementById('pst').innerHTML=h;
+  var rows=DETAIL.filter(function(r){
+    return(!f.from||r[0]>=f.from)&&(!f.to||r[0]<=f.to)
+      &&(!f.pf||r[5]===f.pf)&&(!f.dst||r[6]===f.dst);
+  });
+  // Build groups: "PLATFORM|DESTINATION" → status → {total, months}
+  var groups={};
+  rows.forEach(function(r){
+    var gk=r[5]+'|'+r[6];
+    var stat=r[4];
+    var mk=r[0].substring(0,7);
+    if(!groups[gk])groups[gk]={pf:r[5],dst:r[6],statuses:{}};
+    var g=groups[gk];
+    if(!g.statuses[stat])g.statuses[stat]={total:0,months:{}};
+    g.statuses[stat].total++;
+    g.statuses[stat].months[mk]=(g.statuses[stat].months[mk]||0)+1;
+  });
+  var monthLabels=MONTHS.map(function(mk){try{return new Date(mk+'-01').toLocaleString('en',{month:'short'});}catch(e){return mk;}});
+  var statOrder=['open','delivered','cancelled','refunded'];
+  function statRank(s){var i=statOrder.indexOf(s);return i>=0?i:99;}
+  function stBadge(stat){var sc=stat==='delivered'?'s-del':stat==='cancelled'?'s-can':stat==='in_transit'?'s-tr':stat==='allocated'?'s-all':'s-oth';return '<span class="bc '+sc+'">'+stat+'</span>';}
+  var TH='padding:7px 10px;font-size:11px;font-weight:700;border-bottom:2px solid #e8e4dc;white-space:nowrap;background:#f0ece4;';
+  var TD='padding:5px 10px;font-size:11px;border-bottom:1px solid #f0ece4;';
+  var h='<div class="tw"><table id="tst" style="border-collapse:collapse;width:100%;background:#fff">'
+   +'<thead><tr>'
+   +'<th style="'+TH+'text-align:left">Platform</th>'
+   +'<th style="'+TH+'text-align:left">Destination</th>'
+   +'<th style="'+TH+'text-align:left">Status</th>'
+   +'<th style="'+TH+'text-align:right">Total</th>'
+   +'<th style="'+TH+'text-align:right">% Age</th>'
+   +monthLabels.map(function(m){return '<th style="'+TH+'text-align:right">'+m+'</th>';}).join('')
+   +'</tr></thead><tbody>';
+  var gKeys=Object.keys(groups).sort();
+  var firstGroup=true;
+  gKeys.forEach(function(gk){
+    var g=groups[gk];
+    var statKeys=Object.keys(g.statuses).sort(function(a,b){return statRank(a)-statRank(b);});
+    var groupTotal=0;
+    statKeys.forEach(function(s){groupTotal+=g.statuses[s].total;});
+    // Blank separator row between groups
+    if(!firstGroup){
+      h+='<tr><td colspan="'+(5+monthLabels.length)+'" style="height:12px;background:#f5f3ef;border-top:2px solid #e0dcd4;border-bottom:2px solid #e0dcd4"></td></tr>';
+    }
+    firstGroup=false;
+    // Status rows
+    statKeys.forEach(function(stat,si){
+      var sd=g.statuses[stat];
+      var pct=groupTotal>0?Math.round(sd.total/groupTotal*100):0;
+      var bg=si%2===0?'#fff':'#fafaf8';
+      h+='<tr style="background:'+bg+'">'
+       +'<td style="'+TD+'">'+(si===0?pBadge(g.pf):'')+'</td>'
+       +'<td style="'+TD+'">'+(si===0?dBadge(g.dst):'')+'</td>'
+       +'<td style="'+TD+'">'+stBadge(stat)+'</td>'
+       +'<td style="'+TD+'text-align:right;font-weight:700">'+NF(sd.total)+'</td>'
+       +'<td style="'+TD+'text-align:right;color:#888">'+pct+'%</td>';
+      MONTHS.forEach(function(mk){
+        h+='<td style="'+TD+'text-align:right">'+(sd.months[mk]?NF(sd.months[mk]):'-')+'</td>';
+      });
+      h+='</tr>';
+    });
+    // Group total row
+    var mTot={};
+    statKeys.forEach(function(s){Object.keys(g.statuses[s].months).forEach(function(mk){mTot[mk]=(mTot[mk]||0)+g.statuses[s].months[mk];});});
+    h+='<tr style="background:#fdf8f0;border-top:2px solid #c8a96e">'
+     +'<td style="padding:6px 10px;font-size:11px;font-weight:700"></td>'
+     +'<td style="padding:6px 10px;font-size:11px;font-weight:800;color:var(--gold2)">Total</td>'
+     +'<td style="padding:6px 10px;font-size:11px"></td>'
+     +'<td style="padding:6px 10px;font-size:11px;text-align:right;font-weight:800;color:var(--gold2)">'+NF(groupTotal)+'</td>'
+     +'<td style="padding:6px 10px;font-size:11px;text-align:right;font-weight:700;color:#888">100%</td>';
+    MONTHS.forEach(function(mk){
+      h+='<td style="padding:6px 10px;font-size:11px;text-align:right;font-weight:700">'+(mTot[mk]?NF(mTot[mk]):'-')+'</td>';
+    });
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>';
+  document.getElementById('pst').innerHTML=h;
 }
 
 // ── PRODUCT SUMMARY — built from sales data ──
