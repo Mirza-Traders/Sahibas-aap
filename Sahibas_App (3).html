@@ -690,6 +690,20 @@ function showDash(){
   }
   setTimeout(()=>{rOV();showCostAlert();},30);
 }
+function applyRoleNav(){
+  if(!CU||CU.role!=='Production')return;
+  var nav=document.getElementById('sidebar');if(!nav)return;
+  var allowIds=['po'];
+  nav.querySelectorAll('.sb-item').forEach(function(el){
+    el.style.display=allowIds.indexOf(el.getAttribute('data-id'))>=0?'':'none';
+  });
+  nav.querySelectorAll('.sb-section').forEach(function(sec){
+    var ok=false;
+    sec.querySelectorAll('.sb-item').forEach(function(el){if(allowIds.indexOf(el.getAttribute('data-id'))>=0)ok=true;});
+    sec.style.display=ok?'':'none';
+  });
+  nav.querySelectorAll('.sb-divider').forEach(function(d){d.style.display='none';});
+}
 function goUpload(){
   document.getElementById('uscreen').style.display='flex';
   document.getElementById('dash').style.display='none';
@@ -2264,7 +2278,13 @@ function doLogin(){
     document.getElementById('l-err').textContent='';
     document.getElementById('l-pass').value='';
     var pb=document.getElementById('pub-btn');if(pb)pb.style.display=(u.role==='Owner')?'':'none';
-    if(DETAIL.length||loadBaked()){showDash();}
+    if(u.role==='Production'){
+      // Production users don't need sales data — go straight to their view
+      document.getElementById('uscreen').style.display='none';
+      document.getElementById('dash').style.display='block';
+      applyRoleNav();
+      doST('po');
+    } else if(DETAIL.length||loadBaked()){showDash();}
     else{document.getElementById('uscreen').style.display='flex';}
   }else{
     var err=document.getElementById('l-err');
@@ -2979,7 +2999,11 @@ function rPO(){
         var cs=TD+(done?'background:#e8f8ee;':'');
         if(isProdUser||isOwner){
           var tip=done?('Done'+(ph.by?' by '+ph.by:'')+(ph.date?' on '+fmtD(ph.date):'')):'Click to mark done';
-          return '<td style="'+cs+'"><button onclick="togglePoPhase(\''+o.id+'\',\''+key+'\')" title="'+tip+'" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:'+(done?'700':'400')+';color:'+(done?'#1e8449':'#ccc')+';padding:0;width:100%">'+(done?'✓ Done':'–')+'</button></td>';
+          var btnSt=isProdUser
+            ?(done?'background:#27ae60;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;padding:5px 8px;width:92%;display:block;margin:0 auto'
+                  :'background:#f0f0f0;color:#aaa;border:1px dashed #ccc;border-radius:6px;cursor:pointer;font-size:11px;padding:5px 8px;width:92%;display:block;margin:0 auto')
+            :'background:none;border:none;cursor:pointer;font-size:11px;font-weight:'+(done?'700':'400')+';color:'+(done?'#1e8449':'#ccc')+';padding:0;width:100%';
+          return '<td style="'+cs+'"><button onclick="togglePoPhase(\''+o.id+'\',\''+key+'\')" title="'+tip+'" style="'+btnSt+'">'+(done?'✓ Done':'Mark')+'</button></td>';
         }
         return '<td style="'+cs+'">'+(done?'<span style="color:#1e8449;font-weight:700">✓</span>':'–')+'</td>';
       }
@@ -3013,7 +3037,8 @@ function rPO(){
   }
   tbl+='</tbody></table></div>';
   var overlay=window._poDrop?'<div onclick="togglePoDrop(\'\')" style="position:fixed;inset:0;z-index:499"></div>':'';
-  el.innerHTML=kh+overlay+toolbar+tbl;
+  var prodBanner=isProdUser?'<div style="background:#f0f8f0;border:1px solid #a8d8a8;border-radius:8px;padding:10px 16px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:12px;color:#1e6b3c"><span style="font-size:18px">🏭</span><span><b>Production Dashboard</b> — Click <b>Mark</b> on any phase to record it as done. Your name and date are saved automatically.</span></div>':'';
+  el.innerHTML=kh+overlay+prodBanner+toolbar+tbl;
 }
 
 // ── CHANGE PASSWORD (self-service) ──
