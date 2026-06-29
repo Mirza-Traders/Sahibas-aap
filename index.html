@@ -1458,43 +1458,38 @@ function rCS(){
 function csFixFreeze(){
   var tbl=document.querySelector('#cs-scroll table');if(!tbl)return;
   var hdr=tbl.querySelector('thead tr:nth-child(2)');if(!hdr)return;
-  var hCells=hdr.children;
-  var flCols={},leftAcc=0;
+  var hCells=Array.from(hdr.children);
+  // Batch-read all widths at once (one layout pass, no thrashing)
+  var widths=hCells.map(function(th){return th.offsetWidth;});
+  var flCols={},leftAcc=0,lastFrozenLeft=0;
   for(var i=0;i<hCells.length;i++){
-    if(hCells[i].hasAttribute('data-fl')){flCols[i]=leftAcc;}
-    leftAcc+=hCells[i].offsetWidth;
+    if(hCells[i].hasAttribute('data-fl')){flCols[i]=leftAcc;lastFrozenLeft=leftAcc;}
+    leftAcc+=widths[i];
   }
-  var lastFrozenLeft=0;
-  Object.keys(flCols).forEach(function(k){if(flCols[k]>lastFrozenLeft)lastFrozenLeft=flCols[k];});
-  var rows=tbl.querySelectorAll('tr');
-  rows.forEach(function(row,ri){
+  if(!Object.keys(flCols).length)return;
+  // Style header rows individually — only 3 rows × ~20 cells, negligible cost
+  tbl.querySelectorAll('thead tr').forEach(function(row,ri){
     var cells=row.children;var cIdx=0;
     for(var ci=0;ci<cells.length;ci++){
-      var cell=cells[ci];
-      var span=parseInt(cell.getAttribute('colspan'))||1;
+      var cell=cells[ci];var span=parseInt(cell.getAttribute('colspan'))||1;
       if(ri===0){
         var allFrozen=true;
         for(var s=0;s<span;s++){if(!flCols.hasOwnProperty(cIdx+s))allFrozen=false;}
-        if(allFrozen&&span>0){
-          cell.style.position='sticky';
-          cell.style.left=(flCols[cIdx]||0)+'px';
-          cell.style.zIndex='9';
-          var lastColInSpan=cIdx+span-1;
-          if(flCols.hasOwnProperty(lastColInSpan)&&flCols[lastColInSpan]===lastFrozenLeft){
-            cell.style.borderRight='2px solid #c8a96e';
-          }
-        }
+        if(allFrozen&&span>0){cell.style.position='sticky';cell.style.left=(flCols[cIdx]||0)+'px';cell.style.zIndex='9';if(flCols[cIdx]===lastFrozenLeft)cell.style.borderRight='2px solid #c8a96e';}
         cIdx+=span;continue;
       }
-      if(flCols.hasOwnProperty(cIdx)){
-        cell.style.position='sticky';
-        cell.style.left=flCols[cIdx]+'px';
-        cell.style.zIndex=ri<=2?'7':'4';
-        if(flCols[cIdx]===lastFrozenLeft){cell.style.borderRight='2px solid #c8a96e';}
-      }
+      if(flCols.hasOwnProperty(cIdx)){cell.style.position='sticky';cell.style.left=flCols[cIdx]+'px';cell.style.zIndex=ri<=2?'7':'4';if(flCols[cIdx]===lastFrozenLeft)cell.style.borderRight='2px solid #c8a96e';}
       cIdx+=span;
     }
   });
+  // CSS injection for tbody — replaces ~8000 individual style mutations with 1 write
+  var css=Object.keys(flCols).map(function(i){
+    var nth=parseInt(i)+1,left=flCols[i],border=flCols[i]===lastFrozenLeft?'border-right:2px solid #c8a96e;':'';
+    return '#cs-scroll table tbody tr td:nth-child('+nth+'){position:sticky;left:'+left+'px;z-index:4;'+border+'}';
+  }).join('');
+  var styleEl=document.getElementById('cs-freeze-style');
+  if(!styleEl){styleEl=document.createElement('style');styleEl.id='cs-freeze-style';document.head.appendChild(styleEl);}
+  styleEl.textContent=css;
 }
 
 // ── STOCK ALERT ──
