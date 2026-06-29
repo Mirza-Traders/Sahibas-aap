@@ -2647,6 +2647,33 @@ function advancePoPhase(oid,key){
   showToast(key+': '+cur+' → '+next);
 }
 
+function togglePoRemarks(oid){
+  var el=document.getElementById('po-rmk-'+oid);
+  if(el){el.remove();return;}
+  var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});if(!o)return;
+  var rmks=o.remarks||[];var initNote=o.notes||'';
+  var html='<div id="po-rmk-'+oid+'" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;background:#fff;border:1px solid #ddd;border-radius:10px;padding:16px;width:380px;max-height:70vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:13px">Remarks — '+o.id+'</b><button onclick="document.getElementById(\'po-rmk-'+oid+'\').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#999">✕</button></div>';
+  if(initNote)html+='<div style="background:#f8f6f2;border-radius:6px;padding:8px 10px;margin-bottom:6px;font-size:11px"><b style="color:var(--gold2)">Order Note</b> <span style="color:#aaa;font-size:9px">by '+(o.placedBy||'—')+'</span><div style="margin-top:3px;color:#444">'+initNote.replace(/</g,'&lt;')+'</div></div>';
+  rmks.forEach(function(r){html+='<div style="background:#f0f8ff;border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:11px"><b style="color:#2471a3">'+r.by+'</b> <span style="color:#aaa;font-size:9px">'+r.date+' '+r.time+'</span><div style="margin-top:3px;color:#444">'+r.text.replace(/</g,'&lt;')+'</div></div>';});
+  html+='<div style="display:flex;gap:6px;margin-top:8px"><textarea id="po-rmk-inp-'+oid+'" rows="2" placeholder="Add remark..." style="flex:1;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:11px;resize:none;font-family:inherit;outline:none"></textarea><button onclick="addPoRemark(\''+oid+'\')" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;align-self:flex-end">Send</button></div>';
+  html+='</div><div onclick="document.getElementById(\'po-rmk-'+oid+'\').remove()" style="position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.3)"></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+  setTimeout(function(){var inp=document.getElementById('po-rmk-inp-'+oid);if(inp)inp.focus();},100);
+}
+function addPoRemark(oid){
+  var inp=document.getElementById('po-rmk-inp-'+oid);if(!inp)return;
+  var txt=inp.value.trim();if(!txt){showToast('Type a remark first.');return;}
+  var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});if(!o)return;
+  if(!o.remarks)o.remarks=[];
+  var today=new Date().toISOString().split('T')[0];
+  var timeStr=new Date().toTimeString().split(' ')[0].substring(0,5);
+  o.remarks.push({by:CU?CU.name:'Unknown',date:today,time:timeStr,text:txt});
+  savePO(orders);
+  document.getElementById('po-rmk-'+oid).remove();
+  rendered.po=false;doR('po');
+  showToast('Remark added to '+oid);
+}
 function cancelPO(oid){
   if(!confirm('Cancel order '+oid+'?'))return;
   var orders=loadPO();
@@ -2969,7 +2996,7 @@ function rPO(){
   function srtArrow(col){var cur=window._poSort||{col:'date',asc:false};if(cur.col===col)return' '+(cur.asc?'▲':'▼');return' <span style="opacity:.25;font-size:9px">↕</span>';}
   // Table
   var tbl='<div style="overflow-x:auto;overflow-y:auto;max-height:64vh;border:1px solid #e0dcd4;border-radius:8px">'
-   +'<table style="border-collapse:collapse;min-width:1300px;width:100%;background:#fff">'
+   +'<table style="border-collapse:collapse;min-width:1500px;width:100%;background:#fff">'
    +'<thead style="position:sticky;top:0;z-index:10">'
    // Grouped header row
    +'<tr style="background:#f0ece4">'
@@ -2979,11 +3006,13 @@ function rPO(){
    +'<th style="'+THL+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'prod\')">Product Name'+srtArrow('prod')+'</th>'
    +'<th style="'+TH+'" rowspan="3">Fabric</th>'
    +'<th style="'+TH+'" rowspan="3">Image</th>'
-   +'<th style="'+TH+'" rowspan="3">Fabric<br>Swatch</th>'
+   +'<th style="'+TH+'" rowspan="3">Size<br>Chart</th>'
    +'<th style="'+TH+'background:#fdf8f0;cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'qty\')">Ordered<br>Qty<br><span style="font-size:13px;color:var(--gold2)">'+tQ+'</span>'+srtArrow('qty')+'</th>'
    +'<th style="'+TH+'background:#fff8e0;color:#a07030;border-bottom:none" colspan="4">Size Ratio</th>'
    +'<th style="'+TH+'background:#eef3fb;color:#2471a3;border-bottom:none;cursor:pointer;user-select:none" colspan="5" onclick="setPoSort(\'phases\')" title="Sort by phases completed">Production Phases'+srtArrow('phases')+'</th>'
    +'<th style="'+TH+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'eta\')">ETA'+srtArrow('eta')+'</th>'
+   +'<th style="'+TH+'" rowspan="3">Urgency</th>'
+   +'<th style="'+TH+'" rowspan="3">Remarks</th>'
    +'<th style="'+TH+'" rowspan="3">Actions</th>'
    +'</tr>'
    // Column names
@@ -3006,7 +3035,7 @@ function rPO(){
    +'</tr>'
    +'</thead><tbody>';
   if(active.length===0){
-    tbl+='<tr><td colspan="20" style="padding:40px;text-align:center;color:#bbb;font-size:13px">No orders match the current filter. <a href="#" onclick="clearPoFlt();return false" style="color:var(--gold)">Clear filters</a></td></tr>';
+    tbl+='<tr><td colspan="22" style="padding:40px;text-align:center;color:#bbb;font-size:13px">No orders match the current filter. <a href="#" onclick="clearPoFlt();return false" style="color:var(--gold)">Clear filters</a></td></tr>';
   } else {
     active.forEach(function(o,i){
       var rt=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
@@ -3043,7 +3072,18 @@ function rPO(){
         return '<td style="'+cs+'">–</td>';
       }
       var imgCell='<td style="'+TD+'">'+(o.img&&o.img.startsWith('http')?'<img src="'+o.img+'?width=60" style="width:38px;height:38px;object-fit:cover;border-radius:4px;border:1px solid #eee" onerror="this.style.display=\'none\'">':'–')+'</td>';
-      var fsCell='<td style="'+TD+'">'+(o.fabricShade?'<img src="'+o.fabricShade+'" onclick="var w=window.open();w.document.write(\'<img src=\\\"'+o.fabricShade+'\\\" style=\\\"max-width:100%\\\">\');" style="width:38px;height:38px;object-fit:cover;border:1px solid #eee;cursor:pointer;border-radius:3px" title="Click to enlarge">':(isProdUser&&o.status==='In Progress'?'<label style="font-size:10px;color:#8e44ad;cursor:pointer;background:#f5e8f8;border:1px solid #c0a0d0;border-radius:4px;padding:2px 5px;white-space:nowrap">📷<input type="file" accept="image/*" style="display:none" onchange="uploadFabricShade(\''+o.id+'\',this)"></label>':'–'))+'</td>';
+      var scCell='<td style="'+TD+'">'+(o.sizeChart?'<img src="'+o.sizeChart+'" onclick="var w=window.open();w.document.write(\'<img src=\\\"'+o.sizeChart+'\\\" style=\\\"max-width:100%\\\">\');" style="width:38px;height:38px;object-fit:contain;border:1px solid #d8d8ff;cursor:pointer;border-radius:3px;background:#f8f8ff" title="'+(o.sizeChartName||'Size Chart')+' — click to view full size">':'<span style="color:#ccc;font-size:9px">—</span>')+'</td>';
+      // Urgency from ETA
+      var urgCell;
+      if(o.targetDate){var _etaD=new Date(o.targetDate),_now=new Date();_now.setHours(0,0,0,0);_etaD.setHours(0,0,0,0);var _diff=Math.round((_etaD-_now)/(864e5));urgCell=_diff<0?'<td style="'+TD+'"><span style="background:#fde8e8;color:#c0392b;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700;white-space:nowrap">🔴 Overdue</span></td>':_diff<=7?'<td style="'+TD+'"><span style="background:#fff8e0;color:#a07030;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700;white-space:nowrap">🟡 '+_diff+'d left</span></td>':'<td style="'+TD+'"><span style="background:#e8f8ee;color:#1e8449;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700;white-space:nowrap">🟢 '+_diff+'d</span></td>';}else{urgCell='<td style="'+TD+'"><span style="color:#ccc;font-size:9px">⚪ No ETA</span></td>';}
+      // Remarks — expandable inline
+      var rmks=o.remarks||[];var initNote=o.notes||'';
+      var rmkPreview=rmks.length?rmks[rmks.length-1].text:(initNote||'');
+      var rmkCount=rmks.length+(initNote?1:0);
+      var rmkCell='<td style="'+TD+'min-width:100px;max-width:160px;vertical-align:top">';
+      if(rmkPreview){rmkCell+='<div onclick="togglePoRemarks(\''+o.id+'\')" style="cursor:pointer;font-size:10px;color:#555;max-height:32px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Click to expand">'+rmkPreview.substring(0,40)+(rmkPreview.length>40?'…':'')+(rmkCount>1?' <span style="color:var(--gold);font-weight:700">('+rmkCount+')</span>':'')+'</div>';}
+      else{rmkCell+='<div onclick="togglePoRemarks(\''+o.id+'\')" style="cursor:pointer;font-size:9px;color:#ccc" title="Click to add remark">+ Add</div>';}
+      rmkCell+='</td>';
       var actCell='<td style="'+TD+'min-width:80px"><div style="display:flex;flex-direction:column;gap:3px;align-items:stretch">';
       if(o.status==='Pending Approval'&&isOwner){
         actCell+='<button onclick="approvePO(\''+o.id+'\')" style="background:#27ae60;color:#fff;border:none;border-radius:4px;padding:3px 7px;font-size:10px;cursor:pointer;font-weight:700">✓ Approve</button>';
@@ -3058,7 +3098,7 @@ function rPO(){
        +'<td style="'+TD+'font-weight:700;color:var(--gold2)">'+o.id+'</td>'
        +'<td style="'+TDL+'"><div style="font-weight:600;margin-bottom:2px">'+o.product+'</div><span style="'+stBadge+'">'+o.status+'</span></td>'
        +'<td style="'+TD+'">'+  (o.fabric||'—')+'</td>'
-       +imgCell+fsCell
+       +imgCell+scCell
        +'<td style="'+TD+'font-weight:700;background:#fdf8f0;color:var(--gold2)">'+rt+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.S||0)+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.M||0)+'</td>'
@@ -3066,7 +3106,7 @@ function rPO(){
        +'<td style="'+TD+'background:#fffbea">'+(o.XL||0)+'</td>'
        +phCell('cutting')+phCell('embroidery')+phCell('print')+phCell('stitching')+phCell('finishing')
        +'<td style="'+TD+'color:#2980b9;font-size:10px;white-space:nowrap">'+(o.targetDate?fmtDMY(o.targetDate):'—')+'</td>'
-       +actCell
+       +urgCell+rmkCell+actCell
        +'</tr>';
     });
   }
