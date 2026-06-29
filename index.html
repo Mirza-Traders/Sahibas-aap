@@ -2353,6 +2353,10 @@ function saveRole(idx,role){
 function loadPO(){
   if(window._poData)return window._poData;
   try{window._poData=JSON.parse(localStorage.getItem('sbm_prod_orders')||'[]');}catch(e){window._poData=[];}
+  // Normalize legacy 'Pending' status (old bug set it to 'Pending' instead of 'Pending Approval')
+  var changed=false;
+  window._poData.forEach(function(o){if(o.status==='Pending'){o.status='Pending Approval';changed=true;}});
+  if(changed)try{localStorage.setItem('sbm_prod_orders',JSON.stringify(window._poData));}catch(e){}
   return window._poData;
 }
 function savePO(arr){
@@ -3014,7 +3018,7 @@ function rPO(){
       var isSel=!!sel[o.id];
       var isInit=CU&&(o.placedBy===CU.name||o.placedByEmail===CU.email);
       var canPrint=(isOwner||isInit)&&(o.status==='In Progress'||o.status==='Completed');
-      var phActive=o.status==='In Progress'||o.status==='Completed';
+      var phActive=(o.status==='In Progress'||o.status==='Completed')||(isOwner&&o.status!=='Cancelled'&&o.status!=='Rejected');
       var bg=isSel?'#fffbf0':i%2===0?'#fff':'#fafaf8';
       var stBadge=(ST[o.status]||'background:#f5f5f5;color:#888')+';font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;display:inline-block;white-space:nowrap';
       function phCell(key){
