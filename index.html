@@ -1112,7 +1112,7 @@ function csToggle(el){var n=el.getAttribute('data-n');if(el.checked)_csSelProds.
 function csSelAll(){var allC=document.querySelectorAll('#pcs-tbody input[type=checkbox]');var doAdd=_csSelProds.size<(window._csArr||[]).length;_csSelProds.clear();allC.forEach(function(cb){cb.checked=doAdd;if(doAdd)_csSelProds.add(cb.getAttribute('data-n'));});var b=document.getElementById('cs-exp-sel');if(b)b.style.display=_csSelProds.size>0?'':'none';}
 function csSort(el){var c=el.getAttribute('data-c');if(_csSortCol===c)_csSortAsc=!_csSortAsc;else{_csSortCol=c;_csSortAsc=false;}rendered.cs=false;doR('cs');}
 function csRender(){rendered.cs=false;doR('cs');}
-function csApplyFilter(el){var k=el.getAttribute('data-k'),v=el.value;if(k==='min10d'||k==='minStk')_csFilters[k]=parseInt(v)||0;else if(k==='minRate')_csFilters[k]=parseFloat(v)||0;else _csFilters[k]=v;csRender();}
+function csApplyFilter(el){var k=el.getAttribute('data-k'),v=el.value;if(k==='min10d'||k==='minStk')_csFilters[k]=parseInt(v)||0;else if(k==='minRate')_csFilters[k]=parseFloat(v)||0;else _csFilters[k]=v;if(k==='search'){clearTimeout(window._csSearchTimer);window._csSearchTimer=setTimeout(csRender,300);}else{csRender();}}
 function csExpRows(rows,fname){csvDL(rows.map(function(p){return[p.name,p.sellingPrice||'',p.discount!=null?p.discount+'%':'',p.avgRet,p.shopPrice||'',p.priceDiff!=null?p.priceDiff:'',p.cost,p.gpUnit||'',p.gpPct!=null?p.gpPct+'%':'',p.rev,p.pat,p.marPct+'%',p.orders,p.delivered,p.open,p.cancelled,p.refunded,p.szS,p.szM,p.szL,p.szXL,p.laamTotal||'',p.shopStock!=null?p.shopStock:'',p.stockStatus,p.statusDiff||'',p.shopStatus||'',p.v10i,p.v10l,p.v10o,p.total10,p.total30,p.daily];}),['Product','GrossPrice','Discount%','RetailPrice(Laam)','RetailPrice(Shopify)','PriceDiff','Cost','Profit/Unit','Profit%','Revenue','NetPAT','NetMargin%','AllOrders','Delivered','Open','Cancelled','Refunded','SoldS','SoldM','SoldL','SoldXL','LaamStock','ShopifyStock','LaamStatus','StatusDiff','ShopifyStatus','10dINT','10dLCL','10dOCT','Total10d','30d','Daily'],fname);}
 function csExpSel(){csExpRows((window._csArr||[]).filter(function(p){return _csSelProds.has(p.name);}),'selected.csv');}
 function csExpAll(){csExpRows(window._csArr||[],'all_products.csv');}
@@ -1985,7 +1985,7 @@ function bzTD(v,sty){return '<td style="padding:6px 8px;text-align:right;white-s
 // ── 💰 PRICING & MARGINS ──
 var _prQ='',_prSort='estMPct',_prAsc=true;
 function prSort(c){if(_prSort===c)_prAsc=!_prAsc;else{_prSort=c;_prAsc=true;}_prTable();}
-function prSearch(v){_prQ=v.toLowerCase();_prTable();}
+function prSearch(v){_prQ=v.toLowerCase();clearTimeout(window._prSearchTimer);window._prSearchTimer=setTimeout(_prTable,300);}
 function rPR(){
   var arr=bizStats().filter(function(p){return p.del>0||p.curr>0;});
   window._prArr=arr;
@@ -2042,7 +2042,7 @@ function expPR(){csvDL(window._prArr.map(function(p){return[p.name,p.cost,p.gros
 
 // ── 🏭 PRODUCTION PLANNER ──
 var _ppQ='',_ppT=45;
-function ppSearch(v){_ppQ=v.toLowerCase();_ppTable();}
+function ppSearch(v){_ppQ=v.toLowerCase();clearTimeout(window._ppSearchTimer);window._ppSearchTimer=setTimeout(_ppTable,300);}
 function ppTarget(v){_ppT=parseInt(v)||45;_ppTable();}
 function ppUrg(p){
   if(p.daily>0&&p.stk===0)return{k:0,b:'<span style="background:#fdeeee;color:var(--red);border-radius:4px;padding:2px 8px;font-size:9px;font-weight:700">🔴 OUT OF STOCK</span>'};
@@ -3509,7 +3509,7 @@ function runRC(){
       rcFTab('excess','Excess Only',excess)+
       rcFTab('match','Matched',matched)+
     '</div>'+
-    '<input id="rc-search" type="text" placeholder="Search product..." oninput="_rcSearch=this.value;_rcPage=1;rcRenderTable()" style="border:1px solid #e0dcd4;border-radius:4px;padding:5px 9px;font-size:11px;outline:none;width:180px">'+
+    '<input id="rc-search" type="text" placeholder="Search product..." oninput="clearTimeout(window._rcST);window._rcST=setTimeout(function(){_rcSearch=document.getElementById(\'rc-search\').value;_rcPage=1;rcRenderTable();},250)" style="border:1px solid #e0dcd4;border-radius:4px;padding:5px 9px;font-size:11px;outline:none;width:180px">'+
     '<span style="font-size:10px;color:#aaa" id="rc-count"></span>'+
   '</div>';
 
@@ -3758,7 +3758,7 @@ function toggleSB(){
 
     <!-- Product Name -->
     <label style="display:block;font-size:10px;color:#888;margin-bottom:5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Product Name <span style="color:#e74c3c">*</span></label>
-    <input id="po-prod" list="po-prodlist" autocomplete="off" oninput="poProdHint(this.value)" placeholder="Type or select product..." style="width:100%;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:6px">
+    <input id="po-prod" list="po-prodlist" autocomplete="off" oninput="clearTimeout(window._poProdHintT);window._poProdHintT=setTimeout(function(){poProdHint(document.getElementById('po-prod').value);},250)" placeholder="Type or select product..." style="width:100%;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:6px">
     <datalist id="po-prodlist"></datalist>
     <div id="po-stkhint" style="margin-bottom:12px"></div>
 
