@@ -3037,7 +3037,7 @@ function rPO(){
           var tip=(logLines||'')+' — click to advance/reset';
           if(state==='done')return '<td style="'+cs+'" title="'+tip+'"><button onclick="advancePoPhase(\''+o.id+'\',\''+key+'\')" style="background:#27ae60;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;padding:3px 6px;width:100%">✓ Done</button></td>';
           if(state==='progress')return '<td style="'+cs+'" title="'+tip+'"><button onclick="advancePoPhase(\''+o.id+'\',\''+key+'\')" style="background:#f59e0b;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;padding:3px 6px;width:100%">🔄 IP</button></td>';
-          return '<td style="'+cs+'"><button onclick="advancePoPhase(\''+o.id+'\',\''+key+'\')" title="Click to mark In Progress" style="background:none;border:none;cursor:pointer;font-size:11px;color:#ccc;padding:0;width:100%">—</button></td>';
+          return '<td style="'+cs+'"><button onclick="advancePoPhase(\''+o.id+'\',\''+key+'\')" title="Click to mark In Progress" style="background:#f0f4ff;color:#7090c0;border:1px dashed #b0c4e8;border-radius:5px;cursor:pointer;font-size:10px;padding:3px 4px;width:100%">▶ Start</button></td>';
         }
         if(state==='done')return '<td style="'+cs+'"><span style="color:#1e8449;font-weight:700">✓</span></td>';
         if(state==='progress')return '<td style="'+cs+'"><span style="color:#f59e0b;font-weight:700">🔄</span></td>';
