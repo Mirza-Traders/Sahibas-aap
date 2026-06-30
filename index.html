@@ -434,6 +434,32 @@ var USERS=[
   {name:'Zee',email:'zee4729291@gmail.com',role:'—',pass:'Zee@2026'},
   {name:'Zeeshan Shafayt',email:'zeeshanshafaytex@gmail.com',role:'—',pass:'Zeeshan@2026'}
 ];
+var CLOUD_API='https://sahibas-po-api.junaidsarwar82.workers.dev';
+function cloudSave(key,data){try{fetch(CLOUD_API+'/'+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).catch(function(){});}catch(e){}}
+function initCloud(){
+  fetch(CLOUD_API+'/orders').then(function(r){return r.json();}).then(function(data){
+    if(Array.isArray(data)&&data.length>0){
+      window._poData=data;
+      window._poData.forEach(function(o){if(o.status==='Pending'){o.status='Pending Approval';}});
+      try{localStorage.setItem('sbm_prod_orders',JSON.stringify(window._poData));}catch(e){}
+      rendered.po=false;
+      var active=document.querySelector('.sb-item.on');
+      if(active&&active.getAttribute('data-id')==='po')doR('po');
+    }else{
+      var local=loadPO();
+      if(local.length>0)cloudSave('orders',local);
+    }
+  }).catch(function(){});
+  fetch(CLOUD_API+'/roles').then(function(r){return r.json();}).then(function(data){
+    if(data&&typeof data==='object'&&Object.keys(data).length>0){
+      USERS.forEach(function(u){if(u.role==='Owner')return;if(data[u.email])u.role=data[u.email];});
+      try{localStorage.setItem('sbm_roles',JSON.stringify(data));}catch(e){}
+      applyRoleNav();
+    }else{
+      try{var lr=JSON.parse(localStorage.getItem('sbm_roles')||'{}');if(Object.keys(lr).length>0)cloudSave('roles',lr);}catch(e){}
+    }
+  }).catch(function(){});
+}
 // merge saved passwords from localStorage over defaults; pwR version lets admin force-reset
 (function(){try{var s=JSON.parse(localStorage.getItem('sbm_pw')||'{}');var rv=JSON.parse(localStorage.getItem('sbm_pwrv')||'{}');var chg=false;USERS.forEach(function(u){if(u.pwR&&u.pwR!==rv[u.email]){delete s[u.email];rv[u.email]=u.pwR;chg=true;}else if(s[u.email])u.pass=s[u.email];});if(chg){localStorage.setItem('sbm_pw',JSON.stringify(s));localStorage.setItem('sbm_pwrv',JSON.stringify(rv));}}catch(e){}})();
 // merge saved roles (admin can assign roles via UI) — never override hardcoded Owners
@@ -2324,6 +2350,7 @@ function doLogin(){
   var u=USERS.filter(function(x){return x.email.toLowerCase()===em&&x.pass===pw;})[0];
   if(u){
     CU=u;
+    initCloud();
     document.getElementById('lscreen').style.display='none';
     document.getElementById('u-pill-av').textContent=u.name.trim()[0].toUpperCase();
     document.getElementById('u-pill-name').textContent=u.name.split(' ')[0];
@@ -2395,7 +2422,7 @@ function saveRole(idx,role){
   if(!CU||CU.role!=='Owner')return;
   if(USERS[idx].email===CU.email){showToast('Cannot change your own Owner role.');return;}
   USERS[idx].role=role;
-  try{var r=JSON.parse(localStorage.getItem('sbm_roles')||'{}');r[USERS[idx].email]=role;localStorage.setItem('sbm_roles',JSON.stringify(r));}catch(e){}
+  try{var r=JSON.parse(localStorage.getItem('sbm_roles')||'{}');r[USERS[idx].email]=role;localStorage.setItem('sbm_roles',JSON.stringify(r));cloudSave('roles',r);}catch(e){}
   rendered.us=false;doR('us');
   showToast('Role updated: '+USERS[idx].name+' → '+role);
 }
@@ -2412,8 +2439,9 @@ function loadPO(){
   return window._poData;
 }
 function savePO(arr){
-  window._poData=arr; // update cache first so next loadPO() is instant
+  window._poData=arr;
   try{localStorage.setItem('sbm_prod_orders',JSON.stringify(arr));}catch(e){showToast('Storage full — please delete old orders or reduce image sizes.');}
+  cloudSave('orders',arr);
 }
 // Compress image to JPEG before storing (prevents localStorage bloat & page freezes)
 function compressImg(dataUrl,maxPx,quality,cb){
