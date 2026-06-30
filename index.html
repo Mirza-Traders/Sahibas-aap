@@ -1194,6 +1194,26 @@ function rCS(){
     return true;
   });
   arr.sort(function(a,b){var av=a[_csSortCol],bv=b[_csSortCol];if(typeof av==='string'||typeof bv==='string'){av=(av||'').toLowerCase();bv=(bv||'').toLowerCase();return _csSortAsc?(av<bv?-1:av>bv?1:0):(bv<av?-1:bv>av?1:0);}av=av||0;bv=bv||0;return _csSortAsc?av-bv:bv-av;});
+  // ── PO pipeline data per product ──
+  var _poMap={};
+  var _poOrders=loadPO().filter(function(o){return o.status==='In Progress'||o.status==='Pending Approval';});
+  _poOrders.forEach(function(o){
+    var pk=o.product.toLowerCase().trim();
+    if(!_poMap[pk])_poMap[pk]={total:0,laam:0,factory:0,eta:'',etaExtended:false};
+    var qty=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
+    _poMap[pk].total+=qty;
+    var cust=(o.customer||'').toLowerCase();
+    if(cust.indexOf('laam')>=0)_poMap[pk].laam+=qty;else _poMap[pk].factory+=qty;
+    if(o.targetDate){
+      if(!_poMap[pk].eta||o.targetDate<_poMap[pk].eta)_poMap[pk].eta=o.targetDate;
+      if(o.etaLog&&o.etaLog.length)_poMap[pk].etaExtended=true;
+    }
+  });
+  arr.forEach(function(p){
+    var pk=p.name.toLowerCase().trim();var po=_poMap[pk]||null;
+    p.poQty=po?po.total:0;p.poLaam=po?po.laam:0;p.poFactory=po?po.factory:0;
+    p.poEta=po?po.eta:'';p.poEtaExtended=po?po.etaExtended:false;
+  });
   window._csArr=arr;
 
   // ── Aggregation ──
@@ -1215,6 +1235,7 @@ function rCS(){
   var tot10i=arr.reduce(function(a,r){return a+r.v10i;},0),tot10l=arr.reduce(function(a,r){return a+r.v10l;},0),tot10o=arr.reduce(function(a,r){return a+r.v10o;},0);
   var tot20i=arr.reduce(function(a,r){return a+r.v20i;},0),tot20l=arr.reduce(function(a,r){return a+r.v20l;},0),tot20o=arr.reduce(function(a,r){return a+r.v20o;},0);
   var tot30i=arr.reduce(function(a,r){return a+r.v30i;},0),tot30l=arr.reduce(function(a,r){return a+r.v30l;},0),tot30o=arr.reduce(function(a,r){return a+r.v30o;},0);
+  var totPoQty=arr.reduce(function(a,r){return a+(r.poQty||0);},0);
   var totAvgRet=totDel>0?Math.round(totRev/totDel):0;
   var totMar=totRev>0?Math.round(totPat/totRev*100):0;
   var totCr=totOrders>0?Math.round(totCancelled/totOrders*100):0;
@@ -1292,6 +1313,7 @@ function rCS(){
   }
   gRow+='<th style="background:#dce8f8;color:#2471a3;text-align:center;padding:3px;border-bottom:2px solid #2471a3">🛍 Shopify Stock</th>';
   gRow+='<th style="background:#fce4ec;color:#c0392b;text-align:center;padding:3px;border-bottom:2px solid #c0392b">Diff</th>';
+  gRow+='<th colspan="2" style="background:#fff0e0;color:#d4780a;text-align:center;padding:3px;border-bottom:2px solid #e8a030">🏭 Production Orders</th>';
   gRow+='<th colspan="'+(G.vel20?3:1)+'" style="background:#fffdf0;color:#8a6800;text-align:center;padding:3px;border-bottom:1px solid #e8e0b0">MP-INT</th>';
   gRow+='<th colspan="'+(G.vel20?3:1)+'" style="background:#fffdf0;color:#8a6800;text-align:center;padding:3px;border-bottom:1px solid #e8e0b0">MP-LCL</th>';
   gRow+='<th colspan="'+(G.vel20?3:1)+'" style="background:#fffdf0;color:#8a6800;text-align:center;padding:3px;border-bottom:1px solid #e8e0b0">OCT</th>';
@@ -1342,6 +1364,8 @@ function rCS(){
   }
   cRow+=mkTH('Shopify Stock','shopStock','#dce8f8','right',85);
   cRow+=mkTH('Stock Diff','stockDiff','#fce4ec','right',70);
+  cRow+=mkTH('PO Qty','poQty','#fff0e0','right',65);
+  cRow+=mkTH('PO ETA','poEta','#fff0e0','center',75);
   cRow+=mkTH('10d','v10i','#fffdf0','right',55);
   if(G.vel20){cRow+=mkTH('20d','v20i','#fffdf0','right',55);cRow+=mkTH('30d','v30i','#fffdf0','right',55);}
   cRow+=mkTH('10d','v10l','#fffdf0','right',55);
@@ -1378,6 +1402,8 @@ function rCS(){
    +(hasStock?((G.s_stock?tdc(NF(totLaamS),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamM),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamL),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamXL),'background:#e4eef8;color:#2980b9'):'')+tdc(NF(totLaam),'background:#e4eef8;color:var(--gold2);font-weight:800')):'')
    +tdc(totShopStock>0?NF(totShopStock):'—','background:#dce8f8;color:#2471a3;font-weight:800')
    +tdc(NF(totLaam-totShopStock),'background:#fce4ec;color:#c0392b;font-weight:800')
+   +tdc(totPoQty>0?NF(totPoQty):'—','background:#fff0e0;color:#d4780a;font-weight:800')
+   +tdc('','background:#fff0e0')
    +tdc(NF(tot10i),'background:#fffdf0')+(G.vel20?tdc(NF(tot20i),'background:#fffdf0')+tdc(NF(tot30i),'background:#fffdf0'):'')
    +tdc(NF(tot10l),'background:#fffdf0')+(G.vel20?tdc(NF(tot20l),'background:#fffdf0')+tdc(NF(tot30l),'background:#fffdf0'):'')
    +tdc(NF(tot10o),'background:#fffdf0')+(G.vel20?tdc(NF(tot20o),'background:#fffdf0')+tdc(NF(tot30o),'background:#fffdf0'):'')
@@ -1436,6 +1462,8 @@ function rCS(){
      +(hasStock?((G.s_stock?'<td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamS||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamM||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamL||'-')+'</td><td style="padding:6px 8px;text-align:right;background:#e4eef8">'+(p.laamXL||'-')+'</td>':'')+'<td style="padding:6px 8px;text-align:right;background:#e4eef8;'+lSt+'">'+(p.laamTotal!==null?NF(p.laamTotal):'-')+'</td>'):'')
      +'<td style="padding:6px 8px;text-align:right;background:#dce8f8;'+(p.shopStock!=null?(p.shopStock>=10?'color:#2471a3;font-weight:700':p.shopStock>0?'color:#d4944a;font-weight:700':'color:#c0392b;font-weight:700'):'color:#bbb')+'">'+(p.shopStock!=null?NF(p.shopStock):'-')+'</td>'
      +(function(){var d=(p.laamTotal||0)-(p.shopStock||0);var c=d===0?'color:#bbb':d>0?'color:#c0392b;font-weight:700':'color:#2471a3;font-weight:700';return '<td data-v="'+d+'" style="padding:6px 8px;text-align:right;background:#fce4ec;'+c+'">'+(p.laamTotal!=null&&p.shopStock!=null?(d>0?'+':'')+NF(d):'-')+'</td>';})()
+     +'<td style="padding:6px 8px;text-align:right;background:#fff0e0;'+(p.poQty>0?'color:#d4780a;font-weight:700':'color:#bbb')+'" title="'+(p.poQty>0?'Laam: '+p.poLaam+' | Factory: '+p.poFactory:'')+'">'+(p.poQty>0?NF(p.poQty):'—')+'</td>'
+     +'<td style="padding:6px 8px;text-align:center;background:#fff0e0;font-size:10px;'+(p.poEtaExtended?'color:#c0392b;font-weight:700':'color:#888')+'">'+(p.poEta?fmtDMY(p.poEta):'—')+'</td>'
      +'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v10i||'-')+'</td>'
      +(G.vel20?'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v20i||'-')+'</td>'+'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v30i||'-')+'</td>':'')
      +'<td style="padding:6px 8px;text-align:right;background:#fffdf0">'+(p.v10l||'-')+'</td>'
@@ -2647,6 +2675,19 @@ function advancePoPhase(oid,key){
   showToast(key+': '+cur+' → '+next);
 }
 
+function changePoEta(oid){
+  var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});if(!o)return;
+  var oldEta=o.targetDate||'';
+  var inp=prompt('New ETA date (YYYY-MM-DD):',oldEta);
+  if(!inp||inp===oldEta)return;
+  if(!o.etaLog)o.etaLog=[];
+  var today=new Date().toISOString().split('T')[0];
+  var timeStr=new Date().toTimeString().split(' ')[0].substring(0,5);
+  o.etaLog.push({from:oldEta,to:inp,by:CU?CU.name:'',date:today,time:timeStr});
+  o.targetDate=inp;
+  savePO(orders);rendered.po=false;doR('po');
+  showToast('ETA updated: '+oldEta+' → '+inp);
+}
 function viewSizeChart(oid){
   var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});
   if(!o||!o.sizeChart){showToast('No size chart attached.');return;}
@@ -3112,7 +3153,8 @@ function rPO(){
        +'<td style="'+TD+'background:#fffbea">'+(o.L||0)+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.XL||0)+'</td>'
        +phCell('cutting')+phCell('embroidery')+phCell('print')+phCell('stitching')+phCell('finishing')
-       +'<td style="'+TD+'color:#2980b9;font-size:10px;white-space:nowrap">'+(o.targetDate?fmtDMY(o.targetDate):'—')+'</td>'
+       +(function(){var etaChanged=o.etaLog&&o.etaLog.length>0;var etaTip=etaChanged?o.etaLog.map(function(l){return l.from+' → '+l.to+' by '+l.by+' '+l.date;}).join(' | '):'';var etaColor=etaChanged?'color:#c0392b;font-weight:700':'color:#2980b9';var etaText=o.targetDate?fmtDMY(o.targetDate):'—';var editBtn=(isProdUser||isOwner)&&o.status!=='Completed'&&o.status!=='Cancelled'?' <button onclick="changePoEta(\''+o.id+'\')" style="background:none;border:none;cursor:pointer;font-size:10px;color:#888;padding:0" title="Change ETA">✏️</button>':'';return '<td style="'+TD+etaColor+';font-size:10px;white-space:nowrap" title="'+etaTip+'">'+etaText+editBtn+'</td>';})()
+
        +urgCell+rmkCell+actCell
        +'</tr>';
     });
