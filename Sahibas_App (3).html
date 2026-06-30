@@ -701,21 +701,34 @@ function showDash(){
     var b=document.getElementById('cost-badge');
     if(b){b.style.display='block';b.textContent='⚠ '+META.missing.length+' Missing Costs';}
   }
-  setTimeout(()=>{rOV();showCostAlert();},30);
+  applyRoleNav();
+  var defTab='ov';
+  if(CU&&CU.role!=='Owner'&&CU.role!=='Accountant')defTab='cs';
+  setTimeout(()=>{if(defTab==='ov'){rOV();showCostAlert();}else{doST(defTab);}},30);
 }
 function applyRoleNav(){
-  if(!CU||CU.role!=='Production')return;
+  if(!CU)return;
+  var role=CU.role;
   var nav=document.getElementById('sidebar');if(!nav)return;
-  var allowIds=['po'];
-  nav.querySelectorAll('.sb-item').forEach(function(el){
-    el.style.display=allowIds.indexOf(el.getAttribute('data-id'))>=0?'':'none';
-  });
-  nav.querySelectorAll('.sb-section').forEach(function(sec){
-    var ok=false;
-    sec.querySelectorAll('.sb-item').forEach(function(el){if(allowIds.indexOf(el.getAttribute('data-id'))>=0)ok=true;});
-    sec.style.display=ok?'':'none';
-  });
-  nav.querySelectorAll('.sb-divider').forEach(function(d){d.style.display='none';});
+  if(role==='Production'){
+    var allowIds=['po'];
+    nav.querySelectorAll('.sb-item').forEach(function(el){
+      el.style.display=allowIds.indexOf(el.getAttribute('data-id'))>=0?'':'none';
+    });
+    nav.querySelectorAll('.sb-section').forEach(function(sec){
+      var ok=false;
+      sec.querySelectorAll('.sb-item').forEach(function(el){if(allowIds.indexOf(el.getAttribute('data-id'))>=0)ok=true;});
+      sec.style.display=ok?'':'none';
+    });
+    nav.querySelectorAll('.sb-divider').forEach(function(d){d.style.display='none';});
+    return;
+  }
+  if(role!=='Owner'&&role!=='Accountant'){
+    nav.querySelectorAll('.sb-item').forEach(function(el){
+      var id=el.getAttribute('data-id');
+      if(id==='ov'||id==='pl')el.style.display='none';
+    });
+  }
 }
 function goUpload(){
   document.getElementById('uscreen').style.display='flex';
@@ -1919,7 +1932,7 @@ function rUS(){
     var rc=ROLE_COLORS[u.role]||ROLE_COLORS['—'];
     var badge='<span style="'+rc+';border-radius:4px;padding:2px 10px;font-size:9px;font-weight:700;letter-spacing:.04em">'+u.role+'</span>';
     var roleDropdown=isAdmin?'<select onchange="saveRole('+i+',this.value)" style="background:#fff;border:1px solid #e0dcd4;border-radius:4px;padding:3px 7px;font-size:9px;cursor:pointer;margin-right:6px">'
-      +['Owner','Editor','Viewer','Production','—'].map(function(r){return'<option value="'+r+'"'+(u.role===r?' selected':'')+'>'+r+'</option>';}).join('')
+      +['Owner','Accountant','Editor','Viewer','Production','—'].map(function(r){return'<option value="'+r+'"'+(u.role===r?' selected':'')+'>'+r+'</option>';}).join('')
       +'</select>':'';
     var actions=isAdmin
       ?roleDropdown+'<button onclick="adminResetPW('+i+')" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#666;font-weight:600" title="Reset this user\'s password">🔑 Reset PW</button>'
