@@ -355,6 +355,7 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
     <div class="sb-section">
       <div class="sb-head">Admin</div>
       <div class="sb-item" data-id="us" onclick="doST('us')"><span class="sb-ico">👥</span>Users</div>
+      <div class="sb-item" data-id="co" onclick="doST('co')"><span class="sb-ico">🏷️</span>Costs</div>
     </div>
   </nav>
   <div id="main-area">
@@ -390,6 +391,7 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
     <div id="pal" class="pnl"></div>
     <div id="pdr" class="pnl"></div>
     <div id="pus" class="pnl"></div>
+    <div id="pco" class="pnl"></div>
     <div id="pin" class="pnl"></div>
     <div id="ppr" class="pnl"></div>
     <div id="ppp" class="pnl"></div>
@@ -436,10 +438,12 @@ var USERS=[
 ];
 var CLOUD_API='https://sahibas-po-api.junaidsarwar82.workers.dev';
 function cloudSave(key,data){try{fetch(CLOUD_API+'/'+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).catch(function(){});}catch(e){}}
-function initCloud(){
-  fetch(CLOUD_API+'/orders').then(function(r){return r.json();}).then(function(data){
-    if(Array.isArray(data)&&data.length>0){
-      window._poData=data;
+async function initCloud(){
+  // Orders
+  try{
+    var r1=await fetch(CLOUD_API+'/orders');var data1=await r1.json();
+    if(Array.isArray(data1)&&data1.length>0){
+      window._poData=data1;
       window._poData.forEach(function(o){if(o.status==='Pending'){o.status='Pending Approval';}});
       try{localStorage.setItem('sbm_prod_orders',JSON.stringify(window._poData));}catch(e){}
       rendered.po=false;
@@ -449,16 +453,34 @@ function initCloud(){
       var local=loadPO();
       if(local.length>0)cloudSave('orders',local);
     }
-  }).catch(function(){});
-  fetch(CLOUD_API+'/roles').then(function(r){return r.json();}).then(function(data){
-    if(data&&typeof data==='object'&&Object.keys(data).length>0){
-      USERS.forEach(function(u){if(u.role==='Owner')return;if(data[u.email])u.role=data[u.email];});
-      try{localStorage.setItem('sbm_roles',JSON.stringify(data));}catch(e){}
+  }catch(e){}
+
+  // Roles
+  try{
+    var r2=await fetch(CLOUD_API+'/roles');var data2=await r2.json();
+    if(data2&&typeof data2==='object'&&Object.keys(data2).length>0){
+      USERS.forEach(function(u){if(u.role==='Owner')return;if(data2[u.email])u.role=data2[u.email];});
+      try{localStorage.setItem('sbm_roles',JSON.stringify(data2));}catch(e){}
       applyRoleNav();
     }else{
       try{var lr=JSON.parse(localStorage.getItem('sbm_roles')||'{}');if(Object.keys(lr).length>0)cloudSave('roles',lr);}catch(e){}
     }
-  }).catch(function(){});
+  }catch(e){}
+
+  // Costs — product name -> cost map, editable from the Costs admin page
+  try{
+    var r3=await fetch(CLOUD_API+'/costs');var data3=await r3.json();
+    if(data3&&typeof data3==='object')window.CM=data3;
+  }catch(e){}
+
+  // Sales/Stock dataset — replaces the old "baked into HTML" approach so the
+  // page stays small; this is the live shared source for the whole team.
+  try{
+    var r4=await fetch(CLOUD_API+'/sales-data');var data4=await r4.json();
+    if(data4&&Array.isArray(data4.d)&&data4.d.length){
+      DETAIL=data4.d;STOCK=data4.s||[];META=data4.m||{};STATUSES=data4.st||[];MONTHS=data4.mo||[];
+    }
+  }catch(e){}
 }
 // merge saved passwords from localStorage over defaults; pwR version lets admin force-reset
 (function(){try{var s=JSON.parse(localStorage.getItem('sbm_pw')||'{}');var rv=JSON.parse(localStorage.getItem('sbm_pwrv')||'{}');var chg=false;USERS.forEach(function(u){if(u.pwR&&u.pwR!==rv[u.email]){delete s[u.email];rv[u.email]=u.pwR;chg=true;}else if(s[u.email])u.pass=s[u.email];});if(chg){localStorage.setItem('sbm_pw',JSON.stringify(s));localStorage.setItem('sbm_pwrv',JSON.stringify(rv));}}catch(e){}})();
@@ -752,7 +774,7 @@ function applyRoleNav(){
   if(role!=='Owner'&&role!=='Accountant'){
     nav.querySelectorAll('.sb-item').forEach(function(el){
       var id=el.getAttribute('data-id');
-      if(id==='ov'||id==='pl')el.style.display='none';
+      if(id==='ov'||id==='pl'||id==='co')el.style.display='none';
     });
   }
 }
@@ -838,7 +860,7 @@ function doST(id){
   document.getElementById('p'+id).classList.add('on');
   if(!rendered[id]){rendered[id]=true;document.getElementById('p'+id).innerHTML='<div class="spin">Rendering...</div>';setTimeout(()=>{try{doR(id);}catch(e){document.getElementById('p'+id).innerHTML='<div class="spin" style="color:var(--red)">Error: '+e.message+'</div>';}},15);}
 }
-function doR(id){var M={ov:rOV,pl:rPL,sz:rSZ,vl:rVL,st:rST,sk:rSK,dp:rDP,cs:rCS,ec:rEC,al:rAL,dr:rDR,us:rUS,in:rIN,pr:rPR,pp:rPP,rf:rRF,po:rPO,rc:rRC};M[id]&&M[id]();}
+function doR(id){var M={ov:rOV,pl:rPL,sz:rSZ,vl:rVL,st:rST,sk:rSK,dp:rDP,cs:rCS,ec:rEC,al:rAL,dr:rDR,us:rUS,in:rIN,pr:rPR,pp:rPP,rf:rRF,po:rPO,rc:rRC,co:rCO};M[id]&&M[id]();}
 
 // ═══════════════════════════════════════════════════════════════════
 // TAB RENDERERS
@@ -2344,13 +2366,12 @@ async function publishSnapshot(){
 
 // ── AUTH ──
 var CU=null;
-function doLogin(){
+async function doLogin(){
   var em=document.getElementById('l-email').value.trim().toLowerCase();
   var pw=document.getElementById('l-pass').value;
   var u=USERS.filter(function(x){return x.email.toLowerCase()===em&&x.pass===pw;})[0];
   if(u){
     CU=u;
-    initCloud();
     document.getElementById('lscreen').style.display='none';
     document.getElementById('u-pill-av').textContent=u.name.trim()[0].toUpperCase();
     document.getElementById('u-pill-name').textContent=u.name.split(' ')[0];
@@ -2363,8 +2384,14 @@ function doLogin(){
       document.getElementById('dash').style.display='block';
       applyRoleNav();
       doST('po');
-    } else if(DETAIL.length||loadBaked()){showDash();}
-    else{document.getElementById('uscreen').style.display='flex';}
+      initCloud(); // fire-and-forget — only orders/roles matter for this role
+    } else {
+      document.getElementById('uscreen').style.display='flex';
+      var gs=document.getElementById('gstatus');if(gs)gs.textContent='Checking for shared data...';
+      await initCloud();
+      if(DETAIL.length||loadBaked()){showDash();}
+      else if(gs){gs.textContent='Select at least one sales file (CSV or Excel) to begin';}
+    }
   }else{
     var err=document.getElementById('l-err');
     err.textContent='Incorrect email or password.';
@@ -2425,6 +2452,72 @@ function saveRole(idx,role){
   try{var r=JSON.parse(localStorage.getItem('sbm_roles')||'{}');r[USERS[idx].email]=role;localStorage.setItem('sbm_roles',JSON.stringify(r));cloudSave('roles',r);}catch(e){}
   rendered.us=false;doR('us');
   showToast('Role updated: '+USERS[idx].name+' → '+role);
+}
+
+// ── COST MANAGEMENT ──
+// window.CM is { "Product Name as typed": cost } — keys keep their original
+// casing for display; lookups elsewhere lowercase+trim for matching.
+function saveCost(name,cost){
+  if(!CU||(CU.role!=='Owner'&&CU.role!=='Accountant')){showToast('Not authorized.');return;}
+  name=String(name||'').trim();
+  cost=parseFloat(cost)||0;
+  if(!name||cost<=0){showToast('Enter a valid product name and cost.');return;}
+  if(!window.CM)window.CM={};
+  var lk=name.toLowerCase();
+  var existingKey=Object.keys(window.CM).filter(function(k){return k.toLowerCase()===lk;})[0];
+  if(existingKey)delete window.CM[existingKey];
+  window.CM[name]=cost;
+  cloudSave('costs',window.CM);
+  showToast('Cost saved: '+name+' → PKR '+cost.toLocaleString());
+  rendered.co=false;doR('co');
+}
+function deleteCost(name){
+  if(!CU||(CU.role!=='Owner'&&CU.role!=='Accountant'))return;
+  if(!window.CM||!(name in window.CM))return;
+  delete window.CM[name];
+  cloudSave('costs',window.CM);
+  showToast('Removed: '+name);
+  rendered.co=false;doR('co');
+}
+function rCO(){
+  var allowed=CU&&(CU.role==='Owner'||CU.role==='Accountant');
+  if(!allowed){document.getElementById('pco').innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Not authorized.</div>';return;}
+  var cm=window.CM||{};
+  var names=Object.keys(cm).sort(function(a,b){return a.localeCompare(b);});
+  var q=(window._coSearch||'').toLowerCase().trim();
+  var filtered=q?names.filter(function(n){return n.toLowerCase().indexOf(q)>=0;}):names;
+  var capped=q?filtered:filtered.slice(0,100);
+  var rows=capped.map(function(n){
+    var safe=JSON.stringify(n);
+    return '<tr style="border-bottom:1px solid #f0ede8">'
+      +'<td style="padding:8px 10px;font-size:11px;font-weight:600">'+n+'</td>'
+      +'<td style="padding:8px 10px;font-size:11px;text-align:right;font-family:monospace">PKR '+Number(cm[n]).toLocaleString()+'</td>'
+      +'<td style="padding:8px 10px;text-align:right">'
+      +'<button onclick="document.getElementById(\'co-name\').value='+safe+';document.getElementById(\'co-cost\').value='+cm[n]+';document.getElementById(\'co-name\').focus();" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#666;font-weight:600;margin-right:4px">✎ Edit</button>'
+      +'<button onclick="if(confirm(\'Remove cost for '+n.replace(/'/g,"\\'")+'?\'))deleteCost('+safe+')" style="background:#fdf0f0;border:1px solid #f0d0d0;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#c0392b;font-weight:600">✕</button>'
+      +'</td></tr>';
+  }).join('');
+  var hint=q?(filtered.length+' match'+(filtered.length===1?'':'es')):('Showing first '+capped.length+' of '+names.length+' products — type to search the rest');
+  document.getElementById('pco').innerHTML=
+    '<div style="max-width:860px">'
+    +'<div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px">Product Costs</div>'
+    +'<div style="font-size:10px;color:#aaa;margin-bottom:14px">'+names.length+' products &nbsp;·&nbsp; Add or update a cost below — saves instantly for the whole team</div>'
+    +'<div style="background:#fff;border:1px solid #e8e4dc;border-radius:8px;padding:14px;margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
+    +'<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Product Name</label><input id="co-name" type="text" placeholder="e.g. Aabroo Red" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:240px"></div>'
+    +'<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Cost (PKR)</label><input id="co-cost" type="number" placeholder="0" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:120px"></div>'
+    +'<button onclick="saveCost(document.getElementById(\'co-name\').value,document.getElementById(\'co-cost\').value)" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:8px 18px;font-size:11px;font-weight:700;cursor:pointer">Save</button>'
+    +'</div>'
+    +'<input id="co-search" type="text" placeholder="Search products..." value="'+(window._coSearch||'').replace(/"/g,'&quot;')+'" oninput="clearTimeout(window._coSearchTimer);window._coSearchTimer=setTimeout(function(){window._coSearch=document.getElementById(\'co-search\').value;rendered.co=false;doR(\'co\');var f=document.getElementById(\'co-search\');if(f){f.focus();f.selectionStart=f.selectionEnd=f.value.length;}},300);" style="border:1px solid #e0dcd4;border-radius:6px;padding:8px 12px;font-size:11px;width:280px;margin-bottom:10px;display:block">'
+    +'<div style="border:1px solid #e8e4dc;border-radius:8px;overflow:hidden;background:#fff">'
+    +'<table style="width:100%;border-collapse:collapse">'
+    +'<thead><tr style="background:#f8f6f2;border-bottom:2px solid #e8e4dc">'
+    +'<th style="padding:8px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:left">Product</th>'
+    +'<th style="padding:8px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Cost</th>'
+    +'<th style="padding:8px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Actions</th>'
+    +'</tr></thead><tbody>'+(rows||'<tr><td colspan="3" style="padding:20px;text-align:center;color:#aaa;font-size:11px">No products found</td></tr>')+'</tbody></table>'
+    +'</div>'
+    +'<div style="font-size:9px;color:#bbb;margin-top:8px">'+hint+'</div>'
+    +'</div>';
 }
 
 // ── PRODUCTION ORDERS ──
