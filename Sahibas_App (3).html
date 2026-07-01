@@ -777,6 +777,11 @@ function applyRoleNav(){
       if(id==='ov'||id==='pl'||id==='co')el.style.display='none';
     });
   }
+  if(role!=='Owner'){
+    nav.querySelectorAll('.sb-item').forEach(function(el){
+      if(el.getAttribute('data-id')==='us')el.style.display='none';
+    });
+  }
 }
 function goUpload(){
   document.getElementById('uscreen').style.display='flex';
@@ -1967,6 +1972,7 @@ function rDR(){
 
 // ── USERS ──
 function rUS(){
+  if(!CU||CU.role!=='Owner'){document.getElementById('pus').innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Not authorized.</div>';return;}
   var isAdmin=CU&&CU.role==='Owner';
   var ROLE_COLORS={
     'Owner':'background:#1a1a1a;color:var(--gold)',
