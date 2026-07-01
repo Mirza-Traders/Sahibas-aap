@@ -177,17 +177,29 @@ async function mirrorCostsToGitHub(env, bodyText) {
   }
 }
 
-// Pulls data/sales-snapshot.json (committed by the daily bake job) from GitHub's
-// raw content CDN and stores it in R2 so the app can serve it via /sales-data.
+// Pulls data/sales-snapshot.json (committed by the daily bake job) from GitHub
+// and stores it in R2 so the app can serve it via /sales-data. The repo is
+// private, so this must go through the authenticated Contents API (the public
+// raw.githubusercontent.com CDN 404s for private repos) using the "raw" accept
+// header to stream the actual file bytes regardless of size.
 async function syncSalesFromGitHub(env) {
   try {
-    const rawUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${COSTS_BRANCH}/${SALES_SNAPSHOT_PATH}?_=${Date.now()}`;
-    const res = await fetch(rawUrl, { cf: { cacheTtl: 0 } });
+    if (!env.GITHUB_TOKEN) {
+      return { ok: false, error: 'GITHUB_TOKEN secret not configured on the Worker yet' };
+    }
+    const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${SALES_SNAPSHOT_PATH}?ref=${COSTS_BRANCH}`;
+    const res = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.raw+json',
+        'User-Agent': 'sahibas-po-api-worker',
+      },
+    });
     if (!res.ok) {
-      return { ok: false, error: 'GitHub raw fetch failed: ' + res.status };
+      return { ok: false, error: 'GitHub contents fetch failed: ' + res.status + ' ' + (await res.text()) };
     }
     const body = await res.text();
-    JSON.parse(body); // throws if GitHub returned something unexpected (e.g. a 404 HTML page)
+    JSON.parse(body); // throws if GitHub returned something unexpected
     await env.SALES_DATA.put('snapshot.json', body);
     return { ok: true, bytes: body.length, syncedAt: new Date().toISOString() };
   } catch (err) {
