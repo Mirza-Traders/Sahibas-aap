@@ -1,0 +1,3 @@
+/data/*                /                404!
+/cloudflare-worker.js  /                404!
+/netlify.toml          /                404!
