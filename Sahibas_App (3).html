@@ -2485,6 +2485,36 @@ function deleteCost(name){
   showToast('Removed: '+name);
   rendered.co=false;doR('co');
 }
+function handleCostCsvUpload(inp){
+  if(!CU||(CU.role!=='Owner'&&CU.role!=='Accountant')){showToast('Not authorized.');inp.value='';return;}
+  var file=inp.files&&inp.files[0];if(!file){return;}
+  var r=new FileReader();
+  r.onload=function(e){
+    var rows=Papa.parse(e.target.result,{header:true,skipEmptyLines:true}).data;
+    if(!window.CM)window.CM={};
+    var added=0,updated=0;
+    rows.forEach(function(row){
+      var name=String(row['Name']||row['name']||'').trim();
+      var cost=parseFloat(row['Cost']||row['cost']||0)||0;
+      if(!name||cost<=0)return;
+      var lk=name.toLowerCase();
+      var existingKey=Object.keys(window.CM).filter(function(k){return k.toLowerCase()===lk;})[0];
+      if(existingKey){delete window.CM[existingKey];updated++;}else{added++;}
+      window.CM[name]=cost;
+    });
+    cloudSave('costs',window.CM);
+    showToast('CSV processed: '+added+' added, '+updated+' updated');
+    rendered.co=false;doR('co');
+  };
+  r.readAsText(file);
+  inp.value='';
+}
+function downloadCostsCsv(){
+  var cm=window.CM||{};
+  var names=Object.keys(cm).sort(function(a,b){return a.localeCompare(b);});
+  var rows=names.map(function(n){return [n,cm[n]];});
+  csvDL(rows,['Name','Cost'],'Sahibas_Cost_File.csv');
+}
 function rCO(){
   var allowed=CU&&(CU.role==='Owner'||CU.role==='Accountant');
   if(!allowed){document.getElementById('pco').innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Not authorized.</div>';return;}
@@ -2495,7 +2525,10 @@ function rCO(){
   var capped=q?filtered:filtered.slice(0,100);
   var rows=capped.map(function(n){
     var safe=JSON.stringify(n);
+    var img=findImg(n.toLowerCase().trim());
+    var thumb=img?'<img src="'+img+'" loading="lazy" data-n="'+n.replace(/"/g,'')+'" onerror="imgFail(this)" style="width:32px;height:40px;object-fit:cover;object-position:top center;border-radius:4px;display:block">':prodPH(n).replace('width:52px;height:52px;font-size:14px','width:32px;height:40px;font-size:11px;border-radius:4px');
     return '<tr style="border-bottom:1px solid #f0ede8">'
+      +'<td style="padding:6px 10px;width:44px">'+thumb+'</td>'
       +'<td style="padding:8px 10px;font-size:11px;font-weight:600">'+n+'</td>'
       +'<td style="padding:8px 10px;font-size:11px;text-align:right;font-family:monospace">PKR '+Number(cm[n]).toLocaleString()+'</td>'
       +'<td style="padding:8px 10px;text-align:right">'
@@ -2512,15 +2545,20 @@ function rCO(){
     +'<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Product Name</label><input id="co-name" type="text" placeholder="e.g. Aabroo Red" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:240px"></div>'
     +'<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Cost (PKR)</label><input id="co-cost" type="number" placeholder="0" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:120px"></div>'
     +'<button onclick="saveCost(document.getElementById(\'co-name\').value,document.getElementById(\'co-cost\').value)" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:8px 18px;font-size:11px;font-weight:700;cursor:pointer">Save</button>'
+    +'<div style="flex:1"></div>'
+    +'<input type="file" id="co-csv-file" accept=".csv" style="display:none" onchange="handleCostCsvUpload(this)">'
+    +'<button onclick="document.getElementById(\'co-csv-file\').click()" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:6px;padding:8px 14px;font-size:11px;font-weight:600;cursor:pointer;color:#555">⬆ Upload CSV</button>'
+    +'<button onclick="downloadCostsCsv()" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:6px;padding:8px 14px;font-size:11px;font-weight:600;cursor:pointer;color:#555">⬇ Download CSV</button>'
     +'</div>'
     +'<input id="co-search" type="text" placeholder="Search products..." value="'+(window._coSearch||'').replace(/"/g,'&quot;')+'" oninput="clearTimeout(window._coSearchTimer);window._coSearchTimer=setTimeout(function(){window._coSearch=document.getElementById(\'co-search\').value;rendered.co=false;doR(\'co\');var f=document.getElementById(\'co-search\');if(f){f.focus();f.selectionStart=f.selectionEnd=f.value.length;}},300);" style="border:1px solid #e0dcd4;border-radius:6px;padding:8px 12px;font-size:11px;width:280px;margin-bottom:10px;display:block">'
     +'<div style="border:1px solid #e8e4dc;border-radius:8px;overflow:hidden;background:#fff">'
     +'<table style="width:100%;border-collapse:collapse">'
     +'<thead><tr style="background:#f8f6f2;border-bottom:2px solid #e8e4dc">'
+    +'<th style="padding:8px 10px;width:44px"></th>'
     +'<th style="padding:8px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:left">Product</th>'
     +'<th style="padding:8px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Cost</th>'
     +'<th style="padding:8px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Actions</th>'
-    +'</tr></thead><tbody>'+(rows||'<tr><td colspan="3" style="padding:20px;text-align:center;color:#aaa;font-size:11px">No products found</td></tr>')+'</tbody></table>'
+    +'</tr></thead><tbody>'+(rows||'<tr><td colspan="4" style="padding:20px;text-align:center;color:#aaa;font-size:11px">No products found</td></tr>')+'</tbody></table>'
     +'</div>'
     +'<div style="font-size:9px;color:#bbb;margin-top:8px">'+hint+'</div>'
     +'</div>';
