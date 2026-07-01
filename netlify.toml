@@ -1,4 +1,4 @@
 [build]
   base = "."
   command = "echo done"
-  publish = "."
+  publish = "public"
