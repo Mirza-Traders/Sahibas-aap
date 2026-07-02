@@ -946,7 +946,7 @@ function rOV(){
   function ovLegend(rows,title,color){
     var selStats=filters.stats&&filters.stats.length>0;
     var fchip=selStats?'<span style="background:#fff3e0;color:var(--orange);border-radius:4px;padding:2px 8px;font-size:9px;font-weight:700">FILTERED: '+filters.stats.length+' status'+(filters.stats.length>1?'es':'')+'</span>':'';
-    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0 7px;border-bottom:2px solid '+color+';flex-wrap:wrap;min-width:0"><span style="width:10px;height:10px;border-radius:50%;background:'+color+';display:inline-block;flex-shrink:0"></span><span style="font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap">'+title+'</span><span style="font-size:10px;color:#aaa;white-space:nowrap">'+NF(rows.length)+' orders</span>'+fchip+'</div>';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:14px 0 12px;border-bottom:2px solid '+color+';flex-wrap:wrap;min-width:0;line-height:1.6"><span style="width:10px;height:10px;border-radius:50%;background:'+color+';display:inline-block;flex-shrink:0"></span><span style="font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap">'+title+'</span><span style="font-size:10px;color:#aaa;white-space:nowrap">'+NF(rows.length)+' orders</span>'+fchip+'</div>';
   }
   var mpRows=allRows.filter(r=>r[5]==='MARKETPLACE');
   var ocRows=allRows.filter(r=>r[5]==='OCTANE');
