@@ -711,11 +711,42 @@ function buildMeta(){
     name:m.name,delivered:m.del,rev:m.rev,avg:m.avg.length?Math.round(m.avg.reduce((a,b)=>a+b,0)/m.avg.length):0
   })).sort((a,b)=>b.rev-a.rev);
 }
+// ── LIVE COST RECOMPUTE ──
+// Cost is looked up from the current Costs list every time this runs, instead
+// of staying frozen at whatever it was when the sales data was generated —
+// so editing a cost on the Costs page is reflected everywhere immediately.
+// Only cost/GP/PAT depend on cost; commission and tax do not.
+window._costIdx=null;
+function buildCostIdx(){
+  window._costIdx={};
+  if(window.CM){Object.keys(window.CM).forEach(function(k){window._costIdx[k.toLowerCase().trim()]=window.CM[k];});}
+}
+function recomputeCosts(){
+  if(!DETAIL||!DETAIL.length)return;
+  buildCostIdx();
+  DETAIL.forEach(function(r){
+    var cost=window._costIdx[String(r[1]).toLowerCase().trim()]||0;
+    r[10]=Math.round(cost);
+    r[14]=Math.round(r[9]-cost-r[12]); // gp = retail - cost - comm
+    r[15]=Math.round(r[14]-r[13]); // pat = gp - tax
+  });
+  var mmap={};
+  DETAIL.forEach(function(r){
+    if(r[10]===0&&r[4]==='delivered'){
+      var p=r[1];if(!mmap[p])mmap[p]={name:p,del:0,rev:0,avg:[]};
+      mmap[p].del++;mmap[p].rev+=r[9];mmap[p].avg.push(r[9]);
+    }
+  });
+  META.missing=Object.values(mmap).filter(function(m){return m.del>0;}).map(function(m){
+    return {name:m.name,delivered:m.del,rev:m.rev,avg:m.avg.length?Math.round(m.avg.reduce(function(a,b){return a+b;},0)/m.avg.length):0};
+  }).sort(function(a,b){return b.rev-a.rev;});
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // SCREEN MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════
 function showDash(){
+  recomputeCosts();
   document.getElementById('uscreen').style.display='none';
   document.getElementById('dash').style.display='block';
   document.getElementById('f-from').value=META.min_date;
@@ -1856,11 +1887,19 @@ function drProdToggle(name,cb){
 }
 function drProdClear(){
   _drSelProds.clear();
-  document.querySelectorAll('#dr-prd-panel input').forEach(function(c){c.checked=false;});
+  document.querySelectorAll('#dr-prd-panel input[type=checkbox]').forEach(function(c){c.checked=false;});
+  var srch=document.getElementById('dr-prd-search');if(srch){srch.value='';drProdFilter('');}
   var btn=document.getElementById('dr-prd-btn');
   if(btn)btn.textContent='All Products ▾';
   applyDrFilters();
   document.getElementById('dr-prd-panel').classList.remove('open');
+}
+function drProdFilter(val){
+  var q=(val||'').toLowerCase().trim();
+  document.querySelectorAll('#dr-prd-list label').forEach(function(lbl){
+    var name=lbl.getAttribute('data-pname')||'';
+    lbl.style.display=(!q||name.indexOf(q)>=0)?'flex':'none';
+  });
 }
 document.addEventListener('click',function(e){
   var wrap=document.getElementById('dr-prd-wrap');
@@ -1891,9 +1930,12 @@ function rDR(){
   // Multi-select product dropdown HTML (rendered outside table, positioned absolutely)
   var prdDropdown='<div id="dr-prd-wrap" style="position:relative;display:inline-block;width:100%">'
     +'<button id="dr-prd-btn" onclick="drProdPanel()" style="width:100%;background:#fff;border:1px solid #e0dcd4;border-radius:3px;padding:3px 5px;font-size:10px;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden">All Products ▾</button>'
-    +'<div id="dr-prd-panel" style="display:none;position:absolute;top:100%;left:0;z-index:999;background:#fff;border:1px solid #e0dcd4;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:220px;max-height:260px;overflow-y:auto;padding:4px 0">'
+    +'<div id="dr-prd-panel" style="display:none;position:absolute;top:100%;left:0;z-index:999;background:#fff;border:1px solid #e0dcd4;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:220px;max-height:320px;overflow-y:auto;padding:4px 0">'
     +'<div style="padding:4px 10px;border-bottom:1px solid #f0ede8;display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;color:#aaa;text-transform:uppercase">Select products</span><button onclick="drProdClear()" style="font-size:9px;color:var(--gold2);background:none;border:none;cursor:pointer;font-weight:700">Clear</button></div>'
-    + prds.map(function(p){return'<label style="display:flex;align-items:center;gap:8px;padding:5px 12px;cursor:pointer;font-size:11px;white-space:nowrap"><input type="checkbox" value="'+p+'" onchange="drProdToggle(\''+p.replace(/'/g,"\\'")+'\'  ,this)" style="accent-color:var(--gold);cursor:pointer">'+p+'</label>';}).join('')
+    +'<div style="padding:5px 10px;border-bottom:1px solid #f0ede8"><input type="text" id="dr-prd-search" placeholder="Search products..." oninput="drProdFilter(this.value)" onclick="event.stopPropagation()" style="width:100%;border:1px solid #e0dcd4;border-radius:4px;padding:4px 6px;font-size:10px;outline:none;box-sizing:border-box"></div>'
+    +'<div id="dr-prd-list">'
+    + prds.map(function(p){return'<label data-pname="'+p.toLowerCase().replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:8px;padding:5px 12px;cursor:pointer;font-size:11px;white-space:nowrap"><input type="checkbox" value="'+p+'" onchange="drProdToggle(\''+p.replace(/'/g,"\\'")+'\'  ,this)" style="accent-color:var(--gold);cursor:pointer">'+p+'</label>';}).join('')
+    +'</div>'
     +'</div></div>';
   // Fix open/close toggle
   prdDropdown = prdDropdown.replace("display:none;position", "display:none").replace("display:none", "position:absolute").replace("position:absolute", "display:none;position:absolute");
@@ -2474,6 +2516,7 @@ function saveCost(name,cost){
   if(existingKey)delete window.CM[existingKey];
   window.CM[name]=cost;
   cloudSave('costs',window.CM);
+  recomputeCosts();rendered={};
   showToast('Cost saved: '+name+' → PKR '+cost.toLocaleString());
   rendered.co=false;doR('co');
 }
@@ -2482,6 +2525,7 @@ function deleteCost(name){
   if(!window.CM||!(name in window.CM))return;
   delete window.CM[name];
   cloudSave('costs',window.CM);
+  recomputeCosts();rendered={};
   showToast('Removed: '+name);
   rendered.co=false;doR('co');
 }
@@ -2503,6 +2547,7 @@ function handleCostCsvUpload(inp){
       window.CM[name]=cost;
     });
     cloudSave('costs',window.CM);
+    recomputeCosts();rendered={};
     showToast('CSV processed: '+added+' added, '+updated+' updated');
     rendered.co=false;doR('co');
   };
