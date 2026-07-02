@@ -929,7 +929,7 @@ function rOV(){
     var exc=rows.reduce((a,r)=>a+(r[17]||0),0);
     var cr=rows.length?can.length/rows.length*100:0;
     var fchip=selStats?'<span style="background:#fff3e0;color:var(--orange);border-radius:4px;padding:2px 8px;font-size:9px;font-weight:700">FILTERED: '+filters.stats.length+' status'+(filters.stats.length>1?'es':'')+'</span>':'';
-    var s='<div style="display:flex;align-items:center;gap:8px;margin:0 0 10px;padding-bottom:7px;border-bottom:2px solid '+color+';flex-wrap:wrap"><span style="width:10px;height:10px;border-radius:50%;background:'+color+';display:inline-block"></span><span style="font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase">'+title+'</span><span style="font-size:10px;color:#aaa">'+NF(rows.length)+' orders</span>'+fchip+'</div>';
+    var s='';
     s+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
      +'<div class="kpi g"><div class="kl">Revenue</div><div class="kv">PKR '+N(rev)+'</div><div class="ks">'+NF(fin.length)+' pcs '+(selStats?'(selected statuses)':'delivered')+'</div></div>'
      +'<div class="kpi e"><div class="kl">Net PAT</div><div class="kv">PKR '+N(pat)+'</div><div class="ks">'+P(rev?pat/rev*100:0)+' margin</div></div>'
@@ -943,9 +943,22 @@ function rOV(){
     ].forEach(row=>{var tot=row[0].startsWith('=');var vc=row[1]<0?'color:var(--red)':tot?'color:var(--green)':'';s+='<tr style="'+(tot?'font-weight:700':'')+'"><td style="'+vc+'">'+row[0]+'</td><td class="nr" style="color:#999">'+(row[3]||'')+'</td><td class="nr" style="'+vc+'">'+NF(Math.abs(row[1]))+'</td><td class="nr" style="'+vc+'">'+P(row[2])+'</td></tr>';});
     return s+'</tbody></table></div>';
   }
+  function ovLegend(rows,title,color){
+    var selStats=filters.stats&&filters.stats.length>0;
+    var fchip=selStats?'<span style="background:#fff3e0;color:var(--orange);border-radius:4px;padding:2px 8px;font-size:9px;font-weight:700">FILTERED: '+filters.stats.length+' status'+(filters.stats.length>1?'es':'')+'</span>':'';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0 7px;border-bottom:2px solid '+color+';flex-wrap:wrap;min-width:0"><span style="width:10px;height:10px;border-radius:50%;background:'+color+';display:inline-block;flex-shrink:0"></span><span style="font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap">'+title+'</span><span style="font-size:10px;color:#aaa;white-space:nowrap">'+NF(rows.length)+' orders</span>'+fchip+'</div>';
+  }
   var mpRows=allRows.filter(r=>r[5]==='MARKETPLACE');
   var ocRows=allRows.filter(r=>r[5]==='OCTANE');
-  var h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;align-items:start;margin-bottom:14px">'
+  // Single unified sticky bar for all 3 legends, so it stays visible together
+  // as one unit instead of each column's title scrolling away independently
+  // once that column runs out of its own (possibly shorter) height.
+  var h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;position:sticky;top:77px;z-index:150;background:#fff;margin-bottom:8px">'
+   +ovLegend(mpRows,'Marketplace (Laam)','#c8a96e')
+   +ovLegend(ocRows,'Octane','#2980b9')
+   +ovLegend(allRows,'Combined — All','#27ae60')
+   +'</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;align-items:start;margin-bottom:14px">'
    +'<div>'+ovSec(mpRows,'Marketplace (Laam)','#c8a96e')+'</div>'
    +'<div>'+ovSec(ocRows,'Octane','#2980b9')+'</div>'
    +'<div>'+ovSec(allRows,'Combined — All','#27ae60')+'</div>'
