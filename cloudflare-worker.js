@@ -2,6 +2,7 @@ const REPO_OWNER = 'Mirza-Traders';
 const REPO_NAME = 'Sahibas-aap';
 const COSTS_PATH = 'data/costs.json';
 const SALES_SNAPSHOT_PATH = 'data/sales-snapshot.json';
+const SHOPIFY_SNAPSHOT_PATH = 'data/shopify-snapshot.json';
 const COSTS_BRANCH = 'main';
 
 export default {
@@ -10,6 +11,7 @@ export default {
   // dataset to GitHub instead — this handler pulls it from there into R2.
   async scheduled(event, env, ctx) {
     ctx.waitUntil(syncSalesFromGitHub(env));
+    ctx.waitUntil(syncShopifyFromGitHub(env));
   },
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -116,6 +118,34 @@ export default {
         });
       }
 
+      // GET /shopify-data — read the Shopify stock/price/status snapshot
+      if (path === '/shopify-data' && request.method === 'GET') {
+        const obj = await env.SALES_DATA.get('shopify.json');
+        if (!obj) {
+          return new Response('null', { headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
+        return new Response(obj.body, { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+
+      // POST /shopify-data — overwrite the Shopify snapshot directly (manual/testing path)
+      if (path === '/shopify-data' && request.method === 'POST') {
+        const body = await request.text();
+        await env.SALES_DATA.put('shopify.json', body);
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // GET /sync-shopify-now — manually trigger the GitHub -> R2 sync for the
+      // Shopify snapshot, same idea as /sync-now for sales data.
+      if (path === '/sync-shopify-now' && request.method === 'GET') {
+        const result = await syncShopifyFromGitHub(env);
+        return new Response(JSON.stringify(result), {
+          status: result.ok ? 200 : 500,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
       // Health check
       if (path === '/' || path === '/ping') {
         return new Response(JSON.stringify({ status: 'ok', time: new Date().toISOString() }), {
@@ -201,6 +231,33 @@ async function syncSalesFromGitHub(env) {
     const body = await res.text();
     JSON.parse(body); // throws if GitHub returned something unexpected
     await env.SALES_DATA.put('snapshot.json', body);
+    return { ok: true, bytes: body.length, syncedAt: new Date().toISOString() };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// Same idea as syncSalesFromGitHub, but for the Shopify stock/price/status
+// snapshot committed to data/shopify-snapshot.json.
+async function syncShopifyFromGitHub(env) {
+  try {
+    if (!env.GITHUB_TOKEN) {
+      return { ok: false, error: 'GITHUB_TOKEN secret not configured on the Worker yet' };
+    }
+    const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${SHOPIFY_SNAPSHOT_PATH}?ref=${COSTS_BRANCH}`;
+    const res = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.raw+json',
+        'User-Agent': 'sahibas-po-api-worker',
+      },
+    });
+    if (!res.ok) {
+      return { ok: false, error: 'GitHub contents fetch failed: ' + res.status + ' ' + (await res.text()) };
+    }
+    const body = await res.text();
+    JSON.parse(body);
+    await env.SALES_DATA.put('shopify.json', body);
     return { ok: true, bytes: body.length, syncedAt: new Date().toISOString() };
   } catch (err) {
     return { ok: false, error: err.message };
