@@ -148,20 +148,26 @@ export default {
         return new Response(obj.body, { headers: { ...cors, 'Content-Type': 'application/json' } });
       }
 
-      // POST /sales-data — overwrite the full baked dataset directly (manual/testing path)
+      // POST /sales-data — overwrite the full baked dataset directly. Used by
+      // the in-app "Publish" button (Owner). publishedAt is stamped so the
+      // daily GitHub cron won't clobber a fresher direct publish with an
+      // older committed snapshot.
       if (path === '/sales-data' && request.method === 'POST') {
         const body = await request.text();
-        await env.SALES_DATA.put('snapshot.json', body);
+        JSON.parse(body); // reject broken payloads before they replace good data
+        await env.SALES_DATA.put('snapshot.json', body, {
+          customMetadata: { publishedAt: new Date().toISOString() },
+        });
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
       }
 
       // GET /sync-now — manually trigger the same GitHub -> R2 sync the Cron
-      // Trigger runs daily. Useful right after a fresh bake, or right after
-      // deploying, instead of waiting for the next scheduled tick.
+      // Trigger runs daily. Add ?force=1 to overwrite even if the data in R2
+      // is newer than the GitHub commit.
       if (path === '/sync-now' && request.method === 'GET') {
-        const result = await syncSalesFromGitHub(env);
+        const result = await syncSalesFromGitHub(env, url.searchParams.get('force') === '1');
         return new Response(JSON.stringify(result), {
           status: result.ok ? 200 : 500,
           headers: { ...cors, 'Content-Type': 'application/json' },
@@ -177,10 +183,14 @@ export default {
         return new Response(obj.body, { headers: { ...cors, 'Content-Type': 'application/json' } });
       }
 
-      // POST /shopify-data — overwrite the Shopify snapshot directly (manual/testing path)
+      // POST /shopify-data — overwrite the Shopify snapshot directly (in-app
+      // Publish with a fresh Shopify export, or manual/testing path)
       if (path === '/shopify-data' && request.method === 'POST') {
         const body = await request.text();
-        await env.SALES_DATA.put('shopify.json', body);
+        JSON.parse(body);
+        await env.SALES_DATA.put('shopify.json', body, {
+          customMetadata: { publishedAt: new Date().toISOString() },
+        });
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -189,7 +199,7 @@ export default {
       // GET /sync-shopify-now — manually trigger the GitHub -> R2 sync for the
       // Shopify snapshot, same idea as /sync-now for sales data.
       if (path === '/sync-shopify-now' && request.method === 'GET') {
-        const result = await syncShopifyFromGitHub(env);
+        const result = await syncShopifyFromGitHub(env, url.searchParams.get('force') === '1');
         return new Response(JSON.stringify(result), {
           status: result.ok ? 200 : 500,
           headers: { ...cors, 'Content-Type': 'application/json' },
@@ -259,17 +269,42 @@ async function mirrorJsonToGitHub(env, path, bodyText, message) {
   }
 }
 
-// Pulls data/sales-snapshot.json (committed by the daily bake job) from GitHub
-// and stores it in R2 so the app can serve it via /sales-data. The repo is
-// private, so this must go through the authenticated Contents API (the public
-// raw.githubusercontent.com CDN 404s for private repos) using the "raw" accept
-// header to stream the actual file bytes regardless of size.
-async function syncSalesFromGitHub(env) {
+// When was a repo file last committed on main? Used to decide whether the
+// GitHub copy is actually newer than what's already in R2.
+async function githubLastCommitDate(env, filePath) {
+  const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits?path=${encodeURIComponent(filePath)}&sha=${COSTS_BRANCH}&per_page=1`;
+  const res = await fetch(apiUrl, {
+    headers: {
+      'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'sahibas-po-api-worker',
+    },
+  });
+  if (!res.ok) return null;
+  const commits = await res.json();
+  return (commits[0] && commits[0].commit && commits[0].commit.committer && commits[0].commit.committer.date) || null;
+}
+
+// Shared GitHub -> R2 sync used for both snapshots. The in-app Publish button
+// writes straight to R2 with a publishedAt stamp; this sync must not clobber
+// that fresher data with an older GitHub commit, so it compares dates first
+// (force=true skips the comparison).
+async function syncSnapshotFromGitHub(env, filePath, r2Key, force) {
   try {
     if (!env.GITHUB_TOKEN) {
       return { ok: false, error: 'GITHUB_TOKEN secret not configured on the Worker yet' };
     }
-    const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${SALES_SNAPSHOT_PATH}?ref=${COSTS_BRANCH}`;
+    if (!force) {
+      const head = await env.SALES_DATA.head(r2Key);
+      const publishedAt = head && head.customMetadata && head.customMetadata.publishedAt;
+      if (publishedAt) {
+        const commitDate = await githubLastCommitDate(env, filePath);
+        if (commitDate && new Date(commitDate) <= new Date(publishedAt)) {
+          return { ok: true, skipped: true, reason: 'R2 data (' + publishedAt + ') is newer than the GitHub commit (' + commitDate + ') — add ?force=1 to overwrite anyway' };
+        }
+      }
+    }
+    const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${filePath}?ref=${COSTS_BRANCH}`;
     const res = await fetch(apiUrl, {
       headers: {
         'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
@@ -282,36 +317,19 @@ async function syncSalesFromGitHub(env) {
     }
     const body = await res.text();
     JSON.parse(body); // throws if GitHub returned something unexpected
-    await env.SALES_DATA.put('snapshot.json', body);
+    await env.SALES_DATA.put(r2Key, body, {
+      customMetadata: { publishedAt: new Date().toISOString() },
+    });
     return { ok: true, bytes: body.length, syncedAt: new Date().toISOString() };
   } catch (err) {
     return { ok: false, error: err.message };
   }
 }
 
-// Same idea as syncSalesFromGitHub, but for the Shopify stock/price/status
-// snapshot committed to data/shopify-snapshot.json.
-async function syncShopifyFromGitHub(env) {
-  try {
-    if (!env.GITHUB_TOKEN) {
-      return { ok: false, error: 'GITHUB_TOKEN secret not configured on the Worker yet' };
-    }
-    const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${SHOPIFY_SNAPSHOT_PATH}?ref=${COSTS_BRANCH}`;
-    const res = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
-        'Accept': 'application/vnd.github.raw+json',
-        'User-Agent': 'sahibas-po-api-worker',
-      },
-    });
-    if (!res.ok) {
-      return { ok: false, error: 'GitHub contents fetch failed: ' + res.status + ' ' + (await res.text()) };
-    }
-    const body = await res.text();
-    JSON.parse(body);
-    await env.SALES_DATA.put('shopify.json', body);
-    return { ok: true, bytes: body.length, syncedAt: new Date().toISOString() };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
+function syncSalesFromGitHub(env, force) {
+  return syncSnapshotFromGitHub(env, SALES_SNAPSHOT_PATH, 'snapshot.json', force);
+}
+
+function syncShopifyFromGitHub(env, force) {
+  return syncSnapshotFromGitHub(env, SHOPIFY_SNAPSHOT_PATH, 'shopify.json', force);
 }

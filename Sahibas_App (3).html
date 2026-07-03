@@ -325,7 +325,7 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
         <span style="font-size:9px;color:#555;margin-left:2px">🔑</span>
       </div>
       <button class="new-btn" onclick="goUpload()">↑ New Data</button>
-      <button class="new-btn" id="pub-btn" style="display:none;color:#27ae60;border-color:#2a4a2a" onclick="publishSnapshot()" title="Download index.html with current data baked in — drag it to Netlify">⬆ Publish</button>
+      <button class="new-btn" id="pub-btn" style="display:none;color:#27ae60;border-color:#2a4a2a" onclick="publishSnapshot()" title="Push the currently loaded data to the shared cloud — the whole team sees it on next login">⬆ Publish</button>
       <button class="new-btn" onclick="doLogout()" style="color:#e74c3c;border-color:#333">⎋ Logout</button>
     </div>
   </div>
@@ -549,9 +549,10 @@ async function generate(){
   setProg(5,'Loading cost file...');
   try{
     // Cost map
-    var costMap={};
-    if(costFile){var ct=await readFile(costFile);costMap=buildCostMap(ct);setProg(10,'Cost: '+Object.keys(costMap).length+' products loaded');}
-    window.CM=costMap;
+    // Only overwrite the live cost map when a cost file was actually selected —
+    // otherwise keep whatever initCloud already loaded from the Costs page.
+    if(costFile){var ct=await readFile(costFile);window.CM=buildCostMap(ct);setProg(10,'Cost: '+Object.keys(window.CM).length+' products loaded');}
+    else if(!window.CM)window.CM={};
 
     // Shopify products CSV
     if(shopFile){
@@ -572,6 +573,7 @@ async function generate(){
         if(key&&vp>0&&!SHOP_PRICE[key])SHOP_PRICE[key]=vp;
       });
       setProg(12,'Shopify: '+Object.keys(SHOP_STATUS).length+' products loaded');
+      window._shopFresh=true; // freshly parsed from a real export — safe to publish to cloud
     }
 
     // Stock
@@ -589,7 +591,7 @@ async function generate(){
     for(var i=0;i<salesFiles.length;i++){
       setProg(15+Math.round((i/salesFiles.length)*70),'Reading '+salesFiles[i].name+' ('+(i+1)+'/'+salesFiles.length+')...');
       var txt=await readFile(salesFiles[i]);
-      var chunk=parseSales(txt,costMap);
+      var chunk=parseSales(txt,window.CM||{});
       DETAIL=DETAIL.concat(chunk);
       await tick(); // yield to browser so UI stays responsive
     }
@@ -2446,22 +2448,26 @@ function loadBaked(){
 }
 async function publishSnapshot(){
   if(!DETAIL.length){showToast('Upload data first, then publish');return;}
-  var btn=document.getElementById('pub-btn');var old=btn.textContent;btn.textContent='⏳ Building…';btn.disabled=true;
+  if(!confirm('Publish the currently loaded data to the shared cloud?\n\nEveryone on the team will see this dataset ('+NF(DETAIL.length)+' rows, through '+(META.max_date||'?')+') from their next login.'))return;
+  var btn=document.getElementById('pub-btn');var old=btn.textContent;btn.textContent='⏳ Publishing…';btn.disabled=true;
   try{
-    var res=await fetch(location.href,{cache:'no-store'});
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    var src=await res.text();
-    var payload=JSON.stringify({d:DETAIL,s:STOCK,m:META,st:STATUSES,mo:MONTHS}).replace(/<\//g,'<\\/');
-    var st=src.indexOf('var BAKED=');
-    var en=src.indexOf('/*BAKED*/',st);
-    if(st<0||en<0)throw new Error('snapshot marker not found in page source');
-    src=src.substring(0,st)+'var BAKED='+payload+';'+src.substring(en);
-    var blob=new Blob([src],{type:'text/html'});
-    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='index.html';a.click();
-    showToast('index.html downloaded — put it in the deploy folder & drag to Netlify ✓');
+    var res=await fetch(CLOUD_API+'/sales-data',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({d:DETAIL,s:STOCK,m:META,st:STATUSES,mo:MONTHS})});
+    var j=await res.json();
+    if(!res.ok||!j.ok)throw new Error(j.error||('HTTP '+res.status));
+    var msg='Sales data published to cloud ✓ ('+NF(DETAIL.length)+' rows through '+(META.max_date||'?')+')';
+    // If a fresh Shopify export was part of this upload, publish that too
+    if(window._shopFresh){
+      try{
+        var r2=await fetch(CLOUD_API+'/shopify-data',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({stock:SHOP_STOCK,price:SHOP_PRICE,status:SHOP_STATUS,gen:new Date().toISOString()})});
+        var j2=await r2.json();
+        if(r2.ok&&j2.ok)msg+=' + Shopify snapshot ✓';
+      }catch(e2){}
+    }
+    showToast(msg);
   }catch(e){
-    if(location.protocol==='file:')alert('Publishing a snapshot only works from the live site.\n\n1. Open your netlify.app link\n2. Login → ↑ New Data → upload the fresh CSVs\n3. Click ⬆ Publish there — index.html downloads\n4. Drag it to Netlify Deploys');
-    else alert('Could not build snapshot: '+e.message);
+    alert('Publish failed: '+e.message+'\n\nNothing was changed on the cloud — the team still sees the previous data.');
   }
   btn.textContent=old;btn.disabled=false;
 }
