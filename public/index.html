@@ -473,6 +473,17 @@ async function initCloud(){
     if(data3&&typeof data3==='object')window.CM=data3;
   }catch(e){}
 
+  // Customers & Fabrics — shared pick-lists used by the New Production Order
+  // form; grow over time as Owner/Editor users add new ones from that form.
+  try{
+    var rc=await fetch(CLOUD_API+'/customers');var dataC=await rc.json();
+    window.CUSTOMERS=Array.isArray(dataC)?dataC:[];
+  }catch(e){window.CUSTOMERS=window.CUSTOMERS||[];}
+  try{
+    var rf=await fetch(CLOUD_API+'/fabrics');var dataF=await rf.json();
+    window.FABRICS=Array.isArray(dataF)?dataF:[];
+  }catch(e){window.FABRICS=window.FABRICS||[];}
+
   // Sales/Stock dataset — replaces the old "baked into HTML" approach so the
   // page stays small; this is the live shared source for the whole team.
   try{
@@ -2711,14 +2722,51 @@ function poLoadSizeChart(input){
   reader.readAsDataURL(file);
 }
 
+function poPopulateFabricSelect(selected){
+  var sel=document.getElementById('po-fabric');
+  var list=(window.FABRICS||[]).slice().sort(function(a,b){return a.localeCompare(b);});
+  sel.innerHTML='<option value="">Select fabric...</option>'+list.map(function(f){return '<option value="'+f.replace(/"/g,'&quot;')+'">'+f+'</option>';}).join('');
+  sel.value=selected||'';
+}
+function poPopulateCustomerSelect(selected){
+  var sel=document.getElementById('po-customer');
+  var list=(window.CUSTOMERS||[]).slice().sort(function(a,b){return a.localeCompare(b);});
+  sel.innerHTML='<option value="">Select customer...</option>'+list.map(function(c){return '<option value="'+c.replace(/"/g,'&quot;')+'">'+c+'</option>';}).join('');
+  sel.value=selected||'';
+}
+function addFabricPrompt(){
+  var name=prompt('New fabric / material type:');
+  if(name==null)return;
+  name=name.trim();
+  if(!name){showToast('Enter a fabric name.');return;}
+  window.FABRICS=window.FABRICS||[];
+  if(window.FABRICS.some(function(f){return f.toLowerCase()===name.toLowerCase();})){showToast('That fabric already exists.');poPopulateFabricSelect(name);return;}
+  window.FABRICS.push(name);
+  cloudSave('fabrics',window.FABRICS);
+  poPopulateFabricSelect(name);
+  showToast('Added "'+name+'" to Fabric types.');
+}
+function addCustomerPrompt(){
+  var name=prompt('New customer / buyer name:');
+  if(name==null)return;
+  name=name.trim();
+  if(!name){showToast('Enter a customer name.');return;}
+  window.CUSTOMERS=window.CUSTOMERS||[];
+  if(window.CUSTOMERS.some(function(c){return c.toLowerCase()===name.toLowerCase();})){showToast('That customer already exists.');poPopulateCustomerSelect(name);return;}
+  window.CUSTOMERS.push(name);
+  cloudSave('customers',window.CUSTOMERS);
+  poPopulateCustomerSelect(name);
+  showToast('Added "'+name+'" to Customers.');
+}
+
 function openNewPO(name){
   var dl=document.getElementById('po-prodlist');
   dl.innerHTML='';
   var seen={};
   DETAIL.forEach(function(r){if(!seen[r[1]]){seen[r[1]]=1;var o=document.createElement('option');o.value=r[1];dl.appendChild(o);}});
   document.getElementById('po-prod').value=name||'';
-  document.getElementById('po-fabric').value='';
-  document.getElementById('po-customer').value='';
+  poPopulateFabricSelect('');
+  poPopulateCustomerSelect('');
   document.getElementById('po-qty').value='';
   document.getElementById('po-rs').value='0';document.getElementById('po-rm').value='0';
   document.getElementById('po-rl').value='0';document.getElementById('po-rxl').value='0';
@@ -4117,18 +4165,17 @@ function toggleSB(){
 
     <!-- Fabric -->
     <label style="display:block;font-size:10px;color:#888;margin-bottom:5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Fabric / Material Name <span style="color:#e74c3c">*</span></label>
-    <input id="po-fabric" list="po-fabriclist" placeholder="Select or type fabric..." style="width:100%;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:14px">
-    <datalist id="po-fabriclist">
-      <option value="Lawn"><option value="Khaddar"><option value="Cambric">
-      <option value="Chiffon"><option value="Silk"><option value="Cotton">
-      <option value="Linen"><option value="Karandi"><option value="Organza">
-      <option value="Net"><option value="Velvet"><option value="Jacquard">
-      <option value="Raw Silk"><option value="Cotton Lawn"><option value="Silk Chiffon">
-    </datalist>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <select id="po-fabric" style="flex:1;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box"><option value="">Select fabric...</option></select>
+      <button type="button" onclick="addFabricPrompt()" title="Add new fabric type" style="background:#252525;border:1px solid #3a3a3a;color:var(--gold);border-radius:8px;padding:0 16px;font-size:16px;font-weight:700;cursor:pointer">+</button>
+    </div>
 
     <!-- Customer -->
     <label style="display:block;font-size:10px;color:#888;margin-bottom:5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Customer / Buyer Name <span style="color:#e74c3c">✱</span></label>
-    <input id="po-customer" placeholder="e.g. Wholesale Buyer, Retail Customer..." style="width:100%;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:14px">
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <select id="po-customer" style="flex:1;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box"><option value="">Select customer...</option></select>
+      <button type="button" onclick="addCustomerPrompt()" title="Add new customer" style="background:#252525;border:1px solid #3a3a3a;color:var(--gold);border-radius:8px;padding:0 16px;font-size:16px;font-weight:700;cursor:pointer">+</button>
+    </div>
 
     <!-- Ordered Qty + Size Breakdown -->
     <div style="background:#222;border:1px solid #333;border-radius:10px;padding:14px;margin-bottom:14px">

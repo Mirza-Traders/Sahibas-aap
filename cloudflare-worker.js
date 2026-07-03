@@ -1,6 +1,8 @@
 const REPO_OWNER = 'Mirza-Traders';
 const REPO_NAME = 'Sahibas-aap';
 const COSTS_PATH = 'data/costs.json';
+const CUSTOMERS_PATH = 'data/customers.json';
+const FABRICS_PATH = 'data/fabrics.json';
 const SALES_SNAPSHOT_PATH = 'data/sales-snapshot.json';
 const SHOPIFY_SNAPSHOT_PATH = 'data/shopify-snapshot.json';
 const COSTS_BRANCH = 'main';
@@ -76,10 +78,58 @@ export default {
         const body = await request.text();
         await env.PO_STORE.put('costs', body);
         try {
-          await mirrorCostsToGitHub(env, body);
+          await mirrorJsonToGitHub(env, COSTS_PATH, body, 'Auto-sync cost data from app');
         } catch (mirrorErr) {
           // Cost is already saved to KV (the live source for the app) — a GitHub
           // mirror hiccup shouldn't fail the user's save action. Surface it instead.
+          return new Response(JSON.stringify({ ok: true, githubMirror: 'failed', detail: mirrorErr.message }), {
+            headers: { ...cors, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true, githubMirror: 'ok' }), {
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // GET /customers — read the saved list of customer/buyer names
+      if (path === '/customers' && request.method === 'GET') {
+        const data = await env.PO_STORE.get('customers');
+        return new Response(data || '[]', {
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // POST /customers — save the customer list, and mirror it into GitHub
+      if (path === '/customers' && request.method === 'POST') {
+        const body = await request.text();
+        await env.PO_STORE.put('customers', body);
+        try {
+          await mirrorJsonToGitHub(env, CUSTOMERS_PATH, body, 'Auto-sync customer list from app');
+        } catch (mirrorErr) {
+          return new Response(JSON.stringify({ ok: true, githubMirror: 'failed', detail: mirrorErr.message }), {
+            headers: { ...cors, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true, githubMirror: 'ok' }), {
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // GET /fabrics — read the saved list of fabric/material types
+      if (path === '/fabrics' && request.method === 'GET') {
+        const data = await env.PO_STORE.get('fabrics');
+        return new Response(data || '[]', {
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // POST /fabrics — save the fabric list, and mirror it into GitHub
+      if (path === '/fabrics' && request.method === 'POST') {
+        const body = await request.text();
+        await env.PO_STORE.put('fabrics', body);
+        try {
+          await mirrorJsonToGitHub(env, FABRICS_PATH, body, 'Auto-sync fabric list from app');
+        } catch (mirrorErr) {
           return new Response(JSON.stringify({ ok: true, githubMirror: 'failed', detail: mirrorErr.message }), {
             headers: { ...cors, 'Content-Type': 'application/json' },
           });
@@ -166,14 +216,16 @@ export default {
   },
 };
 
-// Writes the current cost map to data/costs.json in the GitHub repo via the
-// Contents API. Requires a fine-scoped PAT (Contents: read/write on this repo
-// only) stored as the GITHUB_TOKEN Worker secret — never exposed to the browser.
-async function mirrorCostsToGitHub(env, bodyText) {
+// Writes JSON text to a path in the GitHub repo via the Contents API. Requires
+// a fine-scoped PAT (Contents: read/write on this repo only) stored as the
+// GITHUB_TOKEN Worker secret — never exposed to the browser. Shared by
+// /costs, /customers and /fabrics so the offline daily bake job can read any
+// of them straight from GitHub without calling this Worker.
+async function mirrorJsonToGitHub(env, path, bodyText, message) {
   if (!env.GITHUB_TOKEN) {
     throw new Error('GITHUB_TOKEN secret not configured on the Worker yet');
   }
-  const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${COSTS_PATH}`;
+  const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`;
   const headers = {
     'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
     'Accept': 'application/vnd.github+json',
@@ -196,7 +248,7 @@ async function mirrorCostsToGitHub(env, bodyText) {
     method: 'PUT',
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      message: 'Auto-sync cost data from app',
+      message,
       content,
       branch: COSTS_BRANCH,
       ...(sha ? { sha } : {}),
