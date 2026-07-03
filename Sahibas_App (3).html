@@ -3381,7 +3381,7 @@ function rPO(){
   });
   if(!window._poSort)window._poSort={col:'date',asc:false};
   (function(){var _srt=window._poSort;active.sort(function(a,b){var av,bv;if(_srt.col==='date'){av=a.date||'';bv=b.date||'';}else if(_srt.col==='ono'){av=(a.id||'').toLowerCase();bv=(b.id||'').toLowerCase();}else if(_srt.col==='prod'){av=(a.product||'').toLowerCase();bv=(b.product||'').toLowerCase();}else if(_srt.col==='eta'){av=a.targetDate||'';bv=b.targetDate||'';}else if(_srt.col==='qty'){av=a.total!=null?a.total:(a.S||0)+(a.M||0)+(a.L||0)+(a.XL||0);bv=b.total!=null?b.total:(b.S||0)+(b.M||0)+(b.L||0)+(b.XL||0);}else if(_srt.col==='phases'){var pc=function(o){return['cutting','print','embroidery','stitching','finishing'].filter(function(k){var p=o.phases&&o.phases[k];return p&&(p.state==='done'||(!p.state&&p.done));}).length;};av=pc(a);bv=pc(b);}else{av=a.date||'';bv=b.date||'';}var r=av<bv?-1:av>bv?1:0;return _srt.asc?r:-r;});})();
-  var canPlace=CU&&(CU.role==='Owner'||CU.role==='Editor');
+  var canPlace=CU&&(CU.role==='Owner'||CU.role==='Editor'||CU.role==='Production');
   var isOwner=CU&&CU.role==='Owner';
   var isProdUser=CU&&CU.role==='Production';
   var sel=window._poSel;
