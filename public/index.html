@@ -356,6 +356,7 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
       <div class="sb-head">Admin</div>
       <div class="sb-item" data-id="us" onclick="doST('us')"><span class="sb-ico">👥</span>Users</div>
       <div class="sb-item" data-id="co" onclick="doST('co')"><span class="sb-ico">🏷️</span>Costs</div>
+      <div class="sb-item" data-id="ml" onclick="doST('ml')"><span class="sb-ico">📋</span>Manage Lists</div>
     </div>
   </nav>
   <div id="main-area">
@@ -392,6 +393,7 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
     <div id="pdr" class="pnl"></div>
     <div id="pus" class="pnl"></div>
     <div id="pco" class="pnl"></div>
+    <div id="pml" class="pnl"></div>
     <div id="pin" class="pnl"></div>
     <div id="ppr" class="pnl"></div>
     <div id="ppp" class="pnl"></div>
@@ -812,6 +814,9 @@ function applyRoleNav(){
   if(!CU)return;
   var role=CU.role;
   var nav=document.getElementById('sidebar');if(!nav)return;
+  // Reset everything visible first — without this, logging out and back in as a
+  // higher role on the same page load keeps the previous role's items hidden.
+  nav.querySelectorAll('.sb-item,.sb-section,.sb-divider').forEach(function(el){el.style.display='';});
   if(role==='Production'){
     var allowIds=['po'];
     nav.querySelectorAll('.sb-item').forEach(function(el){
@@ -833,7 +838,8 @@ function applyRoleNav(){
   }
   if(role!=='Owner'){
     nav.querySelectorAll('.sb-item').forEach(function(el){
-      if(el.getAttribute('data-id')==='us')el.style.display='none';
+      var id=el.getAttribute('data-id');
+      if(id==='us'||id==='ml')el.style.display='none';
     });
   }
 }
@@ -919,7 +925,7 @@ function doST(id){
   document.getElementById('p'+id).classList.add('on');
   if(!rendered[id]){rendered[id]=true;document.getElementById('p'+id).innerHTML='<div class="spin">Rendering...</div>';setTimeout(()=>{try{doR(id);}catch(e){document.getElementById('p'+id).innerHTML='<div class="spin" style="color:var(--red)">Error: '+e.message+'</div>';}},15);}
 }
-function doR(id){var M={ov:rOV,pl:rPL,sz:rSZ,vl:rVL,st:rST,sk:rSK,dp:rDP,cs:rCS,ec:rEC,al:rAL,dr:rDR,us:rUS,in:rIN,pr:rPR,pp:rPP,rf:rRF,po:rPO,rc:rRC,co:rCO};M[id]&&M[id]();}
+function doR(id){var M={ov:rOV,pl:rPL,sz:rSZ,vl:rVL,st:rST,sk:rSK,dp:rDP,cs:rCS,ec:rEC,al:rAL,dr:rDR,us:rUS,in:rIN,pr:rPR,pp:rPP,rf:rRF,po:rPO,rc:rRC,co:rCO,ml:rML};M[id]&&M[id]();}
 
 // ═══════════════════════════════════════════════════════════════════
 // TAB RENDERERS
@@ -2642,6 +2648,59 @@ function rCO(){
     +'</tr></thead><tbody>'+(rows||'<tr><td colspan="4" style="padding:20px;text-align:center;color:#aaa;font-size:11px">No products found</td></tr>')+'</tbody></table>'
     +'</div>'
     +'<div style="font-size:9px;color:#bbb;margin-top:8px">'+hint+'</div>'
+    +'</div>';
+}
+
+// ── MANAGE LISTS (Customers & Fabrics pick-lists) ──
+function mlAdd(kind){
+  var inp=document.getElementById('ml-new-'+kind);
+  var name=(inp.value||'').trim();
+  if(!name){showToast('Enter a name first.');return;}
+  var key=kind==='customers'?'CUSTOMERS':'FABRICS';
+  window[key]=window[key]||[];
+  if(window[key].some(function(x){return x.toLowerCase()===name.toLowerCase();})){showToast('"'+name+'" is already in the list.');return;}
+  window[key].push(name);
+  cloudSave(kind,window[key]);
+  rendered.ml=false;doR('ml');
+  showToast('Added "'+name+'".');
+}
+function mlDel(kind,name){
+  var label=kind==='customers'?'customer':'fabric';
+  if(!confirm('Remove "'+name+'" from the '+label+' list?\n\nExisting orders that already use it are not affected — it just won\'t be offered for new orders.'))return;
+  var key=kind==='customers'?'CUSTOMERS':'FABRICS';
+  window[key]=(window[key]||[]).filter(function(x){return x!==name;});
+  cloudSave(kind,window[key]);
+  rendered.ml=false;doR('ml');
+  showToast('Removed "'+name+'".');
+}
+function rML(){
+  if(!CU||CU.role!=='Owner'){document.getElementById('pml').innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Not authorized.</div>';return;}
+  function box(kind,title,items){
+    var list=(items||[]).slice().sort(function(a,b){return a.localeCompare(b);});
+    var rows=list.map(function(n){
+      var safe=JSON.stringify(n).replace(/"/g,'&quot;');
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid #f0ede8">'
+        +'<span style="font-size:12px;font-weight:600">'+n+'</span>'
+        +'<button onclick="mlDel(\''+kind+'\','+safe+')" style="background:#fdf0f0;border:1px solid #f0d0d0;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#c0392b;font-weight:600">✕ Remove</button>'
+        +'</div>';
+    }).join('');
+    return '<div style="flex:1;min-width:280px;background:#fff;border:1px solid #e8e4dc;border-radius:8px;overflow:hidden">'
+      +'<div style="padding:12px 14px;border-bottom:2px solid #e8e4dc;background:#f8f6f2;font-size:12px;font-weight:700">'+title+' <span style="color:#aaa;font-weight:400;font-size:10px">('+list.length+')</span></div>'
+      +'<div style="display:flex;gap:8px;padding:12px 14px;border-bottom:1px solid #f0ede8;background:#fdfcf9">'
+      +'<input id="ml-new-'+kind+'" type="text" placeholder="Add new..." onkeydown="if(event.key===\'Enter\')mlAdd(\''+kind+'\')" style="flex:1;border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px">'
+      +'<button onclick="mlAdd(\''+kind+'\')" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:7px 16px;font-size:11px;font-weight:700;cursor:pointer">+ Add</button>'
+      +'</div>'
+      +'<div style="max-height:52vh;overflow-y:auto">'+(rows||'<div style="padding:20px;text-align:center;color:#aaa;font-size:11px">Empty — add the first one above</div>')+'</div>'
+      +'</div>';
+  }
+  document.getElementById('pml').innerHTML=
+    '<div style="max-width:860px">'
+    +'<div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px">Manage Lists</div>'
+    +'<div style="font-size:10px;color:#aaa;margin-bottom:14px">Customer and Fabric options offered on the New Production Order form — changes save instantly for the whole team. Removing an entry never changes existing orders.</div>'
+    +'<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">'
+    +box('customers','👤 Customers',window.CUSTOMERS)
+    +box('fabrics','🧵 Fabric Types',window.FABRICS)
+    +'</div>'
     +'</div>';
 }
 
