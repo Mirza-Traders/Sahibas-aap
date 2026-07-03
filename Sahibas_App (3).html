@@ -504,15 +504,22 @@ async function initCloud(){
     }
   }catch(e){}})(),
 
-  // Shopify snapshot — product name -> {stock, price, status} on Shopify, used
-  // by the Summary Sheet to compare against Laam. Refreshed from a periodic
-  // Shopify product export rather than baked into the app.
+  // Shopify snapshot — product name -> {stock, price, status, img} on Shopify,
+  // used by the Summary Sheet to compare against Laam. Refreshed from a
+  // periodic Shopify product export rather than baked into the app. Images
+  // are merged into PROD_IMG (only filling gaps, never overwriting a Laam
+  // stock photo) so every existing findImg() call site — Costs, PO New Order,
+  // Summary Sheet thumbnails — picks up Shopify photos automatically.
   (async function(){try{
     var r5=await fetch(CLOUD_API+'/shopify-data');var data5=await r5.json();
     if(data5&&typeof data5==='object'){
       if(data5.stock)SHOP_STOCK=data5.stock;
       if(data5.price)SHOP_PRICE=data5.price;
       if(data5.status)SHOP_STATUS=data5.status;
+      if(data5.img){
+        Object.keys(data5.img).forEach(function(k){if(!PROD_IMG[k])PROD_IMG[k]=data5.img[k];});
+        _PIDX=null;
+      }
     }
   }catch(e){}})()
 
