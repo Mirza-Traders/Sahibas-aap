@@ -500,6 +500,7 @@ async function initCloud(){
     var r4=await fetch(CLOUD_API+'/sales-data');var data4=await r4.json();
     if(data4&&Array.isArray(data4.d)&&data4.d.length){
       DETAIL=data4.d;STOCK=data4.s||[];META=data4.m||{};STATUSES=data4.st||[];MONTHS=data4.mo||[];
+      if(STOCK.length)buildStockProds();
     }
   }catch(e){}})(),
 
@@ -800,8 +801,8 @@ function showDash(){
     panel.appendChild(div);
   });
   updDD();
-  // Show stock tabs if stock loaded
-  if(STOCK.length){document.getElementById('sb-sk').style.display='';document.getElementById('sb-dp').style.display='';}
+  // Show stock tabs if stock loaded (elements are optional — older builds don't have them)
+  if(STOCK.length){var skT=document.getElementById('sb-sk');if(skT)skT.style.display='';var dpT=document.getElementById('sb-dp');if(dpT)dpT.style.display='';}
   filters={from:META.min_date,to:META.max_date,stats:[],pf:'',dst:''};
   rendered={};rendered['ov']=true;
   // Show missing cost badge in header permanently
