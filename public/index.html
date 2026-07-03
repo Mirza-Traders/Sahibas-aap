@@ -254,7 +254,11 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
 <div id="uscreen" style="display:none">
   <div class="u-logo">Sahibas by Mirza</div>
   <div class="u-sub">Operations Dashboard</div>
-  <div class="u-card">
+  <div id="u-loading" style="display:none;text-align:center;padding:60px 20px;color:#888;font-size:13px">
+    <div style="font-size:26px;margin-bottom:14px">⏳</div>
+    Loading shared data from cloud...
+  </div>
+  <div class="u-card" id="u-card">
     <div class="u-heading">Upload your data files</div>
     <div class="u-hint">Select files below. Everything runs in your browser — no data is sent anywhere.</div>
 
@@ -441,8 +445,12 @@ var USERS=[
 var CLOUD_API='https://sahibas-po-api.junaidsarwar82.workers.dev';
 function cloudSave(key,data){try{fetch(CLOUD_API+'/'+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).catch(function(){});}catch(e){}}
 async function initCloud(){
+  // All seven datasets are independent, so fetch them in parallel — one round
+  // trip of wait instead of seven. Each block still fails soft on its own.
+  await Promise.all([
+
   // Orders
-  try{
+  (async function(){try{
     var r1=await fetch(CLOUD_API+'/orders');var data1=await r1.json();
     if(Array.isArray(data1)&&data1.length>0){
       window._poData=data1;
@@ -455,10 +463,10 @@ async function initCloud(){
       var local=loadPO();
       if(local.length>0)cloudSave('orders',local);
     }
-  }catch(e){}
+  }catch(e){}})(),
 
   // Roles
-  try{
+  (async function(){try{
     var r2=await fetch(CLOUD_API+'/roles');var data2=await r2.json();
     if(data2&&typeof data2==='object'&&Object.keys(data2).length>0){
       USERS.forEach(function(u){if(u.role==='Owner')return;if(data2[u.email])u.role=data2[u.email];});
@@ -467,45 +475,47 @@ async function initCloud(){
     }else{
       try{var lr=JSON.parse(localStorage.getItem('sbm_roles')||'{}');if(Object.keys(lr).length>0)cloudSave('roles',lr);}catch(e){}
     }
-  }catch(e){}
+  }catch(e){}})(),
 
   // Costs — product name -> cost map, editable from the Costs admin page
-  try{
+  (async function(){try{
     var r3=await fetch(CLOUD_API+'/costs');var data3=await r3.json();
     if(data3&&typeof data3==='object')window.CM=data3;
-  }catch(e){}
+  }catch(e){}})(),
 
   // Customers & Fabrics — shared pick-lists used by the New Production Order
-  // form; grow over time as Owner/Editor users add new ones from that form.
-  try{
+  // form; grow over time as new ones are added from that form or Manage Lists.
+  (async function(){try{
     var rc=await fetch(CLOUD_API+'/customers');var dataC=await rc.json();
     window.CUSTOMERS=Array.isArray(dataC)?dataC:[];
-  }catch(e){window.CUSTOMERS=window.CUSTOMERS||[];}
-  try{
+  }catch(e){window.CUSTOMERS=window.CUSTOMERS||[];}})(),
+  (async function(){try{
     var rf=await fetch(CLOUD_API+'/fabrics');var dataF=await rf.json();
     window.FABRICS=Array.isArray(dataF)?dataF:[];
-  }catch(e){window.FABRICS=window.FABRICS||[];}
+  }catch(e){window.FABRICS=window.FABRICS||[];}})(),
 
   // Sales/Stock dataset — replaces the old "baked into HTML" approach so the
   // page stays small; this is the live shared source for the whole team.
-  try{
+  (async function(){try{
     var r4=await fetch(CLOUD_API+'/sales-data');var data4=await r4.json();
     if(data4&&Array.isArray(data4.d)&&data4.d.length){
       DETAIL=data4.d;STOCK=data4.s||[];META=data4.m||{};STATUSES=data4.st||[];MONTHS=data4.mo||[];
     }
-  }catch(e){}
+  }catch(e){}})(),
 
   // Shopify snapshot — product name -> {stock, price, status} on Shopify, used
   // by the Summary Sheet to compare against Laam. Refreshed from a periodic
   // Shopify product export rather than baked into the app.
-  try{
+  (async function(){try{
     var r5=await fetch(CLOUD_API+'/shopify-data');var data5=await r5.json();
     if(data5&&typeof data5==='object'){
       if(data5.stock)SHOP_STOCK=data5.stock;
       if(data5.price)SHOP_PRICE=data5.price;
       if(data5.status)SHOP_STATUS=data5.status;
     }
-  }catch(e){}
+  }catch(e){}})()
+
+  ]);
 }
 // merge saved passwords from localStorage over defaults; pwR version lets admin force-reset
 (function(){try{var s=JSON.parse(localStorage.getItem('sbm_pw')||'{}');var rv=JSON.parse(localStorage.getItem('sbm_pwrv')||'{}');var chg=false;USERS.forEach(function(u){if(u.pwR&&u.pwR!==rv[u.email]){delete s[u.email];rv[u.email]=u.pwR;chg=true;}else if(s[u.email])u.pass=s[u.email];});if(chg){localStorage.setItem('sbm_pw',JSON.stringify(s));localStorage.setItem('sbm_pwrv',JSON.stringify(rv));}}catch(e){}})();
@@ -845,6 +855,8 @@ function applyRoleNav(){
 }
 function goUpload(){
   document.getElementById('uscreen').style.display='flex';
+  document.getElementById('u-loading').style.display='none';
+  document.getElementById('u-card').style.display='';
   document.getElementById('dash').style.display='none';
 }
 function showCostAlert(){
@@ -2476,11 +2488,18 @@ async function doLogin(){
       doST('po');
       initCloud(); // fire-and-forget — only orders/roles matter for this role
     } else {
+      // Show a clean loading state while shared data is fetched — the upload
+      // form only appears if the cloud genuinely has nothing to offer.
       document.getElementById('uscreen').style.display='flex';
-      var gs=document.getElementById('gstatus');if(gs)gs.textContent='Checking for shared data...';
+      document.getElementById('u-card').style.display='none';
+      document.getElementById('u-loading').style.display='block';
       await initCloud();
       if(DETAIL.length||loadBaked()){showDash();}
-      else if(gs){gs.textContent='Select at least one sales file (CSV or Excel) to begin';}
+      else{
+        document.getElementById('u-loading').style.display='none';
+        document.getElementById('u-card').style.display='';
+        var gs=document.getElementById('gstatus');if(gs)gs.textContent='No shared data found — select at least one sales file (CSV or Excel) to begin';
+      }
     }
   }else{
     var err=document.getElementById('l-err');
@@ -3423,6 +3442,7 @@ function rPO(){
    +'<th style="'+THL+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'date\')">Date'+srtArrow('date')+'</th>'
    +'<th style="'+TH+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'ono\')">Order No'+srtArrow('ono')+'</th>'
    +'<th style="'+THL+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'prod\')">Product Name'+srtArrow('prod')+'</th>'
+   +'<th style="'+TH+'" rowspan="3">Customer</th>'
    +'<th style="'+TH+'" rowspan="3">Fabric</th>'
    +'<th style="'+TH+'" rowspan="3">Image</th>'
    +'<th style="'+TH+'" rowspan="3">Size<br>Chart</th>'
@@ -3454,7 +3474,7 @@ function rPO(){
    +'</tr>'
    +'</thead><tbody>';
   if(active.length===0){
-    tbl+='<tr><td colspan="22" style="padding:40px;text-align:center;color:#bbb;font-size:13px">No orders match the current filter. <a href="#" onclick="clearPoFlt();return false" style="color:var(--gold)">Clear filters</a></td></tr>';
+    tbl+='<tr><td colspan="23" style="padding:40px;text-align:center;color:#bbb;font-size:13px">No orders match the current filter. <a href="#" onclick="clearPoFlt();return false" style="color:var(--gold)">Clear filters</a></td></tr>';
   } else {
     active.forEach(function(o,i){
       var rt=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
@@ -3516,6 +3536,7 @@ function rPO(){
        +'<td style="'+TDL+'color:#888;white-space:nowrap">'+fmtDMY(o.date)+'</td>'
        +'<td style="'+TD+'font-weight:700;color:var(--gold2)">'+o.id+'</td>'
        +'<td style="'+TDL+'"><div style="font-weight:600;margin-bottom:2px">'+o.product+'</div><span style="'+stBadge+'">'+o.status+'</span></td>'
+       +'<td style="'+TD+'">'+  (o.customer||'—')+'</td>'
        +'<td style="'+TD+'">'+  (o.fabric||'—')+'</td>'
        +imgCell+scCell
        +'<td style="'+TD+'font-weight:700;background:#fdf8f0;color:var(--gold2)">'+rt+'</td>'
