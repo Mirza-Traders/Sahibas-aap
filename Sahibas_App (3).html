@@ -1480,7 +1480,7 @@ function rCS(){
   gRow+='<th colspan="3" style="background:#f0fff4;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #b8e8d0">Net P&amp;L</th>';
   gRow+='<th colspan="'+(G.s_sales?5:1)+'" style="background:#e8f8f5;color:#16a085;text-align:center;padding:3px;border-bottom:2px solid #16a085">📊 Sales Qty</th>';
   if(G.totals){gRow+='<th colspan="2" style="background:#fff5e8;color:#e67e22;text-align:center;padding:3px;border-bottom:1px solid #f0c080">Revenue Detail</th>';}
-  gRow+='<th colspan="5" style="background:#f0ede8;border-bottom:1px solid #e0dcd4"></th>';
+  gRow+='<th colspan="'+(G.orders?5:1)+'" style="background:#f0ede8;color:#555;text-align:center;padding:3px;border-bottom:2px solid #999">Order Status</th>';
   if(hasStock){
     gRow+='<th colspan="'+(G.s_stock?5:1)+'" style="background:#eeeaff;color:#5050b0;text-align:center;padding:3px;border-bottom:2px solid #8080d0">⏩ Sell Ahead</th>';
     gRow+='<th colspan="'+(G.s_stock?5:1)+'" style="background:#e4eef8;color:#2980b9;text-align:center;padding:3px;border-bottom:2px solid #2980b9">📦 Stock Qty</th>';
@@ -1526,10 +1526,12 @@ function rCS(){
     cRow+=mkTH('Total Net PAT','pat','#fff5e8','right',85);
   }
   cRow+=mkTH('All Orders','orders',hbg,'right',75);
-  cRow+=mkTH('Delivered','delivered',hbg,'right',70);
-  cRow+=mkTH('Open','open',hbg,'right',55);
-  cRow+=mkTH('Cancelled','cancelled',hbg,'right',70);
-  cRow+=mkTH('Refunded','refunded',hbg,'right',65);
+  if(G.orders){
+    cRow+=mkTH('Delivered','delivered',hbg,'right',70);
+    cRow+=mkTH('Open','open',hbg,'right',55);
+    cRow+=mkTH('Cancelled','cancelled',hbg,'right',70);
+    cRow+=mkTH('Refunded','refunded',hbg,'right',65);
+  }
   if(hasStock){
     if(G.s_stock){cRow+=mkTH('S','saS','#f2f0ff','right',38)+mkTH('M','saM','#f2f0ff','right',38)+mkTH('L','saL','#f2f0ff','right',38)+mkTH('XL','saXL','#f2f0ff','right',38);}
     cRow+=mkTH('Sell Ahead','saTotal','#f2f0ff','right',85);
@@ -1571,7 +1573,7 @@ function rCS(){
    +(G.s_sales?tdc(NF(totSzS),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzM),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzL),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzXL),'background:#e8f8f5;color:#16a085'):'')
    +tdc(NF(totSzS+totSzM+totSzL+totSzXL),'background:#e8f8f5;color:#16a085;font-weight:800')
    +(G.totals?tdc(N(totRev),'color:#c8a96e;background:#fff5e8')+tdc(N(totPat),'color:#27ae60;background:#fff5e8'):'')
-   +tdc(NF(totOrders),'font-weight:800')+tdc(NF(totDel),'color:#27ae60')+tdc(totOpen>0?NF(totOpen):'—',totOpen>0?'color:#d4944a':'')+tdc(NF(totCancelled),'color:#c0392b')+tdc(NF(totRefunded),'color:#8e44ad')
+   +tdc(NF(totOrders),'font-weight:800')+(G.orders?tdc(NF(totDel),'color:#27ae60')+tdc(totOpen>0?NF(totOpen):'—',totOpen>0?'color:#d4944a':'')+tdc(NF(totCancelled),'color:#c0392b')+tdc(NF(totRefunded),'color:#8e44ad'):'')
    +(hasStock?((G.s_stock?tdc(NF(totSaS),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaM),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaL),'background:#f2f0ff;color:#5050b0')+tdc(NF(totSaXL),'background:#f2f0ff;color:#5050b0'):'')+tdc(NF(totSa),'background:#f2f0ff;color:#5050b0;font-weight:800')):'')
    +(hasStock?((G.s_stock?tdc(NF(totLaamS),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamM),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamL),'background:#e4eef8;color:#2980b9')+tdc(NF(totLaamXL),'background:#e4eef8;color:#2980b9'):'')+tdc(NF(totLaam),'background:#e4eef8;color:var(--gold2);font-weight:800')):'')
    +tdc(totShopStock>0?NF(totShopStock):'—','background:#dce8f8;color:#2471a3;font-weight:800')
@@ -1630,10 +1632,10 @@ function rCS(){
      +(G.totals?'<td class="cs-c cs-bg6 cs-gd cs-fw6">'+NF(p.rev)+'</td>':'')
      +(G.totals?'<td class="cs-c cs-bg6 cs-g">'+NF(p.pat)+'</td>':'')
      +'<td class="cs-c cs-fw">'+NF(p.orders)+'</td>'
-     +'<td class="cs-c cs-g cs-fw6">'+NF(p.delivered)+'</td>'
+     +(G.orders?'<td class="cs-c cs-g cs-fw6">'+NF(p.delivered)+'</td>'
      +'<td class="cs-c" style="'+(p.open>0?'color:#d4944a;font-weight:700':'color:#bbb')+'">'+(p.open||'-')+'</td>'
      +'<td class="cs-c" style="'+(p.cancelled>0?'color:#c0392b;font-weight:700':'color:#bbb')+'">'+(p.cancelled||'-')+'</td>'
-     +'<td class="cs-c" style="'+(p.refunded>0?'color:#8e44ad;font-weight:700':'color:#bbb')+'">'+(p.refunded||'-')+'</td>'
+     +'<td class="cs-c" style="'+(p.refunded>0?'color:#8e44ad;font-weight:700':'color:#bbb')+'">'+(p.refunded||'-')+'</td>':'')
      +(hasStock?((G.s_stock?'<td class="cs-c cs-bg7">'+(p.saS||'-')+'</td><td class="cs-c cs-bg7">'+(p.saM||'-')+'</td><td class="cs-c cs-bg7">'+(p.saL||'-')+'</td><td class="cs-c cs-bg7">'+(p.saXL||'-')+'</td>':'')+'<td class="cs-c cs-bg7" style="'+saSt+'">'+(p.saTotal!==null?NF(p.saTotal):'-')+'</td>'):'')
      +(hasStock?((G.s_stock?'<td class="cs-c cs-bg8">'+(p.laamS||'-')+'</td><td class="cs-c cs-bg8">'+(p.laamM||'-')+'</td><td class="cs-c cs-bg8">'+(p.laamL||'-')+'</td><td class="cs-c cs-bg8">'+(p.laamXL||'-')+'</td>':'')+'<td class="cs-c cs-bg8" style="'+lSt+'">'+(p.laamTotal!==null?NF(p.laamTotal):'-')+'</td>'):'')
      +'<td class="cs-c cs-bg9" style="'+(p.shopStock!=null?(p.shopStock>=10?'color:#2471a3;font-weight:700':p.shopStock>0?'color:#d4944a;font-weight:700':'color:#c0392b;font-weight:700'):'color:#bbb')+'">'+(p.shopStock!=null?NF(p.shopStock):'-')+'</td>'
