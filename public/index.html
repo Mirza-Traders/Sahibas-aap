@@ -2752,7 +2752,7 @@ function rML(){
 // suggestions driven by 30d velocity + lead time, and stock ageing. All
 // computed client-side from data already loaded — no new data sources.
 function acCfg(){
-  var d={lead:30,safety:15,cover:45,ageDays:15,minV30:5};
+  var d={lead:30,safety:15,cover:45,ageDays:15,minV30:5,sizeShare:20};
   try{var s=JSON.parse(localStorage.getItem('sbm_ac_cfg')||'{}');Object.keys(d).forEach(function(k){if(s[k]>0)d[k]=s[k];});}catch(e){}
   return d;
 }
@@ -2773,11 +2773,14 @@ function rAC(){
   // reorder/ageing decisions should always see the whole picture)
   var pm={};
   DETAIL.forEach(function(r){
-    var n=r[1];if(!pm[n])pm[n]={name:n,v30:0,lastSale:''};
+    var n=r[1];if(!pm[n])pm[n]={name:n,v30:0,lastSale:'',sS:0,sM:0,sL:0,sXL:0};
     var p=pm[n];
     if(r[4]!=='cancelled'){
       if(r[0]&&r[0]>p.lastSale)p.lastSale=r[0];
-      if(r[0]>=s30)p.v30++;
+      if(r[0]>=s30){
+        p.v30++;
+        var sz=r[3];if(sz==='S')p.sS++;else if(sz==='M')p.sM++;else if(sz==='L')p.sL++;else if(sz==='XL')p.sXL++;
+      }
     }
   });
   // Stock-only products (never sold) still matter for ageing
@@ -2792,12 +2795,18 @@ function rAC(){
   loadPO().forEach(function(o){
     if(o.status==='Cancelled'||o.status==='Completed'||o.status==='Rejected')return;
     var k=(o.product||'').toLowerCase().trim();if(!k)return;
-    if(!poIn[k])poIn[k]={qty:0,eta:''};
-    poIn[k].qty+=(o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0));
+    if(!poIn[k])poIn[k]={qty:0,eta:'',S:0,M:0,L:0,XL:0,unsized:0};
+    var oS=o.S||0,oM=o.M||0,oL=o.L||0,oXL=o.XL||0;
+    var tot=(o.total!=null?o.total:oS+oM+oL+oXL);
+    poIn[k].qty+=tot;
+    // Orders with a size breakdown credit each size; opening-balance imports
+    // carry only a total, which no single size can claim.
+    if(oS+oM+oL+oXL>0){poIn[k].S+=oS;poIn[k].M+=oM;poIn[k].L+=oL;poIn[k].XL+=oXL;}
+    else poIn[k].unsized+=tot;
     if(o.targetDate&&(!poIn[k].eta||o.targetDate<poIn[k].eta))poIn[k].eta=o.targetDate;
   });
 
-  var priceRows=[],statusRows=[],reorderRows=[],ageRows=[],lossRows=[];
+  var priceRows=[],statusRows=[],reorderRows=[],ageRows=[],lossRows=[],sizeRows=[];
   Object.values(pm).forEach(function(p){
     var k=p.name.toLowerCase().trim();
     var sp=STOCK_PRODS[k]||null;
@@ -2839,6 +2848,33 @@ function rAC(){
         ageRows.push({name:p.name,img:img,lastSale:p.lastSale,days:days,stk:stk,val:stk*cost,cost:cost,laamStatus:laamStatus});
       }
     }
+    // 6. Broken size runs — a size carrying >=sizeShare% of demand that can't
+    // actually be bought. Availability = stock + sell-ahead + sized incoming PO;
+    // unsized opening-balance POs can only warn, not cover.
+    if(p.v30>=cfg.minV30){
+      var sizes=['S','M','L','XL'];
+      var cells=[],broken=[],risk=0,anyIssue=false;
+      sizes.forEach(function(sz){
+        var sold=p['s'+sz]||0;
+        var share=p.v30>0?sold/p.v30:0;
+        var st=sp?(sp[sz]||0):0;
+        var sa=sp?(sp['sa'+sz]||0):0;
+        var po=inc[sz]||0;
+        var verdict='OK';
+        if(share>=cfg.sizeShare/100&&st===0){
+          if(sa>0)verdict='SELLAHEAD';
+          else if(po>0)verdict='COVERED';
+          else if((inc.unsized||0)>0)verdict='UNKNOWN';
+          else verdict='BROKEN';
+        }
+        if(verdict!=='OK')anyIssue=true;
+        if(verdict==='BROKEN'){broken.push(sz);risk+=sold*(laamPrice||0);}
+        cells.push({sz:sz,sold:sold,share:Math.round(share*100),st:st,sa:sa,po:po,verdict:verdict});
+      });
+      if(anyIssue){
+        sizeRows.push({name:p.name,img:img,retail:laamPrice,v30:p.v30,cells:cells,broken:broken,risk:risk,unsized:inc.unsized||0,eta:inc.eta,laamStatus:laamStatus});
+      }
+    }
     // 5. Selling at a loss — GP below the 25% all-in load (commission + taxes).
     // Same formula as the Summary Sheet's Net Profit column.
     if(laamPrice>0&&cost>0){
@@ -2857,6 +2893,8 @@ function rAC(){
   var stuckVal=ageRows.reduce(function(a,r){return a+r.val;},0);
   lossRows.sort(function(a,b){return b.bleed-a.bleed||a.loss-b.loss;});
   var totBleed=lossRows.reduce(function(a,r){return a+r.bleed;},0);
+  sizeRows.sort(function(a,b){return b.risk-a.risk||b.broken.length-a.broken.length||b.v30-a.v30;});
+  var totSizeRisk=sizeRows.reduce(function(a,r){return a+r.risk;},0);
 
   var TH='padding:7px 9px;font-size:9px;color:#888;text-transform:uppercase;text-align:right;white-space:nowrap;border-bottom:2px solid #e8e4dc;background:#f8f6f2;position:sticky;top:0;z-index:2;';
   var THL=TH+'text-align:left;';
@@ -2943,6 +2981,28 @@ function rAC(){
   var sec5=box(secHead('🔻','Selling at a Loss — GP below the 25% load',lossRows.length,'#e74c3c','Net loss per piece after commission + taxes · <b style="color:#c0392b">PKR '+NF(totBleed)+'/month bleeding at current sales rate</b> · Breakeven = minimum retail that stops the loss','acExpLoss')
    +(lossRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Gross Price</th><th style="'+TH+'">Disc%</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Cost</th><th style="'+TH+'">GP/pc</th><th style="'+TH+'">Net Loss/pc</th><th style="'+TH+'">Breakeven Price</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Monthly Bleed</th><th style="'+TH+'">Stock</th></tr></thead><tbody>'+h5rows+'</tbody></table>'):empty('No product sells below the 25% load — every sale is profitable')),'ac-sec-loss');
 
+  // Section 6 — Broken size runs
+  var VC={BROKEN:{bg:'#fdeaea',bd:'#e74c3c',fg:'#c0392b',lbl:'BROKEN'},SELLAHEAD:{bg:'#fff3e0',bd:'#e8a030',fg:'#b06000',lbl:'SELL-AHEAD'},COVERED:{bg:'#e8f8ee',bd:'#27ae60',fg:'#1e8449',lbl:'PO INCOMING'},UNKNOWN:{bg:'#fff8e0',bd:'#d4b040',fg:'#8a6800',lbl:'CHECK PO'},OK:{bg:'#fafaf8',bd:'transparent',fg:'#999',lbl:''}};
+  function szCell(c){
+    var v=VC[c.verdict];
+    return '<td style="'+TD+'padding:4px 6px;background:'+v.bg+';border:1px solid '+(v.bd==='transparent'?'#f0ede8':v.bd)+';text-align:center;min-width:86px">'
+     +'<div style="font-weight:800;font-size:11px;color:'+(c.share>=20?'#333':'#aaa')+'">'+c.share+'%<span style="font-weight:400;color:#aaa;font-size:8px"> of sales</span></div>'
+     +'<div style="font-size:9px;color:#666;margin-top:1px">stk <b>'+c.st+'</b> · SA <b>'+c.sa+'</b> · PO <b>'+(c.po||'—')+'</b></div>'
+     +(v.lbl?'<div style="font-size:7px;font-weight:800;color:'+v.fg+';letter-spacing:.04em;margin-top:2px">'+v.lbl+'</div>':'')
+     +'</td>';
+  }
+  var h6rows=sizeRows.map(function(r){
+    var note=r.unsized>0?'<div style="font-size:8px;color:#b06000;margin-top:2px">⚠ '+NF(r.unsized)+' pcs incoming without size split'+(r.eta?' (ETA '+fmtDMY(r.eta)+')':'')+' — confirm it covers '+(r.broken.length?r.broken.join('/'):'the weak sizes')+'</div>':'';
+    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
+     +'<td style="'+TDL+'font-weight:600">'+r.name+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+note+'</td>'
+     +'<td style="'+TD+'">'+(r.retail>0?NF(r.retail):'—')+'</td>'
+     +'<td style="'+TD+'font-weight:700">'+r.v30+'</td>'
+     +r.cells.map(szCell).join('')
+     +'<td style="'+TD+'font-weight:800;color:'+(r.risk>0?'#c0392b':'#bbb')+'">'+(r.risk>0?'PKR '+NF(r.risk):'—')+'</td></tr>';
+  }).join('');
+  var sec6=box(secHead('📏','Broken Size Runs — demand sizes you cannot sell',sizeRows.length,'#16a085','Sizes with ≥'+cfg.sizeShare+'% of 30d sales vs their availability (stock + sell-ahead + incoming PO)','acExpSize')
+   +(sizeRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'text-align:center">S</th><th style="'+TH+'text-align:center">M</th><th style="'+TH+'text-align:center">L</th><th style="'+TH+'text-align:center">XL</th><th style="'+TH+'">Monthly Rev at Risk</th></tr></thead><tbody>'+h6rows+'</tbody></table>'):empty('Every demand size of every fast mover is available')),'ac-sec-size');
+
   function cfgInp(k,lbl,title){return '<label title="'+title+'" style="display:flex;align-items:center;gap:5px;font-size:10px;color:#888;font-weight:600">'+lbl+' <input type="number" min="1" value="'+cfg[k]+'" onchange="acSetCfg(\''+k+'\',this.value)" style="width:52px;border:1px solid #e0dcd4;border-radius:4px;padding:4px 6px;font-size:11px;text-align:right"></label>';}
   // Morning-glance summary strip — each card jumps to its section
   function kpiCard(count,label,sub,color,secId){
@@ -2954,11 +3014,12 @@ function rAC(){
   var kpis='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
    +kpiCard(reorderRows.length,'Reorder Now','will stock out within lead time','#8e44ad','ac-sec-reorder')
    +kpiCard(lossRows.length,'Selling at Loss','PKR '+N(totBleed)+'/month bleeding','#e74c3c','ac-sec-loss')
+   +kpiCard(sizeRows.length,'Broken Size Runs','PKR '+N(totSizeRisk)+'/month at risk','#16a085','ac-sec-size')
    +kpiCard(ageRows.length,'Dead / Slow Stock','PKR '+N(stuckVal)+' stuck at cost','#2980b9','ac-sec-age')
    +kpiCard(priceRows.length,'Price Mismatches','Laam vs Shopify selling price','#c0392b','ac-sec-price')
    +kpiCard(statusRows.length,'Status Mismatches',statusRows.filter(function(r){return r.blocked;}).length+' with blocked revenue','#d4780a','ac-sec-status')
    +'</div>';
-  window._acData={priceRows:priceRows,statusRows:statusRows,reorderRows:reorderRows,ageRows:ageRows,lossRows:lossRows};
+  window._acData={priceRows:priceRows,statusRows:statusRows,reorderRows:reorderRows,ageRows:ageRows,lossRows:lossRows,sizeRows:sizeRows};
   document.getElementById('pac').innerHTML=
     '<div style="max-width:1100px">'
     +'<div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px">🚨 Insights — Action Center</div>'
@@ -2971,14 +3032,16 @@ function rAC(){
     +cfgInp('cover','Target cover after arrival (days)','How many days of stock the suggested order should leave you with once it arrives')
     +cfgInp('ageDays','Dead stock after (days)','No sale in this many days puts an article in the ageing report')
     +cfgInp('minV30','Min sold in 30d','Products selling fewer than this many pieces in the last 30 days are left out of the reorder list')
+    +cfgInp('sizeShare','Min size share %','A size must carry at least this share of a product\'s 30d sales to raise a broken-size alert')
     +'</div>'
-    +sec3+sec5+sec4+sec1+sec2
+    +sec3+sec6+sec5+sec4+sec1+sec2
     +'</div>';
 }
 function acExpPrice(){csvDL((window._acData.priceRows||[]).map(function(r){return[r.name,r.laam,r.shop,r.diff];}),['Product','Laam Price','Shopify Price','Diff (Laam-Shopify)'],'price_mismatch.csv');}
 function acExpStatus(){csvDL((window._acData.statusRows||[]).map(function(r){return[r.name,r.laamStatus,r.shopStatus,r.stk,r.shopStk!=null?r.shopStk:'',r.blocked?'BLOCKED REVENUE':''];}),['Product','Laam Status','Shopify Status','Laam Stock','Shopify Stock','Flag'],'status_mismatch.csv');}
 function acExpReorder(){csvDL((window._acData.reorderRows||[]).map(function(r){return[r.name,r.v30,Math.round(r.rate*100)/100,r.stk,r.inc,r.eta,Math.round(r.cover),r.sug];}),['Product','Sold 30d','Daily Rate','Stock','Incoming PO','PO ETA','Days Cover','Suggested Order Qty'],'reorder_list.csv');}
 function acExpAge(){csvDL((window._acData.ageRows||[]).map(function(r){return[r.name,r.lastSale||'never',r.days===null?'':r.days,r.stk,r.cost,r.val];}),['Product','Last Sale','Days Since Sale','Stock','Unit Cost','Value at Cost'],'stock_ageing.csv');}
+function acExpSize(){csvDL((window._acData.sizeRows||[]).map(function(r){var f={};r.cells.forEach(function(c){f[c.sz]=c.share+'% | stk '+c.st+' | SA '+c.sa+' | PO '+(c.po||0)+' | '+c.verdict;});return[r.name,r.retail,r.v30,f.S,f.M,f.L,f.XL,r.broken.join('/'),r.unsized,r.risk];}),['Product','Retail','Sold 30d','S','M','L','XL','Broken Sizes','Unsized Incoming PO','Monthly Revenue at Risk'],'broken_size_runs.csv');}
 function acExpLoss(){csvDL((window._acData.lossRows||[]).map(function(r){return[r.name,r.gross,r.disc?r.disc+'%':'',r.retail,r.cost,r.gp,r.loss,r.breakeven,r.v30,r.bleed,r.stk];}),['Product','Gross Price','Discount%','Retail','Cost','GP/pc','Net Loss/pc','Breakeven Price','Sold 30d','Monthly Bleed PKR','Stock'],'selling_at_loss.csv');}
 
 // ── PRODUCTION ORDERS ──
