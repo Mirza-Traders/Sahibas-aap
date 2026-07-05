@@ -2858,7 +2858,7 @@ function rAC(){
   lossRows.sort(function(a,b){return b.bleed-a.bleed||a.loss-b.loss;});
   var totBleed=lossRows.reduce(function(a,r){return a+r.bleed;},0);
 
-  var TH='padding:7px 9px;font-size:9px;color:#888;text-transform:uppercase;text-align:right;white-space:nowrap;border-bottom:2px solid #e8e4dc;background:#f8f6f2;';
+  var TH='padding:7px 9px;font-size:9px;color:#888;text-transform:uppercase;text-align:right;white-space:nowrap;border-bottom:2px solid #e8e4dc;background:#f8f6f2;position:sticky;top:0;z-index:2;';
   var THL=TH+'text-align:left;';
   var TD='padding:6px 9px;font-size:11px;text-align:right;border-bottom:1px solid #f0ede8;white-space:nowrap;';
   var TDL=TD+'text-align:left;';
