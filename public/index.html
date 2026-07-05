@@ -1350,8 +1350,10 @@ function rCS(){
     var gpUnit=retailPrice>0&&p.cost>0?retailPrice-p.cost:0;
     var gpPct=retailPrice>0&&p.cost>0?Math.round((retailPrice-p.cost)/retailPrice*100):0;
     var commission=retailPrice>0?Math.round(retailPrice*0.25):0;
-    var netPat=gpUnit>0?gpUnit-commission:0;
-    var netPatPct=retailPrice>0&&netPat>0?Math.round(netPat/retailPrice*100):0;
+    // netPat can be NEGATIVE (loss) when discount pushes GP below commission —
+    // keep the sign so the sheet can show losses instead of hiding them.
+    var netPat=(retailPrice>0&&p.cost>0)?gpUnit-commission:0;
+    var netPatPct=(retailPrice>0&&p.cost>0)?Math.round(netPat/retailPrice*100):0;
     return Object.assign(p,{
       sp:sp,img:(sp&&sp.img)?sp.img:findImg(k),grossPrice:grossPrice,retailPrice:retailPrice,shopPrice:SHOP_PRICE[k]||null,priceDiff:(retailPrice>0&&SHOP_PRICE[k]>0)?retailPrice-SHOP_PRICE[k]:null,stockStatus:sp?sp.status:'',shopStatus:SHOP_STATUS[k]||'',statusDiff:(function(){var ls=sp?sp.status:'';var ss=SHOP_STATUS[k]||'';if(!ss||!ls)return '';if(ls===ss)return 'SAME';return ls+'/'+ss;})(),shopStock:SHOP_STOCK[k]!=null?SHOP_STOCK[k]:null,createdAt:sp?sp.createdAt||'':'',createdAtTs:sp&&sp.createdAt?(new Date(sp.createdAt).getTime()||0):0,
       laamS:sp?sp.S:0,laamM:sp?sp.M:0,laamL:sp?sp.L:0,laamXL:sp?sp.XL:0,laamTotal:sp?sp.total:null,stockDiff:(sp?sp.total:0)-(SHOP_STOCK[k]!=null?SHOP_STOCK[k]:0),saS:sp?sp.saS:0,saM:sp?sp.saM:0,saL:sp?sp.saL:0,saXL:sp?sp.saXL:0,saTotal:sp?sp.saTotal:null,
@@ -1631,8 +1633,8 @@ function rCS(){
      +'<td class="cs-c cs-bg2 cs-fw '+(p.gpUnit>0?'cs-g':'cs-gy')+'">'+(p.gpUnit>0?NF(p.gpUnit):'-')+'</td>':'')
      +'<td class="cs-c cs-bg2 cs-fw" style="color:'+(p.gpPct>=20?'#27ae60':p.gpPct>=10?'#d4944a':'#c0392b')+'">'+(p.gpPct>0?p.gpPct+'%':'-')+'</td>'
      +(G.gp?'<td class="cs-c cs-bg3 cs-pu">'+(p.commission>0?NF(p.commission):'-')+'</td>'
-     +'<td class="cs-c cs-bg4 '+npc+'">'+(p.netPat>0?NF(p.netPat):'-')+'</td>':'')
-     +'<td class="cs-c cs-bg4 '+npc+'">'+(p.netPatPct>0?p.netPatPct+'%':'-')+'</td>'
+     +'<td class="cs-c cs-bg4 '+npc+'">'+(p.netPat!==0?NF(p.netPat):'-')+(p.netPat<0?' ⚠':'')+'</td>':'')
+     +'<td class="cs-c cs-bg4 '+npc+'">'+(p.netPatPct!==0?p.netPatPct+'%':'-')+'</td>'
      +(G.s_sales?'<td class="cs-c cs-bg5">'+(p.szS||'-')+'</td><td class="cs-c cs-bg5">'+(p.szM||'-')+'</td><td class="cs-c cs-bg5">'+(p.szL||'-')+'</td><td class="cs-c cs-bg5">'+(p.szXL||'-')+'</td>':'')
      +'<td class="cs-c cs-bg5 cs-fw cs-tl">'+(p.szTotal||'-')+'</td>'
      +(G.totals?'<td class="cs-c cs-bg6 cs-gd cs-fw6">'+NF(p.rev)+'</td>':'')
