@@ -2797,7 +2797,7 @@ function rAC(){
     if(o.targetDate&&(!poIn[k].eta||o.targetDate<poIn[k].eta))poIn[k].eta=o.targetDate;
   });
 
-  var priceRows=[],statusRows=[],reorderRows=[],ageRows=[];
+  var priceRows=[],statusRows=[],reorderRows=[],ageRows=[],lossRows=[];
   Object.values(pm).forEach(function(p){
     var k=p.name.toLowerCase().trim();
     var sp=STOCK_PRODS[k]||null;
@@ -2839,12 +2839,24 @@ function rAC(){
         ageRows.push({name:p.name,img:img,lastSale:p.lastSale,days:days,stk:stk,val:stk*cost,cost:cost,laamStatus:laamStatus});
       }
     }
+    // 5. Selling at a loss — GP below the 25% all-in load (commission + taxes).
+    // Same formula as the Summary Sheet's Net Profit column.
+    if(laamPrice>0&&cost>0){
+      var npLoss=(laamPrice-cost)-Math.round(laamPrice*0.25);
+      if(npLoss<0){
+        var grossP=sp&&sp.grossPrice>0?sp.grossPrice:0;
+        lossRows.push({name:p.name,img:img,gross:grossP,retail:laamPrice,disc:grossP>0?Math.round((grossP-laamPrice)/grossP*100):0,
+          cost:cost,gp:laamPrice-cost,loss:npLoss,breakeven:Math.ceil(cost/0.75),v30:p.v30,bleed:-npLoss*p.v30,stk:stk,laamStatus:laamStatus});
+      }
+    }
   });
   priceRows.sort(function(a,b){return Math.abs(b.diff)-Math.abs(a.diff);});
   statusRows.sort(function(a,b){return (b.blocked?1:0)-(a.blocked?1:0)||(b.stk||0)-(a.stk||0);});
   reorderRows.sort(function(a,b){return a.cover-b.cover;});
   ageRows.sort(function(a,b){return (b.days===null?99999:b.days)-(a.days===null?99999:a.days)||b.val-a.val;});
   var stuckVal=ageRows.reduce(function(a,r){return a+r.val;},0);
+  lossRows.sort(function(a,b){return b.bleed-a.bleed||a.loss-b.loss;});
+  var totBleed=lossRows.reduce(function(a,r){return a+r.bleed;},0);
 
   var TH='padding:7px 9px;font-size:9px;color:#888;text-transform:uppercase;text-align:right;white-space:nowrap;border-bottom:2px solid #e8e4dc;background:#f8f6f2;';
   var THL=TH+'text-align:left;';
@@ -2914,6 +2926,23 @@ function rAC(){
   var sec4=box(secHead('🐌','Stock Ageing — sitting unsold',ageRows.length,'#2980b9','Stock on hand with no sale in the last '+cfg.ageDays+'+ days · <b style="color:#c0392b">PKR '+NF(stuckVal)+' stuck at cost</b>','acExpAge')
    +(ageRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Last Sale</th><th style="'+TH+'">Days Since</th><th style="'+TH+'text-align:center">Bucket</th><th style="'+TH+'">Stock</th><th style="'+TH+'">Value at Cost</th></tr></thead><tbody>'+h4rows+'</tbody></table>'):empty('Everything with stock has sold within '+cfg.ageDays+' days')),'ac-sec-age');
 
+  // Section 5 — Selling at a loss
+  var h5rows=lossRows.map(function(r){
+    return '<tr'+(r.v30>0?' style="background:#fff5f5"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+r.name+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#888">('+r.laamStatus+')</span>':'')+'</td>'
+     +'<td style="'+TD+'color:#888">'+(r.gross>0?NF(r.gross):'—')+'</td>'
+     +'<td style="'+TD+'">'+(r.disc>0?'<span style="color:#c0392b;font-weight:700">'+r.disc+'%</span>':'—')+'</td>'
+     +'<td style="'+TD+'font-weight:600">'+NF(r.retail)+'</td>'
+     +'<td style="'+TD+'">'+NF(r.cost)+'</td>'
+     +'<td style="'+TD+'color:'+(r.gp>0?'#888':'#c0392b')+'">'+NF(r.gp)+'</td>'
+     +'<td style="'+TD+'font-weight:800;color:#c0392b">'+NF(r.loss)+' ⚠</td>'
+     +'<td style="'+TD+'font-weight:800;color:#27ae60;background:#f0fff4">'+NF(r.breakeven)+'</td>'
+     +'<td style="'+TD+'">'+(r.v30||'-')+'</td>'
+     +'<td style="'+TD+'font-weight:800;color:'+(r.bleed>0?'#c0392b':'#bbb')+'">'+(r.bleed>0?'PKR '+NF(r.bleed):'—')+'</td>'
+     +'<td style="'+TD+'">'+NF(r.stk)+'</td></tr>';
+  }).join('');
+  var sec5=box(secHead('🔻','Selling at a Loss — GP below the 25% load',lossRows.length,'#e74c3c','Net loss per piece after commission + taxes · <b style="color:#c0392b">PKR '+NF(totBleed)+'/month bleeding at current sales rate</b> · Breakeven = minimum retail that stops the loss','acExpLoss')
+   +(lossRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Gross Price</th><th style="'+TH+'">Disc%</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Cost</th><th style="'+TH+'">GP/pc</th><th style="'+TH+'">Net Loss/pc</th><th style="'+TH+'">Breakeven Price</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Monthly Bleed</th><th style="'+TH+'">Stock</th></tr></thead><tbody>'+h5rows+'</tbody></table>'):empty('No product sells below the 25% load — every sale is profitable')),'ac-sec-loss');
+
   function cfgInp(k,lbl,title){return '<label title="'+title+'" style="display:flex;align-items:center;gap:5px;font-size:10px;color:#888;font-weight:600">'+lbl+' <input type="number" min="1" value="'+cfg[k]+'" onchange="acSetCfg(\''+k+'\',this.value)" style="width:52px;border:1px solid #e0dcd4;border-radius:4px;padding:4px 6px;font-size:11px;text-align:right"></label>';}
   // Morning-glance summary strip — each card jumps to its section
   function kpiCard(count,label,sub,color,secId){
@@ -2924,11 +2953,12 @@ function rAC(){
   }
   var kpis='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
    +kpiCard(reorderRows.length,'Reorder Now','will stock out within lead time','#8e44ad','ac-sec-reorder')
+   +kpiCard(lossRows.length,'Selling at Loss','PKR '+N(totBleed)+'/month bleeding','#e74c3c','ac-sec-loss')
    +kpiCard(ageRows.length,'Dead / Slow Stock','PKR '+N(stuckVal)+' stuck at cost','#2980b9','ac-sec-age')
    +kpiCard(priceRows.length,'Price Mismatches','Laam vs Shopify selling price','#c0392b','ac-sec-price')
    +kpiCard(statusRows.length,'Status Mismatches',statusRows.filter(function(r){return r.blocked;}).length+' with blocked revenue','#d4780a','ac-sec-status')
    +'</div>';
-  window._acData={priceRows:priceRows,statusRows:statusRows,reorderRows:reorderRows,ageRows:ageRows};
+  window._acData={priceRows:priceRows,statusRows:statusRows,reorderRows:reorderRows,ageRows:ageRows,lossRows:lossRows};
   document.getElementById('pac').innerHTML=
     '<div style="max-width:1100px">'
     +'<div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px">🚨 Insights — Action Center</div>'
@@ -2942,13 +2972,14 @@ function rAC(){
     +cfgInp('ageDays','Dead stock after (days)','No sale in this many days puts an article in the ageing report')
     +cfgInp('minV30','Min sold in 30d','Products selling fewer than this many pieces in the last 30 days are left out of the reorder list')
     +'</div>'
-    +sec3+sec4+sec1+sec2
+    +sec3+sec5+sec4+sec1+sec2
     +'</div>';
 }
 function acExpPrice(){csvDL((window._acData.priceRows||[]).map(function(r){return[r.name,r.laam,r.shop,r.diff];}),['Product','Laam Price','Shopify Price','Diff (Laam-Shopify)'],'price_mismatch.csv');}
 function acExpStatus(){csvDL((window._acData.statusRows||[]).map(function(r){return[r.name,r.laamStatus,r.shopStatus,r.stk,r.shopStk!=null?r.shopStk:'',r.blocked?'BLOCKED REVENUE':''];}),['Product','Laam Status','Shopify Status','Laam Stock','Shopify Stock','Flag'],'status_mismatch.csv');}
 function acExpReorder(){csvDL((window._acData.reorderRows||[]).map(function(r){return[r.name,r.v30,Math.round(r.rate*100)/100,r.stk,r.inc,r.eta,Math.round(r.cover),r.sug];}),['Product','Sold 30d','Daily Rate','Stock','Incoming PO','PO ETA','Days Cover','Suggested Order Qty'],'reorder_list.csv');}
 function acExpAge(){csvDL((window._acData.ageRows||[]).map(function(r){return[r.name,r.lastSale||'never',r.days===null?'':r.days,r.stk,r.cost,r.val];}),['Product','Last Sale','Days Since Sale','Stock','Unit Cost','Value at Cost'],'stock_ageing.csv');}
+function acExpLoss(){csvDL((window._acData.lossRows||[]).map(function(r){return[r.name,r.gross,r.disc?r.disc+'%':'',r.retail,r.cost,r.gp,r.loss,r.breakeven,r.v30,r.bleed,r.stk];}),['Product','Gross Price','Discount%','Retail','Cost','GP/pc','Net Loss/pc','Breakeven Price','Sold 30d','Monthly Bleed PKR','Stock'],'selling_at_loss.csv');}
 
 // ── PRODUCTION ORDERS ──
 // In-memory cache — avoids repeated JSON.parse of large base64 image data on every render
