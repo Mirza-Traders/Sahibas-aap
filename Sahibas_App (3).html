@@ -2766,14 +2766,14 @@ function rAC(){
   var cfg=acCfg();
   var ref=META.max_date||new Date().toISOString().split('T')[0];
   function offs(d){var x=new Date(ref);x.setDate(x.getDate()-d);return x.toISOString().split('T')[0];}
-  var s30=offs(30),s7=offs(7),s28=offs(28);
+  var s30=offs(30),s7=offs(7),s28=offs(28),s90=offs(90);
   buildCostIdx();
 
   // Per-product rollup from full sales history (ignores page filters on purpose —
   // reorder/ageing decisions should always see the whole picture)
   var pm={},recvRows=[];
   DETAIL.forEach(function(r){
-    var n=r[1];if(!pm[n])pm[n]={name:n,v30:0,v7:0,vP:0,lastSale:'',sS:0,sM:0,sL:0,sXL:0,tot:0,can:0,del:0,revDel:0,refD:0,refBase:0,exc:0};
+    var n=r[1];if(!pm[n])pm[n]={name:n,v30:0,v7:0,vP:0,rev30:0,vPr:0,revPr:0,lastSale:'',sS:0,sM:0,sL:0,sXL:0,tot:0,can:0,del:0,revDel:0,refD:0,refBase:0,exc:0};
     var p=pm[n];
     p.tot++;
     if(r[4]==='cancelled')p.can++;
@@ -2784,9 +2784,9 @@ function rAC(){
     if(r[4]!=='cancelled'){
       if(r[0]&&r[0]>p.lastSale)p.lastSale=r[0];
       if(r[0]>=s30){
-        p.v30++;
+        p.v30++;p.rev30+=r[9];
         var sz=r[3];if(sz==='S')p.sS++;else if(sz==='M')p.sM++;else if(sz==='L')p.sL++;else if(sz==='XL')p.sXL++;
-      }
+      }else if(r[0]>=s90){p.vPr++;p.revPr+=r[9];}
       if(r[0]>=s7)p.v7++;
       else if(r[0]>=s28)p.vP++;
     }
@@ -2796,7 +2796,7 @@ function rAC(){
     var sp=STOCK_PRODS[k];
     var found=false;
     Object.keys(pm).forEach(function(n){if(n.toLowerCase().trim()===k)found=true;});
-    if(!found&&(sp.total||0)>0)pm[sp.title]={name:sp.title,v30:0,v7:0,vP:0,lastSale:'',sS:0,sM:0,sL:0,sXL:0,tot:0,can:0,del:0,revDel:0,refD:0,refBase:0,exc:0};
+    if(!found&&(sp.total||0)>0)pm[sp.title]={name:sp.title,v30:0,v7:0,vP:0,rev30:0,vPr:0,revPr:0,lastSale:'',sS:0,sM:0,sL:0,sXL:0,tot:0,can:0,del:0,revDel:0,refD:0,refBase:0,exc:0};
   });
   // Incoming qty from open Production Orders
   var poIn={};
@@ -2992,6 +2992,37 @@ function rAC(){
     b.n++;b.v+=r.ret;
   });
 
+  // Discount & Price Watch — listed vs effective discount, and price drift
+  // (avg actually-paid last 30d vs the prior 60d). Original prices stay fixed
+  // by policy, so effective discount is a faithful read of total discounting.
+  var priceWatchRows=[];
+  Object.values(pm).forEach(function(p){
+    if(p.v30<1)return;
+    var k=p.name.toLowerCase().trim(),sp=STOCK_PRODS[k]||null;
+    if(!sp||!(sp.grossPrice>0))return;
+    var gross=sp.grossPrice,listed=sp.price>0?sp.price:gross;
+    var avg30=p.rev30/p.v30;
+    var avgPr=p.vPr>=5?p.revPr/p.vPr:null;
+    var listedDisc=(gross-listed)/gross;
+    var effDisc=(gross-avg30)/gross;
+    var extra=effDisc-listedDisc;
+    var drift=(avgPr!==null&&p.v30>=5)?(avg30/avgPr-1):null;
+    var given=Math.max(0,Math.round((listed-avg30)*p.v30));
+    var cost=window._costIdx[k]||0;
+    var net=(cost>0)?Math.round(avg30-cost-avg30*0.25):null;
+    var tags=[];
+    if(drift!==null&&drift<=-0.10)tags.push('SLIDE');
+    if(extra>=0.10)tags.push('LEAK');
+    if(p.v30>=15&&effDisc<0.20)tags.push('RAISE');
+    if(!tags.length)return;
+    priceWatchRows.push({name:p.name,img:(sp&&sp.img)?sp.img:findImg(k),gross:gross,listed:listed,
+      listedDisc:Math.round(listedDisc*100),effDisc:Math.round(effDisc*100),extra:Math.round(extra*100),
+      avg30:Math.round(avg30),drift:drift===null?null:Math.round(drift*100),v30:p.v30,net:net,given:given,tags:tags});
+  });
+  priceWatchRows.sort(function(a,b){return b.given-a.given||(a.drift===null?0:a.drift)-(b.drift===null?0:b.drift);});
+  var totGiven=priceWatchRows.reduce(function(a,r){return a+r.given;},0);
+  var nRaise=priceWatchRows.filter(function(r){return r.tags.indexOf('RAISE')>=0;}).length;
+
   var TH='padding:7px 9px;font-size:9px;color:#888;text-transform:uppercase;text-align:right;white-space:nowrap;border-bottom:2px solid #e8e4dc;background:#f8f6f2;position:sticky;top:0;z-index:2;';
   var THL=TH+'text-align:left;';
   var TD='padding:6px 9px;font-size:11px;text-align:right;border-bottom:1px solid #f0ede8;white-space:nowrap;';
@@ -3127,6 +3158,27 @@ function rAC(){
    +'</div>'
    +(recvRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THL+'">Order#</th><th style="'+TH+'">Date</th><th style="'+THL+'">Product</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Days Pending</th></tr></thead><tbody>'+h10rows+'</tbody></table>'):empty('Nothing pending — every delivered order is paid')),'ac-sec-recv');
 
+  // Section 11 — Discount & Price Watch
+  var PWT={RAISE:{bg:'#e8f8ee',fg:'#1e8449',lbl:'🟢 RAISE PRICE'},LEAK:{bg:'#fff3e0',fg:'#b06000',lbl:'🟠 EXTRA DISCOUNT LEAK'},SLIDE:{bg:'#fde8e8',fg:'#c0392b',lbl:'🔴 PRICE SLIDING'}};
+  var h11rows=priceWatchRows.map(function(r){
+    var badges=r.tags.map(function(t){var v=PWT[t];return '<span style="background:'+v.bg+';color:'+v.fg+';padding:2px 7px;border-radius:3px;font-size:8px;font-weight:800;white-space:nowrap;display:inline-block;margin:1px 0">'+v.lbl+'</span>';}).join('<br>');
+    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
+     +'<td style="'+TDL+'font-weight:600">'+r.name+'</td>'
+     +'<td style="'+TD+'color:#888">'+NF(r.gross)+'</td>'
+     +'<td style="'+TD+'">'+NF(r.listed)+'</td>'
+     +'<td style="'+TD+'">'+r.listedDisc+'%</td>'
+     +'<td style="'+TD+'font-weight:700;color:'+(r.effDisc>=40?'#c0392b':r.effDisc>=20?'#d4944a':'#27ae60')+'">'+r.effDisc+'%</td>'
+     +'<td style="'+TD+'font-weight:700;color:'+(r.extra>=10?'#b06000':'#888')+'">'+(r.extra>0?'+'+r.extra+'pp':'—')+'</td>'
+     +'<td style="'+TD+'">'+NF(r.avg30)+'</td>'
+     +'<td style="'+TD+'font-weight:800;color:'+(r.drift===null?'#bbb':r.drift<=-10?'#c0392b':r.drift<0?'#d4944a':'#27ae60')+'">'+(r.drift===null?'—':(r.drift>0?'+':'')+r.drift+'% '+(r.drift<=-10?'▼':r.drift>=10?'▲':''))+'</td>'
+     +'<td style="'+TD+'">'+r.v30+'</td>'
+     +'<td style="'+TD+'font-weight:700;color:'+(r.net===null?'#bbb':r.net<0?'#c0392b':r.net<cfg.minNet?'#b06000':'#27ae60')+'">'+(r.net===null?'—':NF(r.net))+'</td>'
+     +'<td style="'+TD+'font-weight:800;color:'+(r.given>0?'#c0392b':'#bbb')+'">'+(r.given>0?'PKR '+NF(r.given):'—')+'</td>'
+     +'<td style="'+TD+'text-align:center;line-height:1.3">'+badges+'</td></tr>';
+  }).join('');
+  var sec11=box(secHead('💸','Discount &amp; Price Watch',priceWatchRows.length,'#d4944a','Listed vs effective discount (what buyers really paid, last 30d) and price drift vs the prior 60d \u00b7 <b style="color:#c0392b">PKR '+NF(totGiven)+'/month given beyond listed prices</b> \u00b7 '+nRaise+' raise-price candidates','acExpPW')
+   +(priceWatchRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Original</th><th style="'+TH+'">Current</th><th style="'+TH+'">Listed Disc%</th><th style="'+TH+'">Effective Disc%</th><th style="'+TH+'">Extra Given</th><th style="'+TH+'">Avg Paid 30d</th><th style="'+TH+'">Price Drift</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'">Given Away/mo</th><th style="'+TH+'text-align:center">Verdict</th></tr></thead><tbody>'+h11rows+'</tbody></table>'):empty('No pricing exceptions — discounts are doing their job')),'ac-sec-pw');
+
   // Section 7 — New arrivals scorecard
   var NV={BEST:{bg:'#e8f8ee',fg:'#1e8449',lbl:'🌟 BESTSELLER'},SELLOUT:{bg:'#fde8e8',fg:'#c0392b',lbl:'🔥 SELLING OUT — reorder now'},THIN:{bg:'#fff3e0',fg:'#b06000',lbl:'⚠ FAST BUT THIN — raise price'},THINOUT:{bg:'#fff3e0',fg:'#b06000',lbl:'⚠ FIX PRICE BEFORE REORDER'},NOCOST:{bg:'#f5f5f5',fg:'#888',lbl:'ADD COST TO JUDGE'},OK:{bg:'#f8f6f2',fg:'#888',lbl:'⚖ OK'},SLOW:{bg:'#eef2f8',fg:'#5070a0',lbl:'💤 SLOW'}};
   var h7rows=newRows.map(function(r){
@@ -3186,10 +3238,11 @@ function rAC(){
    +kpiCard(ageRows.length,'Dead / Slow Stock','PKR '+N(stuckVal)+' stuck at cost','#2980b9','ac-sec-age')
    +kpiCard(priceRows.length,'Price Mismatches','Laam vs Shopify selling price','#c0392b','ac-sec-price')
    +kpiCard(statusRows.length,'Status Mismatches',statusRows.filter(function(r){return r.blocked;}).length+' with blocked revenue','#d4780a','ac-sec-status')
+   +kpiCard(priceWatchRows.length,'Price Watch','PKR '+N(totGiven)+'/mo extra discounts','#d4944a','ac-sec-pw')
    +kpiCard(drainRows.length,'Profit Drains','PKR '+N(totDrain)+' leaking','#8e44ad','ac-sec-drain')
    +kpiCard(recvRows.length,'Receivables','PKR '+N(recvTotal)+' payment pending','#2471a3','ac-sec-recv')
    +'</div>';
-  window._acData={priceRows:priceRows,statusRows:statusRows,reorderRows:reorderRows,ageRows:ageRows,lossRows:lossRows,sizeRows:sizeRows,newRows:newRows,moverRows:moverRows,drainRows:drainRows,recvRows:recvRows};
+  window._acData={priceRows:priceRows,statusRows:statusRows,reorderRows:reorderRows,ageRows:ageRows,lossRows:lossRows,sizeRows:sizeRows,newRows:newRows,moverRows:moverRows,drainRows:drainRows,recvRows:recvRows,priceWatchRows:priceWatchRows};
   document.getElementById('pac').innerHTML=
     '<div style="max-width:1100px">'
     +'<div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px">🚨 Insights — Action Center</div>'
@@ -3206,13 +3259,14 @@ function rAC(){
     +cfgInp('newDays','New arrival window (days)','Articles listed on Laam within this many days count as new arrivals')
     +cfgInp('minNet','Min net/pc for bestseller (PKR)','An article must net at least this much per piece (after the 25%% load) to be called a bestseller')
     +'</div>'
-    +sec7+sec8+sec3+sec6+sec5+sec9+sec4+sec10+sec1+sec2
+    +sec7+sec8+sec3+sec6+sec5+sec11+sec9+sec4+sec10+sec1+sec2
     +'</div>';
 }
 function acExpPrice(){csvDL((window._acData.priceRows||[]).map(function(r){return[r.name,r.laam,r.shop,r.diff];}),['Product','Laam Price','Shopify Price','Diff (Laam-Shopify)'],'price_mismatch.csv');}
 function acExpStatus(){csvDL((window._acData.statusRows||[]).map(function(r){return[r.name,r.laamStatus,r.shopStatus,r.stk,r.shopStk!=null?r.shopStk:'',r.blocked?'BLOCKED REVENUE':''];}),['Product','Laam Status','Shopify Status','Laam Stock','Shopify Stock','Flag'],'status_mismatch.csv');}
 function acExpReorder(){csvDL((window._acData.reorderRows||[]).map(function(r){return[r.name,r.v30,Math.round(r.rate*100)/100,r.stk,r.inc,r.eta,Math.round(r.cover),r.net===null?'':r.net,r.sug];}),['Product','Sold 30d','Daily Rate','Stock','Incoming PO','PO ETA','Days Cover','Net Per Piece','Suggested Order Qty'],'reorder_list.csv');}
 function acExpAge(){csvDL((window._acData.ageRows||[]).map(function(r){return[r.name,r.lastSale||'never',r.days===null?'':r.days,r.stk,r.cost,r.val];}),['Product','Last Sale','Days Since Sale','Stock','Unit Cost','Value at Cost'],'stock_ageing.csv');}
+function acExpPW(){csvDL((window._acData.priceWatchRows||[]).map(function(r){return[r.name,r.gross,r.listed,r.listedDisc+'%',r.effDisc+'%',r.extra+'pp',r.avg30,r.drift===null?'':r.drift+'%',r.v30,r.net===null?'':r.net,r.given,r.tags.join('+')];}),['Product','Original Price','Current Price','Listed Disc%','Effective Disc%','Extra Given pp','Avg Paid 30d','Price Drift%','Sold 30d','Net Per Piece','Given Away Per Month','Verdicts'],'discount_price_watch.csv');}
 function acExpMov(){csvDL((window._acData.moverRows||[]).map(function(r){return[r.name,r.dir,r.v7,r.prevWk,r.chg===null?'NEW':r.chg+'%',r.stk,r.coverNew===null?'':r.coverNew];}),['Product','Direction','Sold 7d','Prev Weekly Pace','Change','Stock','Days Cover at New Pace'],'movers_shakers.csv');}
 function acExpDrain(){csvDL((window._acData.drainRows||[]).map(function(r){return[r.name,r.revDel,r.exc,r.refD,r.refLoss,r.canPct+'%',r.bleed,r.total];}),['Product','Delivered Revenue','Excess Commission','Refunded Orders','Refund Loss Est','Cancel%','Loss Bleed Per Month','Total Drain PKR'],'profit_drains.csv');}
 function acExpRecv(){csvDL((window._acData.recvRows||[]).map(function(r){return[r.onum,r.date,r.prd,r.ret,r.days];}),['Order#','Date','Product','Retail','Days Pending'],'receivables_pending.csv');}
