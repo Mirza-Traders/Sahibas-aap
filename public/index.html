@@ -472,6 +472,7 @@ async function initCloud(){
     var r2=await fetch(CLOUD_API+'/roles');var data2=await r2.json();
     if(data2&&typeof data2==='object'&&Object.keys(data2).length>0){
       USERS.forEach(function(u){if(u.role==='Owner')return;if(data2[u.email])u.role=data2[u.email];});
+      window.PUBLISHERS=Array.isArray(data2.__pub)?data2.__pub:[];
       try{localStorage.setItem('sbm_roles',JSON.stringify(data2));}catch(e){}
       applyRoleNav();
     }else{
@@ -794,6 +795,7 @@ function recomputeCosts(){
 // ═══════════════════════════════════════════════════════════════════
 function showDash(){
   recomputeCosts();
+  var pb=document.getElementById('pub-btn');if(pb)pb.style.display=isPublisher(CU)?'':'none';
   document.getElementById('uscreen').style.display='none';
   document.getElementById('dash').style.display='block';
   document.getElementById('f-from').value=META.min_date;
@@ -831,6 +833,12 @@ function showDash(){
   var defTab='ov';
   if(CU&&CU.role!=='Owner'&&CU.role!=='Accountant')defTab='cs';
   setTimeout(()=>{if(defTab==='ov'){rOV();showCostAlert();}else{doST(defTab);}},30);
+}
+// Data Publisher right — Owner always has it; others get it via the Users page
+function isPublisher(u){
+  if(!u)return false;
+  if(u.role==='Owner')return true;
+  return (window.PUBLISHERS||[]).indexOf(u.email)>=0;
 }
 function applyRoleNav(){
   if(!CU)return;
@@ -2113,6 +2121,11 @@ function rUS(){
       +'<td style="padding:9px 10px;font-weight:600;font-size:11px">'+u.name+'</td>'
       +'<td style="padding:9px 10px;font-size:11px;color:#666;font-family:monospace">'+u.email+'</td>'
       +'<td style="padding:9px 10px">'+badge+'</td>'
+      +'<td style="padding:9px 10px;text-align:center">'+(u.role==='Owner'
+        ?'<span title="Owner always has publishing rights" style="color:#27ae60;font-weight:700;font-size:10px">\u2713 always</span>'
+        :(isAdmin
+          ?'<input type="checkbox" '+((window.PUBLISHERS||[]).indexOf(u.email)>=0?'checked':'')+' onchange="togglePublisher('+i+')" style="cursor:pointer;accent-color:var(--gold)" title="Allow this user to publish fresh data to the team">'
+          :((window.PUBLISHERS||[]).indexOf(u.email)>=0?'<span style="color:#27ae60;font-weight:700;font-size:10px">\u2713</span>':'<span style="color:#ddd">\u2014</span>')))+'</td>'
       +'<td style="padding:9px 10px">'+actions+'</td>'
       +'</tr>';
   }).join('');
@@ -2132,6 +2145,7 @@ function rUS(){
     +'<th style="padding:8px 10px;font-size:9px;color:#aaa;text-transform:uppercase">Name</th>'
     +'<th style="padding:8px 10px;font-size:9px;color:#aaa;text-transform:uppercase">Email</th>'
     +'<th style="padding:8px 10px;font-size:9px;color:#aaa;text-transform:uppercase">Role</th>'
+    +'<th style="padding:8px 10px;font-size:9px;color:#aaa;text-transform:uppercase" title="Can upload fresh data files and publish them to the whole team">Data Publisher</th>'
     +'<th style="padding:8px 10px;font-size:9px;color:#aaa;text-transform:uppercase">Actions</th>'
     +'</tr></thead>'
     +'<tbody>'+rows+'</tbody>'
@@ -2465,6 +2479,7 @@ function loadBaked(){
   }catch(e){console.error(e);return false;}
 }
 async function publishSnapshot(){
+  if(!isPublisher(CU)){showToast('You do not have the Data Publisher right.');return;}
   if(!DETAIL.length){showToast('Upload data first, then publish');return;}
   if(!confirm('Publish the currently loaded data to the shared cloud?\n\nEveryone on the team will see this dataset ('+NF(DETAIL.length)+' rows, through '+(META.max_date||'?')+') from their next login.'))return;
   var btn=document.getElementById('pub-btn');var old=btn.textContent;btn.textContent='⏳ Publishing…';btn.disabled=true;
@@ -2578,6 +2593,21 @@ function expDRSel(){var rows=Array.from(_drSel).sort(function(a,b){return a-b;})
 function savePW(email,np){try{var s=JSON.parse(localStorage.getItem('sbm_pw')||'{}');s[email]=np;localStorage.setItem('sbm_pw',JSON.stringify(s));}catch(e){}}
 
 // ── ROLE MANAGEMENT ──
+function togglePublisher(idx){
+  if(!CU||CU.role!=='Owner')return;
+  var em=USERS[idx].email;
+  window.PUBLISHERS=window.PUBLISHERS||[];
+  var i=window.PUBLISHERS.indexOf(em);
+  if(i>=0)window.PUBLISHERS.splice(i,1);else window.PUBLISHERS.push(em);
+  try{
+    var r=JSON.parse(localStorage.getItem('sbm_roles')||'{}');
+    r.__pub=window.PUBLISHERS;
+    localStorage.setItem('sbm_roles',JSON.stringify(r));
+    cloudSave('roles',r);
+  }catch(e){}
+  rendered.us=false;doR('us');
+  showToast(USERS[idx].name+(i>=0?' can no longer publish data.':' can now publish data \u2014 they should log out & back in.'));
+}
 function saveRole(idx,role){
   if(!CU||CU.role!=='Owner')return;
   if(USERS[idx].email===CU.email){showToast('Cannot change your own Owner role.');return;}
