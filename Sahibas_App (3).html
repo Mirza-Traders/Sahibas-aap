@@ -2640,6 +2640,16 @@ function saveCost(name,cost){
   showToast('Cost saved: '+name+' → PKR '+cost.toLocaleString());
   rendered.co=false;doR('co');
 }
+function coEditClick(btn){
+  var n=btn.getAttribute('data-n');
+  document.getElementById('co-name').value=n;
+  document.getElementById('co-cost').value=(window.CM&&window.CM[n])||0;
+  document.getElementById('co-name').focus();
+}
+function coDeleteClick(btn){
+  var n=btn.getAttribute('data-n');
+  if(confirm('Remove cost for '+n+'?'))deleteCost(n);
+}
 function deleteCost(name){
   if(!CU||(CU.role!=='Owner'&&CU.role!=='Accountant'))return;
   if(!window.CM||!(name in window.CM))return;
@@ -2689,7 +2699,7 @@ function rCO(){
   var filtered=q?names.filter(function(n){return n.toLowerCase().indexOf(q)>=0;}):names;
   var capped=q?filtered:filtered.slice(0,100);
   var rows=capped.map(function(n){
-    var safe=JSON.stringify(n);
+    var safeAttr=n.replace(/"/g,'&quot;');
     var img=findImg(n.toLowerCase().trim());
     var thumb=img?'<img src="'+img+'" loading="lazy" data-n="'+n.replace(/"/g,'')+'" onerror="imgFail(this)" style="width:32px;height:40px;object-fit:cover;object-position:top center;border-radius:4px;display:block">':prodPH(n).replace('width:52px;height:52px;font-size:14px','width:32px;height:40px;font-size:11px;border-radius:4px');
     return '<tr style="border-bottom:1px solid #f0ede8">'
@@ -2697,8 +2707,8 @@ function rCO(){
       +'<td style="padding:8px 10px;font-size:11px;font-weight:600">'+n+'</td>'
       +'<td style="padding:8px 10px;font-size:11px;text-align:right;font-family:monospace">PKR '+Number(cm[n]).toLocaleString()+'</td>'
       +'<td style="padding:8px 10px;text-align:right">'
-      +'<button onclick="document.getElementById(\'co-name\').value='+safe+';document.getElementById(\'co-cost\').value='+cm[n]+';document.getElementById(\'co-name\').focus();" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#666;font-weight:600;margin-right:4px">✎ Edit</button>'
-      +'<button onclick="if(confirm(\'Remove cost for '+n.replace(/'/g,"\\'")+'?\'))deleteCost('+safe+')" style="background:#fdf0f0;border:1px solid #f0d0d0;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#c0392b;font-weight:600">✕</button>'
+      +'<button data-n="'+safeAttr+'" onclick="coEditClick(this)" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#666;font-weight:600;margin-right:4px">✎ Edit</button>'
+      +'<button data-n="'+safeAttr+'" onclick="coDeleteClick(this)" style="background:#fdf0f0;border:1px solid #f0d0d0;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#c0392b;font-weight:600">✕</button>'
       +'</td></tr>';
   }).join('');
   var hint=q?(filtered.length+' match'+(filtered.length===1?'':'es')):('Showing first '+capped.length+' of '+names.length+' products — type to search the rest');
