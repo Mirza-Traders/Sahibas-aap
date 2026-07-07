@@ -456,7 +456,20 @@ async function initCloud(){
     var r1=await fetch(CLOUD_API+'/orders');var data1=await r1.json();
     if(Array.isArray(data1)&&data1.length>0){
       window._poData=data1;
-      window._poData.forEach(function(o){if(o.status==='Pending'){o.status='Pending Approval';}});
+      var etaFixed=false;
+      window._poData.forEach(function(o){
+        if(o.status==='Pending'){o.status='Pending Approval';}
+        // Self-heal ETAs that were saved in a non-ISO format (e.g. a free-text
+        // prompt entry like 07/15/2026) before changePoEta() started validating.
+        if(o.targetDate&&!/^\d{4}-\d{2}-\d{2}$/.test(o.targetDate)){
+          var dp=new Date(o.targetDate);
+          if(!isNaN(dp.getTime())){
+            var fixedD=dp.getFullYear()+'-'+String(dp.getMonth()+1).padStart(2,'0')+'-'+String(dp.getDate()).padStart(2,'0');
+            if(fixedD!==o.targetDate){o.targetDate=fixedD;etaFixed=true;}
+          }
+        }
+      });
+      if(etaFixed)cloudSave('orders',window._poData);
       try{localStorage.setItem('sbm_prod_orders',JSON.stringify(window._poData));}catch(e){}
       rendered.po=false;
       var active=document.querySelector('.sb-item.on');
@@ -3666,6 +3679,9 @@ function changePoEta(oid){
   var oldEta=o.targetDate||'';
   var inp=prompt('New ETA date (YYYY-MM-DD):',oldEta);
   if(!inp||inp===oldEta)return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(inp)){showToast('Invalid date — please use YYYY-MM-DD, e.g. 2026-07-15');return;}
+  var dCheck=new Date(inp+'T00:00:00');
+  if(isNaN(dCheck.getTime())||dCheck.toISOString().split('T')[0]!==inp){showToast('That date does not exist — please check it.');return;}
   if(!o.etaLog)o.etaLog=[];
   var today=new Date().toISOString().split('T')[0];
   var timeStr=new Date().toTimeString().split(' ')[0].substring(0,5);
@@ -3920,10 +3936,10 @@ function exportPOCSV(){
   if(selIds.length)rows=rows.filter(function(o){return sel[o.id];});
   if(!rows.length){showToast('No orders to export.');return;}
   function ph(o,k){var p=o.phases&&o.phases[k];if(!p)return'';var st=p.state||(p.done?'done':'none');return st==='done'?'Done':st==='progress'?'In Progress':'';}
-  var hdr=['Date','Order No','Product','Fabric','Customer','Ordered Qty','S','M','L','XL','Status','Cutting','Embroidery','Printing','Stitching','Finishing','ETA','Placed By','Approved By'];
+  var hdr=['Date','Order No','Product','Fabric','Customer','Ordered Qty','S','M','L','XL','Status','Printing','Embroidery','Cutting','Stitching','Finishing','ETA','Placed By','Approved By'];
   var csv=hdr.join(',')+'\n'+rows.map(function(o){
     var rt=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
-    return [fmtDMY(o.date),o.id,o.product,o.fabric||'',o.customer||'',rt,o.S||0,o.M||0,o.L||0,o.XL||0,o.status,ph(o,'cutting'),ph(o,'embroidery'),ph(o,'print'),ph(o,'stitching'),ph(o,'finishing'),fmtDMY(o.targetDate),o.placedBy||'',o.approvedBy||'']
+    return [fmtDMY(o.date),o.id,o.product,o.fabric||'',o.customer||'',rt,o.S||0,o.M||0,o.L||0,o.XL||0,o.status,ph(o,'print'),ph(o,'embroidery'),ph(o,'cutting'),ph(o,'stitching'),ph(o,'finishing'),fmtD(o.targetDate),o.placedBy||'',o.approvedBy||'']
     .map(function(v){return '"'+String(v||'').replace(/"/g,'""')+'"';}).join(',');
   }).join('\n');
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
@@ -4054,9 +4070,9 @@ function rPO(){
    +'<tr style="background:#f8f6f2">'
    +'<th style="'+TH+'background:#fff8e0;color:#a07030">S</th><th style="'+TH+'background:#fff8e0;color:#a07030">M</th>'
    +'<th style="'+TH+'background:#fff8e0;color:#a07030">L</th><th style="'+TH+'background:#fff8e0;color:#a07030">XL</th>'
-   +'<th style="'+TH+'background:#eef3fb;font-size:10px">✂️ Cut</th>'
-   +'<th style="'+TH+'background:#eef3fb;font-size:10px">🌸 Emb</th>'
    +'<th style="'+TH+'background:#eef3fb;font-size:10px">🖨️ Print</th>'
+   +'<th style="'+TH+'background:#eef3fb;font-size:10px">🌸 Emb</th>'
+   +'<th style="'+TH+'background:#eef3fb;font-size:10px">✂️ Cut</th>'
    +'<th style="'+TH+'background:#eef3fb;font-size:10px">🧵 Stitch</th>'
    +'<th style="'+TH+'background:#eef3fb;font-size:10px">✨ Finish</th>'
    +'</tr>'
@@ -4140,8 +4156,8 @@ function rPO(){
        +'<td style="'+TD+'background:#fffbea">'+(o.M||0)+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.L||0)+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.XL||0)+'</td>'
-       +phCell('cutting')+phCell('embroidery')+phCell('print')+phCell('stitching')+phCell('finishing')
-       +(function(){var etaChanged=o.etaLog&&o.etaLog.length>0;var etaTip=etaChanged?o.etaLog.map(function(l){return l.from+' → '+l.to+' by '+l.by+' '+l.date;}).join(' | '):'';var etaColor=etaChanged?'color:#c0392b;font-weight:700':'color:#2980b9';var etaText=o.targetDate?fmtDMY(o.targetDate):'—';var editBtn=(isProdUser||isOwner)&&o.status!=='Completed'&&o.status!=='Cancelled'?' <button onclick="changePoEta(\''+o.id+'\')" style="background:none;border:none;cursor:pointer;font-size:10px;color:#888;padding:0" title="Change ETA">✏️</button>':'';return '<td style="'+TD+etaColor+';font-size:10px;white-space:nowrap" title="'+etaTip+'">'+etaText+editBtn+'</td>';})()
+       +phCell('print')+phCell('embroidery')+phCell('cutting')+phCell('stitching')+phCell('finishing')
+       +(function(){var etaChanged=o.etaLog&&o.etaLog.length>0;var etaTip=etaChanged?o.etaLog.map(function(l){return l.from+' → '+l.to+' by '+l.by+' '+l.date;}).join(' | '):'';var etaColor=etaChanged?'color:#c0392b;font-weight:700':'color:#2980b9';var etaText=o.targetDate?fmtD(o.targetDate):'—';var editBtn=(isProdUser||isOwner)&&o.status!=='Completed'&&o.status!=='Cancelled'?' <button onclick="changePoEta(\''+o.id+'\')" style="background:none;border:none;cursor:pointer;font-size:10px;color:#888;padding:0" title="Change ETA">✏️</button>':'';return '<td style="'+TD+etaColor+';font-size:10px;white-space:nowrap" title="'+etaTip+'">'+etaText+editBtn+'</td>';})()
 
        +urgCell+rmkCell+actCell
        +'</tr>';
