@@ -270,21 +270,12 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
       <div class="dz-info" id="si-s">No files selected</div>
     </div>
 
-    <div class="u-row">
-      <div class="dz cost" id="dz-c" ondragover="dzo(event,'dz-c')" ondragleave="dzl('dz-c')" ondrop="dzd(event,'c')" onclick="document.getElementById('fi-c').click()">
-        <input type="file" id="fi-c" accept=".csv,.xlsx,.xls" onchange="fsel(this,'c')">
-        <div class="dz-ico">💰</div>
-        <div class="dz-lbl">Cost File</div>
-        <div class="dz-hint">Sahibas_Cost_File.csv</div>
-        <div class="dz-info" id="si-c">Not selected</div>
-      </div>
-      <div class="dz stock" id="dz-k" ondragover="dzo(event,'dz-k')" ondragleave="dzl('dz-k')" ondrop="dzd(event,'k')" onclick="document.getElementById('fi-k').click()">
-        <input type="file" id="fi-k" accept=".csv,.xlsx,.xls" onchange="fsel(this,'k')">
-        <div class="dz-ico">📦</div>
-        <div class="dz-lbl">Stock File</div>
-        <div class="dz-hint">Laam inventory export</div>
-        <div class="dz-info" id="si-k">Not selected (optional)</div>
-      </div>
+    <div class="dz stock" id="dz-k" ondragover="dzo(event,'dz-k')" ondragleave="dzl('dz-k')" ondrop="dzd(event,'k')" onclick="document.getElementById('fi-k').click()">
+      <input type="file" id="fi-k" accept=".csv,.xlsx,.xls" onchange="fsel(this,'k')">
+      <div class="dz-ico">📦</div>
+      <div class="dz-lbl">Stock File</div>
+      <div class="dz-hint">Laam inventory export</div>
+      <div class="dz-info" id="si-k">Not selected (optional)</div>
     </div>
 
     <div class="dz" id="dz-sh" style="border-color:#1a1a3a" ondragover="dzo(event,'dz-sh')" ondragleave="dzl('dz-sh')" ondrop="dzd(event,'sh')" onclick="document.getElementById('fi-sh').click()">
@@ -415,7 +406,7 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
 // ═══════════════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════════════
-var salesFiles=[], costFile=null, stockFile=null, shopFile=null;
+var salesFiles=[], stockFile=null, shopFile=null;
 var DETAIL=[], STOCK=[], META={}, STATUSES=[], MONTHS=[];
 var filters={from:'',to:'',stats:[],pf:'',dst:''};
 var SHOP_STOCK={};
@@ -552,15 +543,14 @@ var PROD_IMG={"kriti black":"https://cdn.shopify.com/s/files/1/0648/4213/7654/fi
 // ═══════════════════════════════════════════════════════════════════
 function dzo(e,id){e.preventDefault();document.getElementById(id).classList.add('over');}
 function dzl(id){document.getElementById(id).classList.remove('over');}
-function dzd(e,t){e.preventDefault();var id='dz-'+t;document.getElementById(id).classList.remove('over');var fs=Array.from(e.dataTransfer.files).filter(f=>{var n=f.name.toLowerCase();return n.endsWith('.csv')||n.endsWith('.xlsx')||n.endsWith('.xls');});if(t==='s'){salesFiles=fs;}else if(t==='c'){costFile=fs[0]||null;}else if(t==='sh'){shopFile=fs[0]||null;}else{stockFile=fs[0]||null;}updLabels();}
-function fsel(inp,t){if(t==='s'){salesFiles=Array.from(inp.files);}else if(t==='c'){costFile=inp.files[0]||null;}else if(t==='sh'){shopFile=inp.files[0]||null;}else{stockFile=inp.files[0]||null;}updLabels();}
+function dzd(e,t){e.preventDefault();var id='dz-'+t;document.getElementById(id).classList.remove('over');var fs=Array.from(e.dataTransfer.files).filter(f=>{var n=f.name.toLowerCase();return n.endsWith('.csv')||n.endsWith('.xlsx')||n.endsWith('.xls');});if(t==='s'){salesFiles=fs;}else if(t==='sh'){shopFile=fs[0]||null;}else{stockFile=fs[0]||null;}updLabels();}
+function fsel(inp,t){if(t==='s'){salesFiles=Array.from(inp.files);}else if(t==='sh'){shopFile=inp.files[0]||null;}else{stockFile=inp.files[0]||null;}updLabels();}
 function updLabels(){
   document.getElementById('si-s').textContent=salesFiles.length?salesFiles.length+' file'+(salesFiles.length>1?'s':'')+' selected':'No files selected';
-  document.getElementById('si-c').textContent=costFile?'✓ '+costFile.name:'Not selected';
   document.getElementById('si-k').textContent=stockFile?'✓ '+stockFile.name:'Not selected (optional)';
   document.getElementById('si-sh').textContent=shopFile?'✓ '+shopFile.name:'Not selected (optional — '+Object.keys(SHOP_STATUS).length+' products embedded)';
   document.getElementById('gen-btn').disabled=salesFiles.length===0;
-  document.getElementById('gstatus').textContent=salesFiles.length?salesFiles.length+' sales file(s) ready'+(costFile?' + cost file ✓':'')+(stockFile?' + stock file ✓':'')+(shopFile?' + shopify ✓':''):'Select at least one sales file (CSV or Excel) to begin';
+  document.getElementById('gstatus').textContent=salesFiles.length?salesFiles.length+' sales file(s) ready'+(stockFile?' + stock file ✓':'')+(shopFile?' + shopify ✓':''):'Select at least one sales file (CSV or Excel) to begin';
 }
 function setProg(pct,msg){document.getElementById('pbar').style.width=pct+'%';if(msg)document.getElementById('gstatus').textContent=msg;}
 
@@ -572,11 +562,8 @@ async function generate(){
   document.getElementById('gen-btn').disabled=true;
   setProg(5,'Loading cost file...');
   try{
-    // Cost map
-    // Only overwrite the live cost map when a cost file was actually selected —
-    // otherwise keep whatever initCloud already loaded from the Costs page.
-    if(costFile){var ct=await readFile(costFile);window.CM=buildCostMap(ct);setProg(10,'Cost: '+Object.keys(window.CM).length+' products loaded');}
-    else if(!window.CM)window.CM={};
+    // Cost map — no longer uploaded here; always comes from initCloud (the Costs page).
+    if(!window.CM)window.CM={};
 
     // Shopify products CSV
     if(shopFile){
