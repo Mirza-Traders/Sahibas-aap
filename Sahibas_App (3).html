@@ -4031,10 +4031,15 @@ function rPO(){
   var TDL=TD+'text-align:left;';
   var ST={'Pending Approval':'background:#fff8e0;color:#a07030','In Progress':'background:#e8f8ee;color:#1e8449','Completed':'background:#e8eef8;color:#2471a3','Rejected':'background:#fde8e8;color:#c0392b'};
   function srtArrow(col){var cur=window._poSort||{col:'date',asc:false};if(cur.col===col)return' '+(cur.asc?'▲':'▼');return' <span style="opacity:.25;font-size:9px">↕</span>';}
-  // Table
-  var tbl='<div style="overflow-x:auto;overflow-y:auto;max-height:64vh;border:1px solid #e0dcd4;border-radius:8px">'
-   +'<table style="border-collapse:collapse;min-width:1500px;width:100%;background:#fff">'
-   +'<thead style="position:sticky;top:0;z-index:10">'
+  // Table — virtualized: header lives in its own div, body renders only the
+  // visible slice of rows (like the Detail Report), so the page stays fast
+  // no matter how many orders accumulate.
+  var PO_COLS=[36,92,78,190,92,92,62,62,74,44,44,44,44,92,92,92,92,92,106,96,170,130];
+  var PO_TOT=PO_COLS.reduce(function(a,b){return a+b;},0);
+  var PO_RH=70;
+  var colgroup='<colgroup>'+PO_COLS.map(function(w){return '<col style="width:'+w+'px">';}).join('')+'</colgroup>';
+  var hdr='<table style="border-collapse:collapse;table-layout:fixed;width:'+PO_TOT+'px;background:#fff">'+colgroup
+   +'<thead>'
    // Grouped header row
    +'<tr style="background:#f0ece4">'
    +'<th style="'+TH+'" rowspan="3"><input type="checkbox" '+(allSelCheck?'checked':'')+' onchange="togglePoSelAll(['+allIds.map(function(i){return'\''+i+'\'';}).join(',')+'])" style="cursor:pointer;accent-color:var(--gold)"></th>'
@@ -4071,11 +4076,8 @@ function rPO(){
    +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tXL+'</td>'
    +'<td style="'+TD+'background:#eef3fb" colspan="5"></td>'
    +'</tr>'
-   +'</thead><tbody>';
-  if(active.length===0){
-    tbl+='<tr><td colspan="23" style="padding:40px;text-align:center;color:#bbb;font-size:13px">No orders match the current filter. <a href="#" onclick="clearPoFlt();return false" style="color:var(--gold)">Clear filters</a></td></tr>';
-  } else {
-    active.forEach(function(o,i){
+   +'</thead></table>';
+  function poRowHtml(o,i){
       var rt=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
       var isSel=!!sel[o.id];
       var isInit=CU&&(o.placedBy===CU.name||o.placedByEmail===CU.email);
@@ -4122,19 +4124,21 @@ function rPO(){
       if(rmkPreview){rmkCell+='<div onclick="togglePoRemarks(\''+o.id+'\')" style="cursor:pointer;font-size:10px;color:#555;max-height:32px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Click to expand">'+rmkPreview.substring(0,40)+(rmkPreview.length>40?'…':'')+(rmkCount>1?' <span style="color:var(--gold);font-weight:700">('+rmkCount+')</span>':'')+'</div>';}
       else{rmkCell+='<div onclick="togglePoRemarks(\''+o.id+'\')" style="cursor:pointer;font-size:9px;color:#ccc" title="Click to add remark">+ Add</div>';}
       rmkCell+='</td>';
-      var actCell='<td style="'+TD+'min-width:80px"><div style="display:flex;flex-direction:column;gap:3px;align-items:stretch">';
+      // Compact 2-per-line layout so the tallest possible action set still
+      // fits the fixed virtual row height.
+      var actCell='<td style="'+TD+'"><div style="display:flex;flex-wrap:wrap;gap:3px">';
       if(o.status==='Pending Approval'&&isOwner){
-        actCell+='<button onclick="approvePO(\''+o.id+'\')" style="background:#27ae60;color:#fff;border:none;border-radius:4px;padding:3px 7px;font-size:10px;cursor:pointer;font-weight:700">✓ Approve</button>';
-        actCell+='<button onclick="rejectPO(\''+o.id+'\')" style="background:#fff;border:1px solid #c0392b;color:#c0392b;border-radius:4px;padding:3px 7px;font-size:10px;cursor:pointer">✗ Reject</button>';
+        actCell+='<button onclick="approvePO(\''+o.id+'\')" style="flex:1 1 45%;background:#27ae60;color:#fff;border:none;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:700;white-space:nowrap">✓ Approve</button>';
+        actCell+='<button onclick="rejectPO(\''+o.id+'\')" style="flex:1 1 45%;background:#fff;border:1px solid #c0392b;color:#c0392b;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">✗ Reject</button>';
       }
-      if(canPrint)actCell+='<button onclick="printPO(\''+o.id+'\')" style="background:#f0f5fb;border:1px solid #a0c0e0;color:#2471a3;border-radius:4px;padding:3px 7px;font-size:10px;cursor:pointer;font-weight:600">🖨️ Print</button>';
-      if((isOwner||isInit)&&o.status!=='Completed'&&o.status!=='Cancelled'&&o.status!=='Rejected')actCell+='<button onclick="cancelPO(\''+o.id+'\')" style="background:none;border:1px solid #eee;color:#c0392b;border-radius:4px;padding:2px 5px;font-size:9px;cursor:pointer">Cancel</button>';
+      if(canPrint)actCell+='<button onclick="printPO(\''+o.id+'\')" style="flex:1 1 45%;background:#f0f5fb;border:1px solid #a0c0e0;color:#2471a3;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:600;white-space:nowrap">🖨️ Print</button>';
+      if((isOwner||isInit)&&o.status!=='Completed'&&o.status!=='Cancelled'&&o.status!=='Rejected')actCell+='<button onclick="cancelPO(\''+o.id+'\')" style="flex:1 1 45%;background:none;border:1px solid #eee;color:#c0392b;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">Cancel</button>';
       actCell+='</div></td>';
-      tbl+='<tr style="background:'+bg+'">'
+      return '<tr style="height:'+PO_RH+'px;background:'+bg+'">'
        +'<td style="'+TD+'"><input type="checkbox" '+(isSel?'checked':'')+' onchange="togglePoSel(\''+o.id+'\')" style="cursor:pointer;accent-color:var(--gold)"></td>'
        +'<td style="'+TDL+'color:#888;white-space:nowrap">'+fmtDMY(o.date)+'</td>'
        +'<td style="'+TD+'font-weight:700;color:var(--gold2)">'+o.id+'</td>'
-       +'<td style="'+TDL+'"><div style="font-weight:600;margin-bottom:2px">'+o.product+'</div><span style="'+stBadge+'">'+o.status+'</span></td>'
+       +'<td style="'+TDL+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+o.product+'</div><span style="'+stBadge+'">'+o.status+'</span></td>'
        +'<td style="'+TD+'">'+  (o.customer||'—')+'</td>'
        +'<td style="'+TD+'">'+  (o.fabric||'—')+'</td>'
        +imgCell+scCell
@@ -4148,12 +4152,54 @@ function rPO(){
 
        +urgCell+rmkCell+actCell
        +'</tr>';
-    });
   }
-  tbl+='</tbody></table></div>';
   var overlay=window._poDrop?'<div onclick="togglePoDrop(\'\')" style="position:fixed;inset:0;z-index:499"></div>':'';
   var prodBanner=isProdUser?'<div style="background:#f0f8f0;border:1px solid #a8d8a8;border-radius:8px;padding:10px 16px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:12px;color:#1e6b3c"><span style="font-size:18px">🏭</span><span><b>Production Dashboard</b> — Tap <b>Mark</b> to start a phase (turns orange 🔄), tap <b>🔄 In Prog</b> when complete (turns green ✓). Each action is logged with your name &amp; time. Completed phases cannot be undone.</span></div>':'';
-  el.innerHTML=kh+overlay+prodBanner+toolbar+tbl;
+  el.innerHTML=kh+overlay+prodBanner+toolbar
+   +'<div id="po-outer" style="overflow-x:auto;border:1px solid #e0dcd4;border-radius:8px;background:#fff">'
+   +'<div id="po-hdr" style="overflow:hidden">'+hdr+'</div>'
+   +(active.length===0
+     ?'<div style="padding:40px;text-align:center;color:#bbb;font-size:13px;width:100%">No orders match the current filter. <a href="#" onclick="clearPoFlt();return false" style="color:var(--gold)">Clear filters</a></div>'
+     :'<div id="po-vs" style="overflow-y:auto;max-height:64vh;position:relative">'
+      +'<div id="po-sp" style="position:relative;width:'+PO_TOT+'px;height:'+(active.length*PO_RH)+'px">'
+      +'<div id="po-rv" style="position:absolute;left:0;right:0;top:0"></div>'
+      +'</div></div>')
+   +'</div>';
+  // Virtual slice renderer — only the rows in (or near) the viewport exist in the DOM.
+  var vs=document.getElementById('po-vs');
+  if(vs){
+    var visCount=Math.ceil((vs.clientHeight||window.innerHeight*0.64)/PO_RH)+8;
+    var lastStart=-1,lastEnd=-1;
+    function poSliceHtml(a,b){var h='';for(var i=a;i<b;i++)h+=poRowHtml(active[i],i);return h;}
+    function renderPoSlice(){
+      // Header follows horizontal scroll on every tick (cheap)...
+      document.getElementById('po-hdr').scrollLeft=vs.scrollLeft;
+      // ...rows only change when the viewport crosses a row boundary, and even
+      // then existing rows are REUSED — only the 1-2 rows entering the window
+      // get built, so scrolling never rebuilds the whole slice.
+      var start=Math.max(0,Math.floor(vs.scrollTop/PO_RH)-2);
+      if(start===lastStart)return;
+      var rv=document.getElementById('po-rv');if(!rv)return;
+      var end=Math.min(start+visCount,active.length);
+      var tb=rv.querySelector('tbody');
+      if(tb&&lastStart>=0&&start>lastStart&&start<lastEnd){
+        // scrolled down: drop rows off the top, append new ones at the bottom
+        for(var d=0;d<start-lastStart&&tb.rows.length;d++)tb.deleteRow(0);
+        if(end>lastEnd)tb.insertAdjacentHTML('beforeend',poSliceHtml(lastEnd,end));
+      }else if(tb&&lastStart>=0&&start<lastStart&&end>lastStart){
+        // scrolled up: drop rows off the bottom, prepend new ones on top
+        for(var d2=0;d2<lastEnd-end&&tb.rows.length;d2++)tb.deleteRow(tb.rows.length-1);
+        tb.insertAdjacentHTML('afterbegin',poSliceHtml(start,lastStart));
+      }else{
+        // first render or a jump larger than the window: full slice
+        rv.innerHTML='<table style="border-collapse:collapse;table-layout:fixed;width:'+PO_TOT+'px;background:#fff">'+colgroup+'<tbody>'+poSliceHtml(start,end)+'</tbody></table>';
+      }
+      rv.style.top=(start*PO_RH)+'px';
+      lastStart=start;lastEnd=end;
+    }
+    vs.addEventListener('scroll',renderPoSlice,{passive:true});
+    renderPoSlice();
+  }
 }
 
 // ── CHANGE PASSWORD (self-service) ──
