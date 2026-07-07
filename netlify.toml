@@ -2,4 +2,9 @@
   base = "."
   command = "echo done"
   publish = "public"
-  ignore = "git diff --quiet HEAD^ HEAD -- . ':!data'"
+  # Skip the build when nothing outside data/ changed since the LAST DEPLOYED
+  # commit (CACHED_COMMIT_REF). Comparing against HEAD^ would only inspect the
+  # newest commit of a push — a multi-commit deploy push ending in a data-only
+  # merge commit would be silently skipped. Fallback: if the refs are missing
+  # (first build, deep history), git diff exits non-zero and the build runs.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ':!data'"
