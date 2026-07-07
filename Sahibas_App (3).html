@@ -1494,8 +1494,12 @@ function rCS(){
   gRow+='<th colspan="4" style="background:#f0ede8;padding:3px 9px;position:sticky;left:0;z-index:9;border-bottom:1px solid #e0dcd4;text-align:left;color:var(--gold2);font-size:10px">Summary Sheet</th>';
   if(hasStock&&G.pricing){gRow+='<th colspan="3" style="background:#fdf3e8;color:#c8a96e;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8">Gross Price &amp; Disc%</th>';}
   if(hasStock){gRow+='<th colspan="3" style="background:#fdf3e8;color:#2980b9;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8;border-right:2px solid #c8a96e">Retail Price</th>';}
-  gRow+='<th colspan="'+(G.gp?3:1)+'" style="background:#ecfaec;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #c3e6cb">Gross Profit</th>';
-  gRow+='<th colspan="'+(G.gp?3:1)+'" style="background:#f0fff4;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #b8e8d0">Net P&amp;L</th>';
+  if(G.gp){
+    gRow+='<th colspan="3" style="background:#ecfaec;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #c3e6cb">Gross Profit</th>';
+    gRow+='<th colspan="3" style="background:#f0fff4;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #b8e8d0">Net P&amp;L</th>';
+  }else{
+    gRow+='<th colspan="2" style="background:#f0fff4;color:#27ae60;text-align:center;padding:3px;border-bottom:1px solid #b8e8d0">Net P&amp;L</th>';
+  }
   gRow+='<th colspan="'+(G.s_sales?5:1)+'" style="background:#e8f8f5;color:#16a085;text-align:center;padding:3px;border-bottom:2px solid #16a085">📊 Sales Qty</th>';
   if(G.totals){gRow+='<th colspan="2" style="background:#fff5e8;color:#e67e22;text-align:center;padding:3px;border-bottom:1px solid #f0c080">Revenue Detail</th>';}
   gRow+='<th colspan="'+(G.orders?5:1)+'" style="background:#f0ede8;color:#555;text-align:center;padding:3px;border-bottom:2px solid #999">Order Status</th>';
@@ -1531,11 +1535,13 @@ function rCS(){
     cRow+='<th data-fl="1" data-c="shopPrice" onclick="csSort(this)" style="padding:6px 8px;background:#dce8f8;border-bottom:2px solid #e8e4dc;text-align:right;min-width:75px;white-space:nowrap;cursor:pointer;user-select:none">Shopify'+((_csSortCol==='shopPrice'&&_csSortAsc)?' ↑':(_csSortCol==='shopPrice'&&!_csSortAsc)?' ↓':'')+'</th>';
     cRow+='<th data-fl="1" data-c="priceDiff" onclick="csSort(this)" style="padding:6px 8px;background:#fff0f0;border-bottom:2px solid #e8e4dc;text-align:right;min-width:55px;white-space:nowrap;cursor:pointer;user-select:none">Diff'+((_csSortCol==='priceDiff'&&_csSortAsc)?' ↑':(_csSortCol==='priceDiff'&&!_csSortAsc)?' ↓':'')+'</th>';
   }
-  if(G.gp)cRow+=mkTH('Cost','cost',hbg,'right',65);
-  if(G.gp)cRow+=mkTH('GP','gpUnit','#ecfaec','right',70);
-  cRow+=mkTH('GP%','gpPct','#ecfaec','right',55);
-  if(G.gp)cRow+=mkTH('Commission','commission','#f9f5ff','right',85);
-  if(G.gp)cRow+=mkTH('Net Profit','netPat','#f0fff4','right',80);
+  if(G.gp){
+    cRow+=mkTH('Cost','cost',hbg,'right',65);
+    cRow+=mkTH('GP','gpUnit','#ecfaec','right',70);
+    cRow+=mkTH('GP%','gpPct','#ecfaec','right',55);
+    cRow+=mkTH('Commission','commission','#f9f5ff','right',85);
+  }
+  cRow+=mkTH('Net Profit','netPat','#f0fff4','right',80);
   cRow+=mkTH('Net Profit%','netPatPct','#f0fff4','right',70);
   if(G.s_sales){cRow+=mkTH('S','szS','#e8f8f5','right',38)+mkTH('M','szM','#e8f8f5','right',38)+mkTH('L','szL','#e8f8f5','right',38)+mkTH('XL','szXL','#e8f8f5','right',38);}
   cRow+=mkTH('Total Sales','szTotal','#e8f8f5','right',65);
@@ -1582,9 +1588,8 @@ function rCS(){
    +'<td data-fl="1" style="padding:5px 8px;background:'+totBg+'"></td>'
    +(hasStock&&G.pricing?'<td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td>':'')
    +(hasStock?'<td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td>':'')
-   +(G.gp?tdc('—','color:#bbb')+tdc('—','background:#ecfaec;color:#bbb'):'')
-   +tdc('—','background:#ecfaec;color:#bbb')
-   +(G.gp?tdc('—','background:#f9f5ff;color:#bbb')+tdc('—','background:#f0fff4;color:#bbb'):'')
+   +(G.gp?tdc('—','color:#bbb')+tdc('—','background:#ecfaec;color:#bbb')+tdc('—','background:#ecfaec;color:#bbb')+tdc('—','background:#f9f5ff;color:#bbb'):'')
+   +tdc('—','background:#f0fff4;color:#bbb')
    +tdc('—','background:#f0fff4;color:#bbb')
    +(G.s_sales?tdc(NF(totSzS),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzM),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzL),'background:#e8f8f5;color:#16a085')+tdc(NF(totSzXL),'background:#e8f8f5;color:#16a085'):'')
    +tdc(NF(totSzS+totSzM+totSzL+totSzXL),'background:#e8f8f5;color:#16a085;font-weight:800')
@@ -1638,10 +1643,10 @@ function rCS(){
      +'<td data-fl="1" class="cs-c cs-bg9 cs-lb cs-fw6">'+(p.shopPrice>0?NF(p.shopPrice):'-')+'</td>'
      +'<td data-fl="1" class="cs-c" style="background:#fff0f0;'+(p.priceDiff!=null?(p.priceDiff!==0?'color:#c0392b;font-weight:700':'color:#27ae60;font-weight:600'):'color:#bbb')+'">'+(p.priceDiff!=null?(p.priceDiff===0?'✓':NF(p.priceDiff)):'-')+'</td>':'')
      +(G.gp?'<td class="cs-c cs-dk">'+NF(p.cost)+'</td>'
-     +'<td class="cs-c cs-bg2 cs-fw '+(p.gpUnit>0?'cs-g':'cs-gy')+'">'+(p.gpUnit>0?NF(p.gpUnit):'-')+'</td>':'')
+     +'<td class="cs-c cs-bg2 cs-fw '+(p.gpUnit>0?'cs-g':'cs-gy')+'">'+(p.gpUnit>0?NF(p.gpUnit):'-')+'</td>'
      +'<td class="cs-c cs-bg2 cs-fw" style="color:'+(p.gpPct>=20?'#27ae60':p.gpPct>=10?'#d4944a':'#c0392b')+'">'+(p.gpPct>0?p.gpPct+'%':'-')+'</td>'
-     +(G.gp?'<td class="cs-c cs-bg3 cs-pu">'+(p.commission>0?NF(p.commission):'-')+'</td>'
-     +'<td class="cs-c cs-bg4 '+npc+'">'+(p.netPat!==0?NF(p.netPat):'-')+(p.netPat<0?' ⚠':'')+'</td>':'')
+     +'<td class="cs-c cs-bg3 cs-pu">'+(p.commission>0?NF(p.commission):'-')+'</td>':'')
+     +'<td class="cs-c cs-bg4 '+npc+'">'+(p.netPat!==0?NF(p.netPat):'-')+(p.netPat<0?' ⚠':'')+'</td>'
      +'<td class="cs-c cs-bg4 '+npc+'">'+(p.netPatPct!==0?p.netPatPct+'%':'-')+'</td>'
      +(G.s_sales?'<td class="cs-c cs-bg5">'+(p.szS||'-')+'</td><td class="cs-c cs-bg5">'+(p.szM||'-')+'</td><td class="cs-c cs-bg5">'+(p.szL||'-')+'</td><td class="cs-c cs-bg5">'+(p.szXL||'-')+'</td>':'')
      +'<td class="cs-c cs-bg5 cs-fw cs-tl">'+(p.szTotal||'-')+'</td>'
