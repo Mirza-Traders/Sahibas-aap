@@ -91,6 +91,24 @@ export default {
         });
       }
 
+      // GET /tickets — read all refund/exchange tickets
+      if (path === '/tickets' && request.method === 'GET') {
+        const data = await env.PO_STORE.get('tickets');
+        return new Response(data || '[]', {
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // POST /tickets — save all refund/exchange tickets
+      if (path === '/tickets' && request.method === 'POST') {
+        const body = await request.text();
+        JSON.parse(body); // reject broken payloads
+        await env.PO_STORE.put('tickets', body);
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
       // GET /customers — read the saved list of customer/buyer names
       if (path === '/customers' && request.method === 'GET') {
         const data = await env.PO_STORE.get('customers');
