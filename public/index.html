@@ -3126,6 +3126,11 @@ function rAC(){
   var TD='padding:6px 9px;font-size:11px;text-align:right;border-bottom:1px solid #f0ede8;white-space:nowrap;';
   var TDL=TD+'text-align:left;';
   function thumb(r){return r.img?'<img src="'+r.img+(r.img.indexOf('?')>=0?'&':'?')+'width=60" loading="lazy" data-n="'+r.name.replace(/"/g,'')+'" onerror="imgFail(this)" style="width:30px;height:38px;object-fit:cover;object-position:top center;border-radius:4px;display:block">':prodPH(r.name).replace('width:52px;height:52px;font-size:14px','width:30px;height:38px;font-size:10px;border-radius:4px');}
+  // Product name opens the full-size photo, same convention as the Summary Sheet
+  function acName(r){
+    if(r.img&&String(r.img).indexOf('http')===0)return '<a href="'+r.img+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+r.name+'</a>';
+    return r.name;
+  }
   function secHead(ico,title,count,color,sub,expId){
     return '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:2px solid '+color+';background:#fff">'
      +'<span style="font-size:17px">'+ico+'</span>'
@@ -3141,7 +3146,7 @@ function rAC(){
 
   // Section 1 — Price mismatches
   var h1rows=priceRows.map(function(r){
-    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+r.name+'</td>'
+    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'">'+NF(r.laam)+'</td><td style="'+TD+'">'+NF(r.shop)+'</td>'
      +'<td style="'+TD+'font-weight:700;color:'+(r.diff>0?'#c0392b':'#2980b9')+'">'+(r.diff>0?'+':'')+NF(r.diff)+'</td>'
      +'<td style="'+TD+'color:#888">'+(r.shop>0?Math.round(Math.abs(r.diff)/r.shop*100)+'%':'—')+'</td></tr>';
@@ -3152,7 +3157,7 @@ function rAC(){
   // Section 2 — Status mismatches
   var h2rows=statusRows.map(function(r){
     var badge=function(s,act){return '<span style="padding:2px 7px;border-radius:3px;font-size:8px;font-weight:700;'+(act?'background:#e8f8ee;color:#27ae60':'background:#fdeaea;color:#c0392b')+'">'+s+'</span>';};
-    return '<tr'+(r.blocked?' style="background:#fff8f0"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+r.name+'</td>'
+    return '<tr'+(r.blocked?' style="background:#fff8f0"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'text-align:center">'+badge(r.laamStatus,r.laamStatus==='ACTIVE')+'</td>'
      +'<td style="'+TD+'text-align:center">'+badge(r.shopStatus,r.shopStatus==='ACTIVE')+'</td>'
      +'<td style="'+TD+'">'+NF(r.stk)+'</td><td style="'+TD+'">'+(r.shopStk!=null?NF(r.shopStk):'—')+'</td>'
@@ -3165,7 +3170,7 @@ function rAC(){
   var h3rows=reorderRows.map(function(r){
     var cv=Math.round(r.cover);
     var cvColor=cv<cfg.lead?'#c0392b':cv<cfg.lead+cfg.safety?'#d4944a':'#27ae60';
-    return '<tr'+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' style="opacity:.55"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+r.name+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
+    return '<tr'+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' style="opacity:.55"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
      +'<td style="'+TD+'">'+r.v30+'</td><td style="'+TD+'">'+(Math.round(r.rate*10)/10)+'/day</td>'
      +'<td style="'+TD+'font-weight:700;color:'+(r.stk===0?'#c0392b':'#333')+'">'+NF(r.stk)+'</td>'
      +'<td style="'+TD+'">'+(r.inc>0?NF(r.inc)+(r.eta?' <span style="color:#888;font-size:9px">('+fmtDMY(r.eta)+')</span>':''):'—')+'</td>'
@@ -3182,7 +3187,7 @@ function rAC(){
   var h4rows=ageRows.map(function(r){
     var bucket=r.days===null?'Never sold':r.days>=90?'90+ days':r.days>=60?'60–90 days':r.days>=30?'30–60 days':r.days+' days';
     var bColor=r.days===null||r.days>=90?'#c0392b':r.days>=60?'#d4780a':r.days>=30?'#d4944a':'#888';
-    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+r.name+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
+    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
      +'<td style="'+TD+'">'+(r.lastSale?fmtDMY(r.lastSale):'<span style="color:#c0392b;font-weight:700">never</span>')+'</td>'
      +'<td style="'+TD+'font-weight:800;color:'+bColor+'">'+(r.days===null?'∞':r.days)+'</td>'
      +'<td style="'+TD+'text-align:center"><span style="background:'+bColor+'18;color:'+bColor+';padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700">'+bucket+'</span></td>'
@@ -3194,7 +3199,7 @@ function rAC(){
 
   // Section 5 — Selling at a loss
   var h5rows=lossRows.map(function(r){
-    return '<tr'+(r.v30>0?' style="background:#fff5f5"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+r.name+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#888">('+r.laamStatus+')</span>':'')+'</td>'
+    return '<tr'+(r.v30>0?' style="background:#fff5f5"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#888">('+r.laamStatus+')</span>':'')+'</td>'
      +'<td style="'+TD+'color:#888">'+(r.gross>0?NF(r.gross):'—')+'</td>'
      +'<td style="'+TD+'">'+(r.disc>0?'<span style="color:#c0392b;font-weight:700">'+r.disc+'%</span>':'—')+'</td>'
      +'<td style="'+TD+'font-weight:600">'+NF(r.retail)+'</td>'
@@ -3213,7 +3218,7 @@ function rAC(){
   var h8rows=moverRows.map(function(r){
     var up=r.dir==='RISING';
     return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
-     +'<td style="'+TDL+'font-weight:600">'+r.name+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
+     +'<td style="'+TDL+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
      +'<td style="'+TD+'text-align:center"><span style="background:'+(up?'#e8f8ee':'#eef2f8')+';color:'+(up?'#1e8449':'#5070a0')+';padding:2px 9px;border-radius:3px;font-size:9px;font-weight:800">'+(up?'▲ RISING':'▼ COOLING')+'</span></td>'
      +'<td style="'+TD+'font-weight:700">'+r.v7+'</td>'
      +'<td style="'+TD+'color:#888">'+r.prevWk+'/wk</td>'
@@ -3227,7 +3232,7 @@ function rAC(){
   // Section 9 — Profit drains
   var h9rows=drainRows.slice(0,150).map(function(r){
     return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
-     +'<td style="'+TDL+'font-weight:600">'+r.name+'</td>'
+     +'<td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'">'+N(r.revDel)+'</td>'
      +'<td style="'+TD+'color:'+(r.exc>0?'#c0392b;font-weight:700':'#bbb')+'">'+(r.exc>0?NF(r.exc):'—')+'</td>'
      +'<td style="'+TD+'">'+(r.refD>0?r.refD+' <span style="color:#888;font-size:9px">('+r.refPct+'%)</span>':'—')+'</td>'
@@ -3261,7 +3266,7 @@ function rAC(){
   var h11rows=priceWatchRows.map(function(r){
     var badges=r.tags.map(function(t){var v=PWT[t];return '<span style="background:'+v.bg+';color:'+v.fg+';padding:2px 7px;border-radius:3px;font-size:8px;font-weight:800;white-space:nowrap;display:inline-block;margin:1px 0">'+v.lbl+'</span>';}).join('<br>');
     return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
-     +'<td style="'+TDL+'font-weight:600">'+r.name+'</td>'
+     +'<td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'color:#888">'+NF(r.gross)+'</td>'
      +'<td style="'+TD+'">'+NF(r.listed)+'</td>'
      +'<td style="'+TD+'">'+r.listedDisc+'%</td>'
@@ -3282,7 +3287,7 @@ function rAC(){
   var h7rows=newRows.map(function(r){
     var v=NV[r.verdict];
     return '<tr'+(r.verdict==='SELLOUT'?' style="background:#fff8f0"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
-     +'<td style="'+TDL+'font-weight:600">'+r.name+'</td>'
+     +'<td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'white-space:nowrap">'+fmtDMY(r.launch.toISOString().split('T')[0])+' <span style="color:#aaa;font-size:9px">('+r.daysLive+'d)</span></td>'
      +'<td style="'+TD+'">'+(r.first14||'-')+'</td>'
      +'<td style="'+TD+'font-weight:700">'+r.sold+'</td>'
@@ -3310,7 +3315,7 @@ function rAC(){
   var h6rows=sizeRows.map(function(r){
     var note=r.unsized>0?'<div style="font-size:8px;color:#b06000;margin-top:2px">⚠ '+NF(r.unsized)+' pcs incoming without size split'+(r.eta?' (ETA '+fmtDMY(r.eta)+')':'')+' — confirm it covers '+(r.broken.length?r.broken.join('/'):'the weak sizes')+'</div>':'';
     return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
-     +'<td style="'+TDL+'font-weight:600">'+r.name+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+note+'</td>'
+     +'<td style="'+TDL+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+note+'</td>'
      +'<td style="'+TD+'">'+(r.retail>0?NF(r.retail):'—')+'</td>'
      +'<td style="'+TD+'font-weight:700">'+r.v30+'</td>'
      +r.cells.map(szCell).join('')
