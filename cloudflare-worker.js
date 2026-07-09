@@ -1,6 +1,7 @@
 const REPO_OWNER = 'Mirza-Traders';
 const REPO_NAME = 'Sahibas-aap';
 const COSTS_PATH = 'data/costs.json';
+const ORDERS_PATH = 'data/orders.json';
 const CUSTOMERS_PATH = 'data/customers.json';
 const FABRICS_PATH = 'data/fabrics.json';
 const SALES_SNAPSHOT_PATH = 'data/sales-snapshot.json';
@@ -198,11 +199,21 @@ export default {
         });
       }
 
-      // POST /orders — save all orders
+      // POST /orders — save all orders, and mirror them into the GitHub repo
+      // so a daily offline review can read Production Orders without calling this Worker.
       if (path === '/orders' && request.method === 'POST') {
         const body = await request.text();
         await env.PO_STORE.put('orders', body);
-        return new Response(JSON.stringify({ ok: true }), {
+        try {
+          await mirrorJsonToGitHub(env, ORDERS_PATH, body, 'Auto-sync production orders from app');
+        } catch (mirrorErr) {
+          // Orders are already saved to KV (the live source for the app) — a GitHub
+          // mirror hiccup shouldn't fail the user's save action. Surface it instead.
+          return new Response(JSON.stringify({ ok: true, githubMirror: 'failed', detail: mirrorErr.message }), {
+            headers: { ...cors, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true, githubMirror: 'ok' }), {
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
       }
