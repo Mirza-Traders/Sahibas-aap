@@ -7,6 +7,94 @@ const SALES_SNAPSHOT_PATH = 'data/sales-snapshot.json';
 const SHOPIFY_SNAPSHOT_PATH = 'data/shopify-snapshot.json';
 const COSTS_BRANCH = 'main';
 
+// Login lasts this long before the user must sign in again.
+const TOKEN_TTL_DAYS = 30;
+
+// Seed credentials — used ONLY to first-populate the KV user store, and only
+// if it's empty. After that, KV ('auth_users') is the source of truth and
+// password changes/resets persist there. This file lives server-side in a
+// PRIVATE repo and is never served to browsers, so these are not publicly
+// exposed the way the old in-HTML passwords were. Rotate them post-launch to
+// remove plaintext from source entirely.
+const SEED_USERS = [
+  { name: 'Junaid Sarwar', email: 'junaidsarwar82@gmail.com', pass: '0000' },
+  { name: 'Bano Hussain', email: 'banohussain720@gmail.com', pass: 'Bano@2026' },
+  { name: 'Bilal MBA', email: 'bilalmba246@gmail.com', pass: 'Bilal@2026' },
+  { name: 'Ch Toseef Manzoor', email: 'am2066949@gmail.com', pass: 'Toseef@2026' },
+  { name: 'Elite Tech Services', email: 'infoelitetechservices@gmail.com', pass: 'Elite@2026' },
+  { name: 'Javeria Rehman', email: 'javeriarehman510@gmail.com', pass: 'Javeria@2026' },
+  { name: 'Kamran Maqsood', email: 'kamranmaqsood128@gmail.com', pass: 'Kamran@2026' },
+  { name: 'M. Shahbaz Alam', email: 'mshahbazalam.2000@gmail.com', pass: 'Shahbaz@2026' },
+  { name: 'Mubasher Iqbal', email: 'mubbasheriqbal32@gmail.com', pass: 'Mubasher@2026' },
+  { name: 'RZ', email: 'rz1753431@gmail.com', pass: 'Rz@2026' },
+  { name: 'Sahibas by Mirza', email: 'sahibasbymirza@gmail.com', pass: 'Sahibas@2026' },
+  { name: 'Sahibas US', email: 'sahibasus2211@gmail.com', pass: 'SahibasUS@2026' },
+  { name: 'Sana', email: 'sana28042002@gmail.com', pass: 'Sana@2026' },
+  { name: 'Zaid', email: 'zaid77870@gmail.com', pass: 'Zaid@2026' },
+  { name: 'Zee', email: 'zee4729291@gmail.com', pass: 'Zee@2026' },
+  { name: 'Zeeshan Shafayt', email: 'zeeshanshafaytex@gmail.com', pass: 'Zeeshan@2026' },
+];
+
+// ── AUTH PRIMITIVES ──────────────────────────────────────────────────────
+const enc = new TextEncoder();
+function b64urlFromBytes(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64urlFromStr(str) { return b64urlFromBytes(enc.encode(str)); }
+function strFromB64url(b64) {
+  b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  return decodeURIComponent(Array.prototype.map.call(atob(b64), function (c) {
+    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+  }).join(''));
+}
+async function hmac(secret, msg) {
+  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(msg));
+  return b64urlFromBytes(new Uint8Array(sig));
+}
+async function sha256Hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
+  return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+}
+function hashPassword(secret, pw) { return sha256Hex(pw + '::' + secret); }
+
+async function makeToken(secret, payloadObj) {
+  const payload = b64urlFromStr(JSON.stringify(payloadObj));
+  const sig = await hmac(secret, payload);
+  return payload + '.' + sig;
+}
+// Returns the payload object if the token is valid & unexpired, else null.
+async function verifyToken(secret, token) {
+  if (!token || token.indexOf('.') < 0) return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const expected = await hmac(secret, parts[0]);
+  // constant-time-ish compare
+  if (expected.length !== parts[1].length) return null;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ parts[1].charCodeAt(i);
+  if (diff !== 0) return null;
+  let obj;
+  try { obj = JSON.parse(strFromB64url(parts[0])); } catch (e) { return null; }
+  if (!obj.exp || obj.exp < Math.floor(Date.now() / 1000)) return null;
+  return obj;
+}
+
+// Loads (seeding on first use) the KV user store: { email: {name, hash} }.
+async function loadAuthUsers(env) {
+  const raw = await env.PO_STORE.get('auth_users');
+  if (raw) { try { return JSON.parse(raw); } catch (e) { /* fall through to reseed */ } }
+  const map = {};
+  for (const u of SEED_USERS) {
+    map[u.email.toLowerCase()] = { name: u.name, hash: await hashPassword(env.AUTH_SECRET, u.pass) };
+  }
+  await env.PO_STORE.put('auth_users', JSON.stringify(map));
+  return map;
+}
+
 export default {
   // Runs on the Cron Trigger configured in the dashboard (e.g. daily). My sandbox
   // can't reach this Worker directly, so the daily bake job commits the fresh
@@ -20,7 +108,7 @@ export default {
     const cors = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     };
 
     if (request.method === 'OPTIONS') {
@@ -30,6 +118,78 @@ export default {
     const path = url.pathname;
 
     try {
+      if (!env.AUTH_SECRET) {
+        return new Response(JSON.stringify({ error: 'AUTH_SECRET not configured on the Worker' }), {
+          status: 500, headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // POST /login — exchange email+password for a signed session token.
+      if (path === '/login' && request.method === 'POST') {
+        let body; try { body = await request.json(); } catch (e) { body = {}; }
+        const email = String(body.email || '').toLowerCase().trim();
+        const pw = String(body.password || '');
+        const users = await loadAuthUsers(env);
+        const u = users[email];
+        const ok = u && (await hashPassword(env.AUTH_SECRET, pw)) === u.hash;
+        if (!ok) {
+          return new Response(JSON.stringify({ ok: false, error: 'Incorrect email or password.' }), {
+            status: 401, headers: { ...cors, 'Content-Type': 'application/json' },
+          });
+        }
+        const exp = Math.floor(Date.now() / 1000) + TOKEN_TTL_DAYS * 86400;
+        const token = await makeToken(env.AUTH_SECRET, { email, exp });
+        return new Response(JSON.stringify({ ok: true, token, user: { name: u.name, email } }), {
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // POST /change-password — self-service, requires a valid token.
+      if (path === '/change-password' && request.method === 'POST') {
+        const auth = await verifyToken(env.AUTH_SECRET, (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
+        if (!auth) return new Response(JSON.stringify({ ok: false, error: 'Not authenticated' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
+        let body; try { body = await request.json(); } catch (e) { body = {}; }
+        const users = await loadAuthUsers(env);
+        const u = users[auth.email];
+        if (!u || (await hashPassword(env.AUTH_SECRET, String(body.oldPassword || ''))) !== u.hash) {
+          return new Response(JSON.stringify({ ok: false, error: 'Current password is incorrect.' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
+        const np = String(body.newPassword || '');
+        if (np.length < 6) return new Response(JSON.stringify({ ok: false, error: 'New password must be at least 6 characters.' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+        u.hash = await hashPassword(env.AUTH_SECRET, np);
+        await env.PO_STORE.put('auth_users', JSON.stringify(users));
+        return new Response(JSON.stringify({ ok: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+
+      // POST /admin-reset-pw — Owner resets someone else's password.
+      if (path === '/admin-reset-pw' && request.method === 'POST') {
+        const auth = await verifyToken(env.AUTH_SECRET, (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
+        if (!auth || auth.email !== 'junaidsarwar82@gmail.com') {
+          return new Response(JSON.stringify({ ok: false, error: 'Only the Owner can reset passwords.' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
+        let body; try { body = await request.json(); } catch (e) { body = {}; }
+        const target = String(body.email || '').toLowerCase().trim();
+        const np = String(body.newPassword || '');
+        if (np.length < 6) return new Response(JSON.stringify({ ok: false, error: 'Password must be at least 6 characters.' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+        const users = await loadAuthUsers(env);
+        if (!users[target]) return new Response(JSON.stringify({ ok: false, error: 'Unknown user.' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
+        users[target].hash = await hashPassword(env.AUTH_SECRET, np);
+        await env.PO_STORE.put('auth_users', JSON.stringify(users));
+        return new Response(JSON.stringify({ ok: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+
+      // Health + sync endpoints stay open: they return only status (no business
+      // data) and the sync links are triggered by pasting a URL in a browser,
+      // where an Authorization header can't be added.
+      const OPEN = (path === '/' || path === '/ping' || path === '/sync-now' || path === '/sync-shopify-now');
+      if (!OPEN) {
+        const auth = await verifyToken(env.AUTH_SECRET, (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
+        if (!auth) {
+          return new Response(JSON.stringify({ error: 'Not authenticated' }), {
+            status: 401, headers: { ...cors, 'Content-Type': 'application/json' },
+          });
+        }
+      }
       // GET /orders — read all orders
       if (path === '/orders' && request.method === 'GET') {
         const data = await env.PO_STORE.get('orders');
