@@ -3713,7 +3713,11 @@ function addCustomerPrompt(){
   showToast('Added "'+name+'" to Customers.');
 }
 
+var _poEditId=null;
 function openNewPO(name){
+  _poEditId=null;
+  var t=document.getElementById('po-modal-title');if(t)t.textContent='📋 New Production Order';
+  var sb=document.getElementById('po-submit-btn');if(sb)sb.textContent='Place Order →';
   var dl=document.getElementById('po-prodlist');
   dl.innerHTML='';
   var seen={};
@@ -3870,7 +3874,98 @@ function poStockPositionHtml(k,cur,curLabel){
   return html;
 }
 
-function closePO(){document.getElementById('po-modal').style.display='none';}
+function closePO(){document.getElementById('po-modal').style.display='none';_poEditId=null;}
+// Owner may edit any order at any stage; the placer may edit their own order
+// only until it's approved.
+function poCanEdit(o){
+  if(!o||!CU)return false;
+  if(CU.role==='Owner')return true;
+  var isInit=(o.placedBy===CU.name||o.placedByEmail===CU.email);
+  return isInit&&o.status==='Pending Approval';
+}
+function openEditPO(oid){
+  var orders=loadPO();
+  var o=orders.find(function(x){return x.id===oid;});
+  if(!o){showToast('Order not found.');return;}
+  if(!poCanEdit(o)){showToast('You can only edit your own order before it is approved.');return;}
+  _poEditId=oid;
+  var t=document.getElementById('po-modal-title');if(t)t.textContent='✏️ Edit '+o.id;
+  var sb=document.getElementById('po-submit-btn');if(sb)sb.textContent='Save Changes →';
+  var dl=document.getElementById('po-prodlist');dl.innerHTML='';var seen={};
+  DETAIL.forEach(function(r){if(!seen[r[1]]){seen[r[1]]=1;var op=document.createElement('option');op.value=r[1];dl.appendChild(op);}});
+  document.getElementById('po-prod').value=o.product||'';
+  poPopulateFabricSelect(o.fabric||'');
+  poPopulateCustomerSelect(o.customer||'');
+  // Feeding the stored per-size quantities in as the "ratio" with total = their
+  // sum reproduces exactly the same split via poCalcQty (round(sum*S/sum)=S).
+  var s=o.S||0,m=o.M||0,l=o.L||0,xl=o.XL||0,sum=s+m+l+xl;
+  document.getElementById('po-qty').value=sum>0?sum:(o.total||'');
+  document.getElementById('po-rs').value=s;document.getElementById('po-rm').value=m;
+  document.getElementById('po-rl').value=l;document.getElementById('po-rxl').value=xl;
+  poCalcQty();
+  document.getElementById('po-urgency').value=o.urgency||'ROUTINE';
+  document.getElementById('po-notes').value=o.notes||'';
+  document.getElementById('po-target').value=o.targetDate||'';
+  _poSizeChart=o.sizeChart||'';_poSizeChartName=o.sizeChartName||'';
+  document.getElementById('po-sc-info').innerHTML=o.sizeChart?'<span style="color:var(--gold)">✓ '+(o.sizeChartName||'attached')+' (tap to replace)</span>':'📎 Click to attach size chart (image or PDF)';
+  document.getElementById('po-sc-area').style.borderColor=o.sizeChart?'var(--gold)':'#444';
+  document.getElementById('po-datedisp').textContent=o.date||'';
+  document.getElementById('po-stkhint').innerHTML='';
+  if(o.product)poProdHint(o.product);
+  document.getElementById('po-modal').style.display='flex';
+}
+// ── SET SIZE RATIO (compact) — for orders placed with a total qty but no
+// size split yet; the split can be decided later (e.g. at cutting/stitching).
+// Available to Owner, the order's placer, and Production users on any active order.
+var _ssId=null;
+function poCanSetSizes(o){
+  if(!o||!CU)return false;
+  if(o.status==='Cancelled'||o.status==='Rejected')return false;
+  if(CU.role==='Owner'||CU.role==='Production')return true;
+  return (o.placedBy===CU.name||o.placedByEmail===CU.email);
+}
+function sizesMissing(o){return o&&(o.total>0)&&((o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0)===0);}
+function openSetSizes(oid){
+  var orders=loadPO();
+  var o=orders.find(function(x){return x.id===oid;});
+  if(!o){showToast('Order not found.');return;}
+  if(!poCanSetSizes(o)){showToast('Not allowed to set sizes on this order.');return;}
+  _ssId=oid;
+  document.getElementById('ss-title').textContent='📐 Set Size Ratio — '+o.id;
+  document.getElementById('ss-sub').textContent=o.product+' · total '+(o.total||0)+' pcs';
+  document.getElementById('ss-total').value=o.total||0;
+  document.getElementById('ss-rs').value=o.S||0;document.getElementById('ss-rm').value=o.M||0;
+  document.getElementById('ss-rl').value=o.L||0;document.getElementById('ss-rxl').value=o.XL||0;
+  ssCalc();
+  document.getElementById('ss-modal').style.display='flex';
+}
+function closeSetSizes(){document.getElementById('ss-modal').style.display='none';_ssId=null;}
+function ssSetRatio(s,m,l,xl){document.getElementById('ss-rs').value=s;document.getElementById('ss-rm').value=m;document.getElementById('ss-rl').value=l;document.getElementById('ss-rxl').value=xl;ssCalc();}
+function ssCalc(){
+  var total=parseInt(document.getElementById('ss-total').value)||0;
+  var rs=parseFloat(document.getElementById('ss-rs').value)||0,rm=parseFloat(document.getElementById('ss-rm').value)||0,rl=parseFloat(document.getElementById('ss-rl').value)||0,rxl=parseFloat(document.getElementById('ss-rxl').value)||0;
+  var rsum=rs+rm+rl+rxl,qs=0,qm=0,ql=0,qxl=0;
+  if(rsum>0&&total>0){qs=Math.round(total*rs/rsum);qm=Math.round(total*rm/rsum);ql=Math.round(total*rl/rsum);qxl=total-qs-qm-ql;}
+  document.getElementById('ss-qs').textContent=qs;document.getElementById('ss-qm').textContent=qm;
+  document.getElementById('ss-ql').textContent=ql;document.getElementById('ss-qxl').textContent=qxl;
+  window._ssSplit={S:qs,M:qm,L:ql,XL:qxl};
+}
+function saveSetSizes(){
+  if(!_ssId)return;
+  var sp=window._ssSplit||{S:0,M:0,L:0,XL:0};
+  var sum=sp.S+sp.M+sp.L+sp.XL;
+  if(sum<=0){showToast('Enter a ratio to split the quantity.');return;}
+  var orders=loadPO();
+  var o=orders.find(function(x){return x.id===_ssId;});
+  if(!o){showToast('Order not found.');closeSetSizes();return;}
+  if(!poCanSetSizes(o)){showToast('Not allowed.');closeSetSizes();return;}
+  o.S=sp.S;o.M=sp.M;o.L=sp.L;o.XL=sp.XL;o.total=sum;
+  var nowD=new Date();
+  o.editLog=o.editLog||[];
+  o.editLog.push({by:CU?CU.name:'',date:nowD.toISOString().split('T')[0],time:nowD.toTimeString().slice(0,5),note:'set sizes '+sp.S+'/'+sp.M+'/'+sp.L+'/'+sp.XL});
+  savePO(orders);var id=_ssId;closeSetSizes();rendered.po=false;doR('po');
+  showToast('✓ Sizes set for '+id);
+}
 function closePoReview(){var m=document.getElementById('po-review-modal');if(m)m.style.display='none';}
 function openPoReview(oid){
   var orders=loadPO();
@@ -3926,6 +4021,23 @@ function submitPO(){
   if(!_poSizeChart){showToast('Please attach the Size Chart ✱');return;}
   if(!tot){showToast('Enter total ordered quantity.');return;}
   var orders=loadPO();
+  // EDIT MODE — update the existing order in place, keep its id/status/phases/
+  // approval history, and log who changed it.
+  if(_poEditId){
+    var eo=orders.find(function(x){return x.id===_poEditId;});
+    if(!eo){showToast('Order not found.');_poEditId=null;return;}
+    if(!poCanEdit(eo)){showToast('Not allowed to edit this order.');_poEditId=null;return;}
+    eo.product=prod;eo.img=findImg(prod.toLowerCase().trim());
+    eo.S=s;eo.M=m;eo.L=l;eo.XL=xl;eo.total=tot;
+    eo.fabric=fabric;eo.customer=customer;eo.sizeChart=_poSizeChart;eo.sizeChartName=_poSizeChartName;
+    eo.urgency=urgency;eo.notes=notes;eo.targetDate=document.getElementById('po-target').value||'';
+    var nowD=new Date();
+    eo.editLog=eo.editLog||[];
+    eo.editLog.push({by:CU?CU.name:'',date:nowD.toISOString().split('T')[0],time:nowD.toTimeString().slice(0,5)});
+    savePO(orders);var editedId=_poEditId;_poEditId=null;closePO();rendered.po=false;doR('po');
+    showToast('✓ '+editedId+' updated');
+    return;
+  }
   var id='PO-'+String(orders.length+1).padStart(3,'0');
   var today=new Date().toISOString().split('T')[0];
   var img=findImg(prod.toLowerCase().trim());
@@ -4079,6 +4191,9 @@ function printPO(oid){
   var orders=loadPO();
   var o=orders.find(function(x){return x.id===oid;});
   if(!o){showToast('Order not found.');return;}
+  // Print stays locked until the order is approved (In Progress) — the placer
+  // cannot print an order that's still Pending Approval or Rejected.
+  if(o.status==='Pending Approval'||o.status==='Rejected'){showToast('This order can be printed only after it is approved.');return;}
   showToast('Preparing print…');
   var imgUrl=o.img&&o.img.startsWith('http')?o.img:'';
   if(imgUrl){
@@ -4452,6 +4567,9 @@ function rPO(){
         actCell+='<button onclick="approvePO(\''+o.id+'\')" style="flex:1 1 45%;background:#27ae60;color:#fff;border:none;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:700;white-space:nowrap">✓ Approve</button>';
         actCell+='<button onclick="rejectPO(\''+o.id+'\')" style="flex:1 1 45%;background:#fff;border:1px solid #c0392b;color:#c0392b;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">✗ Reject</button>';
       }
+      if(poCanEdit(o))actCell+='<button onclick="openEditPO(\''+o.id+'\')" style="flex:1 1 45%;background:#f5f0fb;border:1px solid #c0a8e0;color:#7040a0;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:600;white-space:nowrap">✏️ Edit</button>';
+      if(sizesMissing(o)&&poCanSetSizes(o))actCell+='<button onclick="openSetSizes(\''+o.id+'\')" style="flex:1 1 45%;background:#fff6e8;border:1px solid #e8c080;color:#a06010;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:700;white-space:nowrap">📐 Set Sizes</button>';
+      else if(poCanSetSizes(o)&&o.status!=='Completed')actCell+='<button onclick="openSetSizes(\''+o.id+'\')" style="flex:1 1 45%;background:#faf8f2;border:1px solid #ddd;color:#888;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">📐 Sizes</button>';
       if(canPrint)actCell+='<button onclick="printPO(\''+o.id+'\')" style="flex:1 1 45%;background:#f0f5fb;border:1px solid #a0c0e0;color:#2471a3;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:600;white-space:nowrap">🖨️ Print</button>';
       if((isOwner||isInit)&&o.status!=='Completed'&&o.status!=='Cancelled'&&o.status!=='Rejected')actCell+='<button onclick="cancelPO(\''+o.id+'\')" style="flex:1 1 45%;background:none;border:1px solid #eee;color:#c0392b;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">Cancel</button>';
       actCell+='</div></td>';
@@ -4463,7 +4581,7 @@ function rPO(){
        +'<td style="'+TD+'">'+  (o.customer||'—')+'</td>'
        +'<td style="'+TD+'">'+  (o.fabric||'—')+'</td>'
        +imgCell+scCell
-       +'<td style="'+TD+'font-weight:700;background:#fdf8f0;color:var(--gold2)">'+rt+'</td>'
+       +'<td style="'+TD+'font-weight:700;background:#fdf8f0;color:var(--gold2)">'+rt+(sizesMissing(o)?'<br><span style="font-size:8px;color:#a06010;font-weight:700">⚠ sizes not set</span>':'')+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.S||0)+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.M||0)+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.L||0)+'</td>'
@@ -5459,7 +5577,7 @@ function toggleSB(){
 <div id="po-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9000;align-items:center;justify-content:center">
   <div style="background:#1a1a1a;border-radius:14px;padding:26px 22px;width:min(540px,96vw);max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.7)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <div style="color:#fff;font-size:16px;font-weight:700;letter-spacing:.02em">📋 New Production Order</div>
+      <div id="po-modal-title" style="color:#fff;font-size:16px;font-weight:700;letter-spacing:.02em">📋 New Production Order</div>
       <button onclick="closePO()" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer;line-height:1;padding:2px 6px">✕</button>
     </div>
 
@@ -5542,7 +5660,7 @@ function toggleSB(){
 
     <div style="font-size:10px;color:#555;margin-bottom:16px">Order Date: <strong style="color:#888" id="po-datedisp"></strong></div>
     <div style="display:flex;gap:10px">
-      <button onclick="submitPO()" style="flex:1;background:var(--gold);color:#111;border:none;border-radius:8px;padding:13px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.02em">Place Order →</button>
+      <button id="po-submit-btn" onclick="submitPO()" style="flex:1;background:var(--gold);color:#111;border:none;border-radius:8px;padding:13px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.02em">Place Order →</button>
       <button onclick="closePO()" style="background:#252525;color:#666;border:1px solid #3a3a3a;border-radius:8px;padding:13px 18px;font-size:13px;cursor:pointer">Cancel</button>
     </div>
   </div>
@@ -5551,6 +5669,47 @@ function toggleSB(){
 <!-- ── PENDING-APPROVAL REVIEW MODAL (read-only stock context before approving) ── -->
 <div id="po-review-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9000;align-items:center;justify-content:center">
   <div class="pr-body" style="background:#1a1a1a;border-radius:14px;padding:26px 22px;width:min(560px,96vw);max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.7)"></div>
+</div>
+
+<!-- ── SET SIZE RATIO MODAL (decide the S/M/L/XL split later, e.g. at cutting) ── -->
+<div id="ss-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#1a1a1a;border-radius:14px;padding:24px 22px;width:min(440px,96vw);box-shadow:0 24px 64px rgba(0,0,0,.7)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div id="ss-title" style="color:#fff;font-size:15px;font-weight:700">📐 Set Size Ratio</div>
+      <button onclick="closeSetSizes()" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer;line-height:1;padding:2px 6px">✕</button>
+    </div>
+    <div id="ss-sub" style="font-size:11px;color:#888;margin-bottom:16px"></div>
+    <label style="display:block;font-size:10px;color:#888;margin-bottom:5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Total Qty to Split</label>
+    <input id="ss-total" type="number" min="1" oninput="ssCalc()" style="width:130px;background:#1a1a1a;border:1px solid #444;color:#fff;border-radius:6px;padding:8px 11px;font-size:14px;font-weight:700;outline:none;margin-bottom:14px">
+    <div style="font-size:10px;color:#666;margin-bottom:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase">Ratio <span style="color:#555;font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">— tap a preset or type your own</span></div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <button onclick="ssSetRatio(1,2,2,1)" style="background:#252525;border:1px solid #3a3a3a;color:#aaa;border-radius:20px;padding:4px 13px;font-size:10px;cursor:pointer;font-weight:700">1:2:2:1</button>
+      <button onclick="ssSetRatio(1,3,3,1)" style="background:#252525;border:1px solid #3a3a3a;color:#aaa;border-radius:20px;padding:4px 13px;font-size:10px;cursor:pointer;font-weight:700">1:3:3:1</button>
+      <button onclick="ssSetRatio(1,1,1,1)" style="background:#252525;border:1px solid #3a3a3a;color:#aaa;border-radius:20px;padding:4px 13px;font-size:10px;cursor:pointer;font-weight:700">1:1:1:1</button>
+      <button onclick="ssSetRatio(1,2,1,0)" style="background:#252525;border:1px solid #3a3a3a;color:#aaa;border-radius:20px;padding:4px 13px;font-size:10px;cursor:pointer;font-weight:700">1:2:1:0</button>
+    </div>
+    <div style="display:grid;grid-template-columns:52px 1fr 1fr 1fr 1fr;gap:5px;align-items:center">
+      <div></div>
+      <div style="text-align:center;font-size:11px;color:#aaa;font-weight:700">S</div>
+      <div style="text-align:center;font-size:11px;color:#aaa;font-weight:700">M</div>
+      <div style="text-align:center;font-size:11px;color:#aaa;font-weight:700">L</div>
+      <div style="text-align:center;font-size:11px;color:#aaa;font-weight:700">XL</div>
+      <div style="font-size:10px;color:#666;font-weight:600">Ratio:</div>
+      <input id="ss-rs" type="number" min="0" value="0" oninput="ssCalc()" style="background:#1a1a1a;border:1px solid #444;color:#ddd;border-radius:6px;padding:7px 4px;font-size:13px;text-align:center;outline:none;width:100%;box-sizing:border-box">
+      <input id="ss-rm" type="number" min="0" value="0" oninput="ssCalc()" style="background:#1a1a1a;border:1px solid #444;color:#ddd;border-radius:6px;padding:7px 4px;font-size:13px;text-align:center;outline:none;width:100%;box-sizing:border-box">
+      <input id="ss-rl" type="number" min="0" value="0" oninput="ssCalc()" style="background:#1a1a1a;border:1px solid #444;color:#ddd;border-radius:6px;padding:7px 4px;font-size:13px;text-align:center;outline:none;width:100%;box-sizing:border-box">
+      <input id="ss-rxl" type="number" min="0" value="0" oninput="ssCalc()" style="background:#1a1a1a;border:1px solid #444;color:#ddd;border-radius:6px;padding:7px 4px;font-size:13px;text-align:center;outline:none;width:100%;box-sizing:border-box">
+      <div style="font-size:10px;color:#666;font-weight:600">Qty:</div>
+      <div id="ss-qs" style="text-align:center;font-size:15px;font-weight:700;color:#fff;background:#1e2a1e;border-radius:6px;padding:8px 4px;border:1px solid #2a3a2a">0</div>
+      <div id="ss-qm" style="text-align:center;font-size:15px;font-weight:700;color:#fff;background:#1e2a1e;border-radius:6px;padding:8px 4px;border:1px solid #2a3a2a">0</div>
+      <div id="ss-ql" style="text-align:center;font-size:15px;font-weight:700;color:#fff;background:#1e2a1e;border-radius:6px;padding:8px 4px;border:1px solid #2a3a2a">0</div>
+      <div id="ss-qxl" style="text-align:center;font-size:15px;font-weight:700;color:#fff;background:#1e2a1e;border-radius:6px;padding:8px 4px;border:1px solid #2a3a2a">0</div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button onclick="saveSetSizes()" style="flex:1;background:var(--gold);color:#111;border:none;border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer">Save Sizes →</button>
+      <button onclick="closeSetSizes()" style="background:#252525;color:#666;border:1px solid #3a3a3a;border-radius:8px;padding:12px 18px;font-size:13px;cursor:pointer">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── PRINT FRAME ── -->
