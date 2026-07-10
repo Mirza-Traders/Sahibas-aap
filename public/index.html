@@ -2815,125 +2815,151 @@ function rCO(){
 }
 
 // ── DISCOUNT CALCULATOR ──
-// Uses the same commission/tax formula as the live sales data (see parseSales
-// above): commission% comes from RATES[platform|destination], tax% is 6% Local
-// / 2% International. No CSV row exists yet for a hypothetical price, so RATES
-// is the best available estimate rather than an actual per-order rate.
-window._dc={name:'',img:'',cost:0,price:0,platform:'MARKETPLACE',dest:'LOCAL',qty:0,base:10};
+// Mirrors the Summary Sheet's own pricing formula exactly (see rCS above):
+// Gross Price = pre-discount anchor, Retail Price = what's actually charged,
+// Commission = flat 25% of Retail Price, Net Profit = (Retail-Cost)-Commission.
+// Breakeven Retail = Cost/0.75, same formula already used on the Insights page.
+var DC_COMM_RATE=0.25;
+window._dc={name:'',img:'',cost:0,gross:0,retail:0,discPct:0,qty:0,mode:'forward'};
 function dcCostIdx(){var cm=window.CM||{},idx={};Object.keys(cm).forEach(function(k){idx[k.toLowerCase().trim()]=cm[k];});return idx;}
 function dcProductOptions(){
-  return Object.keys(SHOP_PRICE||{}).sort().map(function(k){
-    var label=k.replace(/\w\S*/g,function(t){return t.charAt(0).toUpperCase()+t.slice(1);});
+  return Object.keys(STOCK_PRODS||{}).filter(function(k){var sp=STOCK_PRODS[k];return sp.grossPrice>0||sp.price>0;}).sort().map(function(k){
+    var label=STOCK_PRODS[k].title;
     return '<option value="'+label.replace(/"/g,'&quot;')+'">';
   }).join('');
 }
+function dcRecalc(){
+  // Keeps gross/retail/discPct internally consistent after any single field edit.
+  var d=window._dc;
+  if(d.mode==='forward'){
+    d.retail=d.gross>0?Math.round(d.gross*(1-d.discPct/100)):0;
+  }else{
+    d.gross=(d.discPct<100)?Math.round(d.retail/(1-d.discPct/100)):0;
+  }
+}
 function dcPick(val){
   var key=(val||'').toLowerCase().trim();
+  var sp=(STOCK_PRODS||{})[key];
   var d=window._dc;
   d.name=val;
-  d.price=(SHOP_PRICE||{})[key]||0;
   d.cost=dcCostIdx()[key]||0;
-  d.qty=(SHOP_STOCK||{})[key]||0;
-  d.img=findImg(key)||'';
+  d.gross=sp?sp.grossPrice:0;
+  d.retail=sp?sp.price:0;
+  d.discPct=(d.gross>0&&d.retail>0)?Math.round((d.gross-d.retail)/d.gross*100):0;
+  d.qty=sp?sp.total:0;
+  d.img=(sp&&sp.img)?sp.img:findImg(key)||'';
   rendered.dc=false;doR('dc');
 }
+function dcSetMode(m){window._dc.mode=m;dcRecalc();rendered.dc=false;doR('dc');}
 function dcSet(field,val){
   var d=window._dc;
-  if(field==='price'||field==='cost'||field==='qty'||field==='base')d[field]=parseFloat(val)||0;
-  else d[field]=val;
+  d[field]=parseFloat(val)||0;
+  dcRecalc();
   rendered.dc=false;doR('dc');
 }
-function dcCalcRow(discountPct){
-  var d=window._dc;
-  var sellPrice=d.price*(1-discountPct/100);
-  var commPct=RATES[d.platform+'|'+d.dest]||15;
-  var taxPct=d.dest==='INTERNATIONAL'?2:6;
-  var commission=sellPrice*commPct/100;
-  var tax=sellPrice*taxPct/100;
-  var net=sellPrice-commission-tax;
-  var profit=net-d.cost;
-  var margin=sellPrice>0?profit/sellPrice*100:0;
-  return {discountPct,sellPrice,commPct,commission,taxPct,tax,net,profit,margin};
+function dcPnl(retail,cost){
+  // Rounds Commission to the nearest rupee before subtracting, same order the
+  // Summary Sheet uses (rCS above) — keeps the two reports pixel-for-pixel identical.
+  var gp=retail>0&&cost>0?retail-cost:0;
+  var gpPct=retail>0&&cost>0?gp/retail*100:0;
+  var commission=retail>0?Math.round(retail*DC_COMM_RATE):0;
+  var netProfit=(retail>0&&cost>0)?gp-commission:0;
+  var netPct=retail>0&&cost>0?netProfit/retail*100:0;
+  return {gp,gpPct,commission,netProfit,netPct};
 }
 function rDC(){
   var allowed=CU&&(CU.role==='Owner'||CU.role==='Accountant');
   if(!allowed){document.getElementById('pdc').innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Not authorized.</div>';return;}
   var d=window._dc;
-  var hasProduct=d.name&&d.price>0;
+  var hasProduct=!!d.name;
   var thumb=d.img?'<img src="'+d.img+'" loading="lazy" style="width:52px;height:66px;object-fit:cover;object-position:top center;border-radius:6px;border:1px solid #e8e4dc">':'<div style="width:52px;height:66px;border-radius:6px;background:#f5f3ee;border:1px solid #e8e4dc;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:10px">no photo</div>';
-  var costWarn=hasProduct&&!d.cost?'<div style="background:#fff3e0;color:#a35b00;border-radius:6px;padding:8px 12px;font-size:11px;margin-top:10px">No cost on file for this product — add it on the Costs page first, or the numbers below will show a false 100% margin.</div>':'';
+  var costWarn=hasProduct&&!d.cost?'<div style="background:#fff3e0;color:#a35b00;border-radius:6px;padding:8px 12px;font-size:11px;margin-top:10px">No cost on file for this product — add it on the Costs page first, or the numbers below will show a false margin.</div>':'';
+  var field=function(lbl,inner){return '<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">'+lbl+'</label>'+inner+'</div>';};
+  var modeTab=function(m,lbl){return '<button onclick="dcSetMode(\''+m+'\')" style="padding:7px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid '+(d.mode===m?'var(--gold)':'#e0dcd4')+';background:'+(d.mode===m?'#fff8e6':'#f5f5f5')+';color:'+(d.mode===m?'var(--gold2)':'#777')+'">'+lbl+'</button>';};
 
-  var levels=[0,5,10,15,20,25,30];
-  if(levels.indexOf(d.base)<0)levels.push(d.base);
-  levels=levels.filter(function(v,i,a){return a.indexOf(v)===i;}).sort(function(a,b){return a-b;});
-  var rows=levels.map(function(lvl){
-    var r=dcCalcRow(lvl);
-    var loss=r.profit<0;
-    var isBase=lvl===d.base;
-    return '<tr style="'+(isBase?'background:#fff8e6;font-weight:700;':'')+'border-bottom:1px solid #f0ede8">'
-      +'<td style="padding:7px 10px">'+lvl+'%'+(isBase?' <span style="font-size:9px;color:var(--gold2)">◀ your pick</span>':'')+'</td>'
-      +'<td style="padding:7px 10px;text-align:right;font-family:monospace">PKR '+Math.round(r.sellPrice).toLocaleString()+'</td>'
-      +'<td style="padding:7px 10px;text-align:right;font-family:monospace;color:#999">-'+Math.round(r.commission).toLocaleString()+'</td>'
-      +'<td style="padding:7px 10px;text-align:right;font-family:monospace;color:#999">-'+Math.round(r.tax).toLocaleString()+'</td>'
-      +'<td style="padding:7px 10px;text-align:right;font-family:monospace;font-weight:700;color:'+(loss?'var(--red)':'var(--green)')+'">'+(loss?'-':'')+'PKR '+Math.abs(Math.round(r.profit)).toLocaleString()+(loss?' ⚠':'')+'</td>'
-      +'<td style="padding:7px 10px;text-align:right;font-family:monospace">'+r.margin.toFixed(1)+'%</td>'
-      +'</tr>';
-  }).join('');
+  var pnl=dcPnl(d.retail,d.cost);
 
-  var baseRow=dcCalcRow(d.base),plus5Row=dcCalcRow(d.base+5);
-  var deltaPerPc=plus5Row.profit-baseRow.profit;
-  var deltaTotal=deltaPerPc*(d.qty||0);
-  var impactBox=!hasProduct?'':
-    '<div style="background:#fdf0f0;border:1px solid #f5d5d5;border-radius:8px;padding:14px 16px;margin-top:14px">'
-    +'<div style="font-size:11px;font-weight:700;color:#a03030;margin-bottom:6px">If you go 5% deeper — from '+d.base+'% to '+(d.base+5)+'% discount</div>'
-    +'<div style="font-size:12px;color:#555">Profit per piece drops from <strong>PKR '+Math.round(baseRow.profit).toLocaleString()+'</strong> to <strong>PKR '+Math.round(plus5Row.profit).toLocaleString()+'</strong> ('+(deltaPerPc<0?'-':'+')+'PKR '+Math.abs(Math.round(deltaPerPc)).toLocaleString()+') — margin goes from '+baseRow.margin.toFixed(1)+'% to '+plus5Row.margin.toFixed(1)+'%.</div>'
-    +(d.qty>0?'<div style="font-size:12px;color:#555;margin-top:4px">Across your <strong>'+d.qty+' units</strong> in stock, that\'s a total swing of <strong style="color:'+(deltaTotal<0?'var(--red)':'var(--green)')+'">'+(deltaTotal<0?'-':'+')+'PKR '+Math.abs(Math.round(deltaTotal)).toLocaleString()+'</strong>.</div>':'')
+  var summaryBlock=!hasProduct?'':
+    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px">'
+    +'<div class="kpi b"><div class="kl">Retail Price</div><div class="kv">PKR '+Math.round(d.retail).toLocaleString()+'</div><div class="ks">Gross PKR '+Math.round(d.gross).toLocaleString()+' · '+d.discPct+'% off</div></div>'
+    +'<div class="kpi g"><div class="kl">GP</div><div class="kv">PKR '+Math.round(pnl.gp).toLocaleString()+'</div><div class="ks">'+pnl.gpPct.toFixed(1)+'% GP</div></div>'
+    +'<div class="kpi w"><div class="kl">Commission (25%)</div><div class="kv">PKR '+Math.round(pnl.commission).toLocaleString()+'</div><div class="ks">of retail price</div></div>'
+    +'<div class="kpi '+(pnl.netProfit<0?'r':'e')+'"><div class="kl">Net Profit</div><div class="kv" style="color:'+(pnl.netProfit<0?'var(--red)':'inherit')+'">PKR '+Math.round(pnl.netProfit).toLocaleString()+(pnl.netProfit<0?' ⚠':'')+'</div><div class="ks">'+pnl.netPct.toFixed(1)+'% NP</div></div>'
+    +'<div class="kpi b"><div class="kl">Cost</div><div class="kv">PKR '+Math.round(d.cost).toLocaleString()+'</div><div class="ks">'+(d.qty?d.qty+' in stock':'—')+'</div></div>'
     +'</div>';
 
-  // Breakeven discount — the exact % where profit hits zero
-  var commPct=RATES[d.platform+'|'+d.dest]||15,taxPct=d.dest==='INTERNATIONAL'?2:6;
-  var netFactor=1-(commPct+taxPct)/100;
+  // Forward-mode ladder: fixed Gross Price, vary Discount% — shows Retail Price
+  // moving with it, exactly answering "what happens to retail price as discount rises."
+  var ladder='';
+  if(hasProduct&&d.mode==='forward'&&d.gross>0){
+    var levels=[0,5,10,15,20,25,30,40,50,60];
+    if(levels.indexOf(d.discPct)<0)levels.push(d.discPct);
+    levels=levels.filter(function(v,i,a){return a.indexOf(v)===i&&v>=0&&v<100;}).sort(function(a,b){return a-b;});
+    var rows=levels.map(function(lvl){
+      var retail=Math.round(d.gross*(1-lvl/100));
+      var p=dcPnl(retail,d.cost);
+      var loss=p.netProfit<0;
+      var isBase=lvl===d.discPct;
+      return '<tr style="'+(isBase?'background:#fff8e6;font-weight:700;':'')+'border-bottom:1px solid #f0ede8">'
+        +'<td style="padding:7px 10px">'+lvl+'%'+(isBase?' <span style="font-size:9px;color:var(--gold2)">◀ your pick</span>':'')+'</td>'
+        +'<td style="padding:7px 10px;text-align:right;font-family:monospace">PKR '+retail.toLocaleString()+'</td>'
+        +'<td style="padding:7px 10px;text-align:right;font-family:monospace;color:#999">'+(d.cost?'PKR '+Math.round(p.gp).toLocaleString():'—')+'</td>'
+        +'<td style="padding:7px 10px;text-align:right;font-family:monospace;color:#999">-'+Math.round(p.commission).toLocaleString()+'</td>'
+        +'<td style="padding:7px 10px;text-align:right;font-family:monospace;font-weight:700;color:'+(loss?'var(--red)':'var(--green)')+'">'+(loss?'-':'')+'PKR '+Math.abs(Math.round(p.netProfit)).toLocaleString()+(loss?' ⚠':'')+'</td>'
+        +'<td style="padding:7px 10px;text-align:right;font-family:monospace">'+p.netPct.toFixed(1)+'%</td>'
+        +'</tr>';
+    }).join('');
+    ladder='<div style="border:1px solid #e8e4dc;border-radius:8px;overflow:hidden;background:#fff;margin-top:14px">'
+      +'<div style="padding:9px 10px;font-size:10px;color:#888;background:#f8f6f2;border-bottom:1px solid #e8e4dc">Gross Price held fixed at PKR '+Math.round(d.gross).toLocaleString()+' — how Retail Price and profit move as discount increases</div>'
+      +'<table style="width:100%;border-collapse:collapse">'
+      +'<thead><tr style="background:#f8f6f2;border-bottom:2px solid #e8e4dc">'
+      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:left">Discount</th>'
+      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Retail Price</th>'
+      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">GP</th>'
+      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Commission</th>'
+      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Net Profit</th>'
+      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">NP%</th>'
+      +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }
+
+  // Breakeven — always shown once cost is known, from three angles.
   var breakevenBox='';
-  if(hasProduct&&d.cost>0&&d.price>0){
-    var breakevenPrice=d.cost/netFactor;
-    var breakevenPct=(1-breakevenPrice/d.price)*100;
-    breakevenBox='<div style="background:#f0f7f0;border:1px solid #d5e8d5;border-radius:8px;padding:14px 16px;margin-top:10px">'
-      +'<div style="font-size:11px;font-weight:700;color:#2d6b3f;margin-bottom:4px">Max safe discount</div>'
-      +(breakevenPct>=0
-        ?'<div style="font-size:12px;color:#555">You can discount up to <strong>'+breakevenPct.toFixed(1)+'%</strong> before this item stops making any profit at all (at the current cost and platform/destination rates).</div>'
-        :'<div style="font-size:12px;color:var(--red)">This item is already below breakeven at full listed price (0% discount) — it needs a price increase, not a discount, or its cost/margin need review.</div>')
+  if(hasProduct&&d.cost>0){
+    var beRetail=d.cost/(1-DC_COMM_RATE);
+    var beDiscAtGross=d.gross>0?(1-beRetail/d.gross)*100:null;
+    var beGrossAtDisc=(d.discPct<100)?beRetail/(1-d.discPct/100):null;
+    breakevenBox='<div style="background:#f0f7f0;border:1px solid #d5e8d5;border-radius:8px;padding:14px 16px;margin-top:14px">'
+      +'<div style="font-size:11px;font-weight:700;color:#2d6b3f;margin-bottom:8px">Break-Even Point</div>'
+      +'<div style="font-size:12px;color:#555;margin-bottom:4px">• Retail Price can never go below <strong>PKR '+Math.round(beRetail).toLocaleString()+'</strong> — below that, this item loses money no matter what the discount looks like.</div>'
+      +(beDiscAtGross!==null?'<div style="font-size:12px;color:#555;margin-bottom:4px">• At your current Gross Price (PKR '+Math.round(d.gross).toLocaleString()+'), the max safe discount is <strong>'+(beDiscAtGross>=0?beDiscAtGross.toFixed(1)+'%':'0% — already below breakeven')+'</strong>.</div>':'')
+      +(beGrossAtDisc!==null?'<div style="font-size:12px;color:#555">• To run a <strong>'+d.discPct+'% discount</strong> and still break even, Gross Price needs to be at least <strong>PKR '+Math.round(beGrossAtDisc).toLocaleString()+'</strong>.</div>':'')
       +'</div>';
   }
 
   document.getElementById('pdc').innerHTML=
-    '<div style="max-width:820px">'
+    '<div style="max-width:860px">'
     +'<div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px">Discount Calculator</div>'
-    +'<div style="font-size:10px;color:#aaa;margin-bottom:14px">See the profit and margin impact of a discount before you run it — uses the same commission/tax rates as your live sales data.</div>'
+    +'<div style="font-size:10px;color:#aaa;margin-bottom:14px">Same Gross Price / Retail Price / Commission(25%) math as the Summary Sheet — plan a discount before you run it.</div>'
     +'<div style="background:#fff;border:1px solid #e8e4dc;border-radius:8px;padding:14px;margin-bottom:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'
-    +'<div style="flex:1;min-width:220px"><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Product</label><input list="dc-prodlist" value="'+(d.name||'').replace(/"/g,'&quot;')+'" placeholder="Type to search a product…" onchange="dcPick(this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:100%;box-sizing:border-box"><datalist id="dc-prodlist">'+dcProductOptions()+'</datalist></div>'
+    +'<div style="flex:1;min-width:220px">'+field('Product','<input list="dc-prodlist" value="'+(d.name||'').replace(/"/g,'&quot;')+'" placeholder="Type to search a product…" onchange="dcPick(this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:100%;box-sizing:border-box"><datalist id="dc-prodlist">'+dcProductOptions()+'</datalist>')+'</div>'
     +thumb
     +'</div>'
-    +(!hasProduct?'<div style="padding:16px;text-align:center;color:#aaa;font-size:11px;background:#faf9f6;border:1px dashed #e0dcd4;border-radius:8px">Pick a product above to start — cost, current price, and stock fill in automatically.</div>':
-      '<div style="background:#fff;border:1px solid #e8e4dc;border-radius:8px;padding:14px;margin-bottom:0;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'
-      +'<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Listed Price</label><input type="number" value="'+d.price+'" onchange="dcSet(\'price\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:110px"></div>'
-      +'<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Cost</label><input type="number" value="'+d.cost+'" onchange="dcSet(\'cost\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:110px"></div>'
-      +'<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Platform</label><select onchange="dcSet(\'platform\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px"><option value="MARKETPLACE"'+(d.platform==='MARKETPLACE'?' selected':'')+'>Marketplace (Laam)</option><option value="OCTANE"'+(d.platform==='OCTANE'?' selected':'')+'>Octane (Website)</option></select></div>'
-      +'<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Destination</label><select onchange="dcSet(\'dest\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px"><option value="LOCAL"'+(d.dest==='LOCAL'?' selected':'')+'>Local</option><option value="INTERNATIONAL"'+(d.dest==='INTERNATIONAL'?' selected':'')+'>International</option></select></div>'
-      +'<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Your discount %</label><input type="number" value="'+d.base+'" onchange="dcSet(\'base\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:90px"></div>'
-      +'<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Stock qty</label><input type="number" value="'+d.qty+'" onchange="dcSet(\'qty\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:90px"></div>'
+    +(!hasProduct?'<div style="padding:16px;text-align:center;color:#aaa;font-size:11px;background:#faf9f6;border:1px dashed #e0dcd4;border-radius:8px">Pick a product above to start — cost, Gross Price, and Retail Price fill in automatically from your live data.</div>':
+      '<div style="display:flex;gap:8px;margin-bottom:10px">'
+      +modeTab('forward','I know Gross Price → find Retail Price')
+      +modeTab('reverse','I know Retail Price → find Gross Price')
       +'</div>'
-      +costWarn
-      +'<div style="border:1px solid #e8e4dc;border-radius:8px;overflow:hidden;background:#fff;margin-top:14px">'
-      +'<table style="width:100%;border-collapse:collapse">'
-      +'<thead><tr style="background:#f8f6f2;border-bottom:2px solid #e8e4dc">'
-      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:left">Discount</th>'
-      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Sell Price</th>'
-      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Commission</th>'
-      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Tax</th>'
-      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Profit / pc</th>'
-      +'<th style="padding:7px 10px;font-size:9px;color:#aaa;text-transform:uppercase;text-align:right">Margin</th>'
-      +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
-      +impactBox+breakevenBox)
+      +'<div style="background:#fff;border:1px solid #e8e4dc;border-radius:8px;padding:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'
+      +(d.mode==='forward'
+        ?field('Gross Price','<input type="number" value="'+d.gross+'" onchange="dcSet(\'gross\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:120px">')
+        :field('Target Retail Price','<input type="number" value="'+d.retail+'" onchange="dcSet(\'retail\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:120px">')
+      )
+      +field('Discount %','<input type="number" value="'+d.discPct+'" onchange="dcSet(\'discPct\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:90px">')
+      +field(d.mode==='forward'?'→ Retail Price':'→ Required Gross Price','<div style="font-size:15px;font-weight:700;color:var(--gold2);padding:7px 0">PKR '+(d.mode==='forward'?Math.round(d.retail):Math.round(d.gross)).toLocaleString()+'</div>')
+      +field('Cost','<input type="number" value="'+d.cost+'" onchange="dcSet(\'cost\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:110px">')
+      +field('Stock qty','<input type="number" value="'+d.qty+'" onchange="dcSet(\'qty\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:90px">')
+      +'</div>'
+      +costWarn+summaryBlock+ladder+breakevenBox)
     +'</div>';
 }
 
