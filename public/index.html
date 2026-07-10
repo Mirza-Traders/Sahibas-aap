@@ -3752,17 +3752,21 @@ function poProdHint(name){
   var h=document.getElementById('po-stkhint');
   if(!h)return;
   if(!name){h.innerHTML='';return;}
-  var sp=STOCK_PRODS[k]||null;
-  // On Hand
-  var onH={S:sp?sp.S||0:0,M:sp?sp.M||0:0,L:sp?sp.L||0:0,XL:sp?sp.XL||0:0};
-  // Current Order (live from inputs)
   var curS=parseInt(document.getElementById('po-s').value)||0;
   var curM=parseInt(document.getElementById('po-m').value)||0;
   var curL=parseInt(document.getElementById('po-l').value)||0;
   var curXL=parseInt(document.getElementById('po-xl').value)||0;
-  var cur={S:curS,M:curM,L:curL,XL:curXL};
+  h.innerHTML=poStockPositionHtml(k,{S:curS,M:curM,L:curL,XL:curXL},'+ Current Order (this form)');
+}
+// Shared by the New Order form (live inputs as "current order") and the
+// Pending-Approval Review modal (the order's own recorded S/M/L/XL) so both
+// show the identical Stock Position math.
+function poStockPositionHtml(k,cur,curLabel){
+  var sp=STOCK_PRODS[k]||null;
+  // On Hand
+  var onH={S:sp?sp.S||0:0,M:sp?sp.M||0:0,L:sp?sp.L||0:0,XL:sp?sp.XL||0:0};
   // Total Stock
-  var tot={S:onH.S+curS,M:onH.M+curM,L:onH.L+curL,XL:onH.XL+curXL};
+  var tot={S:onH.S+cur.S,M:onH.M+cur.M,L:onH.L+cur.L,XL:onH.XL+cur.XL};
   // Open Orders from sales data (status='open')
   var openOrd={S:0,M:0,L:0,XL:0};
   if(DETAIL&&DETAIL.length){
@@ -3822,7 +3826,7 @@ function poProdHint(name){
    +'<th style="'+cs+'font-size:10px;color:#aaa;font-weight:700">Total</th>'
    +'</tr></thead><tbody>'
    +'<tr style="background:#f0ece4"><td style="'+lcs+'color:#333;font-weight:600">On Hand (Laam)</td><td style="'+cs+'color:#1a1a1a;font-weight:600">'+onH.S+'</td><td style="'+cs+'color:#1a1a1a;font-weight:600">'+onH.M+'</td><td style="'+cs+'color:#1a1a1a;font-weight:600">'+onH.L+'</td><td style="'+cs+'color:#1a1a1a;font-weight:600">'+onH.XL+'</td><td style="'+cs+'color:#555;font-weight:700">'+sumOf(onH)+'</td></tr>'
-   +mkRow('+ Current Order',cur,'var(--gold)','var(--gold)',false,'1px solid #2e2e2e')
+   +mkRow(curLabel||'+ Current Order',cur,'var(--gold)','var(--gold)',false,'1px solid #2e2e2e')
    +'<tr style="background:#fff;border-top:2px solid #555"><td style="'+lcs+'color:#1a1a1a;font-weight:700">= Total Stock</td><td style="'+cs+'color:#1a1a1a;font-weight:700">'+tot.S+'</td><td style="'+cs+'color:#1a1a1a;font-weight:700">'+tot.M+'</td><td style="'+cs+'color:#1a1a1a;font-weight:700">'+tot.L+'</td><td style="'+cs+'color:#1a1a1a;font-weight:700">'+tot.XL+'</td><td style="'+cs+'color:var(--gold2);font-weight:700">'+sumOf(tot)+'</td></tr>'
    +'<tr style="border-top:1px solid #2e2e2e">'
    +'<td style="'+lcs+'color:#c0392b">Less: Open Orders</td>'
@@ -3863,10 +3867,46 @@ function poProdHint(name){
       +'</tr>'
      :'')
    +'</tbody></table></div>';
-  h.innerHTML=html;
+  return html;
 }
 
 function closePO(){document.getElementById('po-modal').style.display='none';}
+function closePoReview(){var m=document.getElementById('po-review-modal');if(m)m.style.display='none';}
+function openPoReview(oid){
+  var orders=loadPO();
+  var o=orders.find(function(x){return x.id===oid;});
+  if(!o)return;
+  var k=(o.product||'').toLowerCase().trim();
+  var cur={S:o.S||0,M:o.M||0,L:o.L||0,XL:o.XL||0};
+  var stockHtml=poStockPositionHtml(k,cur,'+ This Order ('+o.id+')');
+  var thumb=(o.img&&o.img.startsWith('http'))?'<img src="'+o.img+'" style="width:56px;height:70px;object-fit:cover;border-radius:6px;border:1px solid #3a3a3a">':'<div style="width:56px;height:70px;border-radius:6px;background:#252525;border:1px solid #3a3a3a"></div>';
+  var body='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">'
+   +'<div style="color:#fff;font-size:16px;font-weight:700;letter-spacing:.02em">👁 Review '+o.id+' — before you approve</div>'
+   +'<button onclick="closePoReview()" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer;line-height:1;padding:2px 6px">✕</button>'
+   +'</div>'
+   +'<div style="display:flex;gap:14px;margin-bottom:16px">'
+   +thumb
+   +'<div style="flex:1">'
+   +'<div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:4px">'+o.product+'</div>'
+   +'<div style="font-size:11px;color:#888;line-height:1.7">Fabric: <span style="color:#ccc">'+(o.fabric||'—')+'</span><br>'
+   +'Customer: <span style="color:#ccc">'+(o.customer||'—')+'</span><br>'
+   +'Requirement: <span style="color:#ccc">'+(o.urgency||'ROUTINE')+'</span> · Target: <span style="color:#ccc">'+(o.targetDate?fmtD(o.targetDate):'—')+'</span><br>'
+   +'Placed by: <span style="color:#ccc">'+(o.placedBy||'—')+'</span> on '+fmtD(o.date)+'</div>'
+   +'</div></div>'
+   +stockHtml
+   +(o.notes?'<div style="font-size:11px;color:#aaa;background:#222;border:1px solid #333;border-radius:8px;padding:10px 12px;margin-top:12px"><b style="color:#888">Remarks:</b> '+o.notes+'</div>':'')
+   +(o.sizeChart?'<div style="margin-top:12px"><img src="'+o.sizeChart+'" onclick="viewSizeChart(\''+o.id+'\')" style="max-width:100%;max-height:160px;border:1px solid #333;border-radius:6px;cursor:pointer" title="Click to view full size"></div>':'')
+   +'<div style="display:flex;gap:10px;margin-top:20px">'
+   +(o.status==='Pending Approval'&&CU&&CU.role==='Owner'
+     ?'<button onclick="closePoReview();approvePO(\''+o.id+'\')" style="flex:1;background:#27ae60;color:#fff;border:none;border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer">✓ Approve</button>'
+      +'<button onclick="closePoReview();rejectPO(\''+o.id+'\')" style="background:#252525;color:#c0392b;border:1px solid #c0392b;border-radius:8px;padding:12px 18px;font-size:13px;cursor:pointer">✗ Reject</button>'
+     :'')
+   +'<button onclick="closePoReview()" style="background:#252525;color:#666;border:1px solid #3a3a3a;border-radius:8px;padding:12px 18px;font-size:13px;cursor:pointer">Close</button>'
+   +'</div>';
+  var m=document.getElementById('po-review-modal');
+  m.querySelector('.pr-body').innerHTML=body;
+  m.style.display='flex';
+}
 
 function submitPO(){
   var prod=document.getElementById('po-prod').value.trim();
@@ -4408,6 +4448,7 @@ function rPO(){
       // fits the fixed virtual row height.
       var actCell='<td style="'+TD+'"><div style="display:flex;flex-wrap:wrap;gap:3px">';
       if(o.status==='Pending Approval'&&isOwner){
+        actCell+='<button onclick="openPoReview(\''+o.id+'\')" style="flex:1 1 45%;background:#f0f5fb;border:1px solid #a0c0e0;color:#2471a3;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:600;white-space:nowrap">👁 Review</button>';
         actCell+='<button onclick="approvePO(\''+o.id+'\')" style="flex:1 1 45%;background:#27ae60;color:#fff;border:none;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:700;white-space:nowrap">✓ Approve</button>';
         actCell+='<button onclick="rejectPO(\''+o.id+'\')" style="flex:1 1 45%;background:#fff;border:1px solid #c0392b;color:#c0392b;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">✗ Reject</button>';
       }
@@ -5505,6 +5546,11 @@ function toggleSB(){
       <button onclick="closePO()" style="background:#252525;color:#666;border:1px solid #3a3a3a;border-radius:8px;padding:13px 18px;font-size:13px;cursor:pointer">Cancel</button>
     </div>
   </div>
+</div>
+
+<!-- ── PENDING-APPROVAL REVIEW MODAL (read-only stock context before approving) ── -->
+<div id="po-review-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9000;align-items:center;justify-content:center">
+  <div class="pr-body" style="background:#1a1a1a;border-radius:14px;padding:26px 22px;width:min(560px,96vw);max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.7)"></div>
 </div>
 
 <!-- ── PRINT FRAME ── -->
