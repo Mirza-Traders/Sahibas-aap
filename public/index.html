@@ -2847,7 +2847,10 @@ function dcPick(val){
   d.retail=sp?sp.price:0;
   d.discPct=(d.gross>0&&d.retail>0)?Math.round((d.gross-d.retail)/d.gross*100):0;
   d.qty=sp?sp.total:0;
-  d.img=(sp&&sp.img)?sp.img:findImg(key)||'';
+  // Same lookup order as the Costs page (findImg first) — the Laam stock
+  // sheet's own image column is often blank, so checking it first left the
+  // thumbnail empty for most products.
+  d.img=findImg(key)||(sp&&sp.img)||'';
   rendered.dc=false;doR('dc');
 }
 function dcSetMode(m){window._dc.mode=m;dcRecalc();rendered.dc=false;doR('dc');}
@@ -2877,7 +2880,7 @@ function rDC(){
   if(!allowed){document.getElementById('pdc').innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Not authorized.</div>';return;}
   var d=window._dc;
   var hasProduct=!!d.name;
-  var thumb=d.img?'<img src="'+d.img+'" loading="lazy" style="width:52px;height:66px;object-fit:cover;object-position:top center;border-radius:6px;border:1px solid #e8e4dc">':'<div style="width:52px;height:66px;border-radius:6px;background:#f5f3ee;border:1px solid #e8e4dc;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:10px">no photo</div>';
+  var thumb=d.img?'<img src="'+d.img+'" loading="lazy" data-n="'+(d.name||'').replace(/"/g,'')+'" onerror="imgFail(this)" style="width:52px;height:66px;object-fit:cover;object-position:top center;border-radius:6px;border:1px solid #e8e4dc">':(hasProduct?prodPH(d.name).replace('width:52px;height:52px','width:52px;height:66px'):'<div style="width:52px;height:66px;border-radius:6px;background:#f5f3ee;border:1px solid #e8e4dc;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:10px">no photo</div>');
   var costWarn=hasProduct&&!d.cost?'<div style="background:#fff3e0;color:#a35b00;border-radius:6px;padding:8px 12px;font-size:11px;margin-top:10px">No cost on file for this product — add it on the Costs page first, or the numbers below will show a false margin.</div>':'';
   var field=function(lbl,inner){return '<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">'+lbl+'</label>'+inner+'</div>';};
   var modeTab=function(m,lbl){return '<button onclick="dcSetMode(\''+m+'\')" style="padding:7px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid '+(d.mode===m?'var(--gold)':'#e0dcd4')+';background:'+(d.mode===m?'#fff8e6':'#f5f5f5')+';color:'+(d.mode===m?'var(--gold2)':'#777')+'">'+lbl+'</button>';};
