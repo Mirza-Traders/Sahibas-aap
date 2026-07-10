@@ -2854,6 +2854,11 @@ function dcSetMode(m){window._dc.mode=m;dcRecalc();rendered.dc=false;doR('dc');}
 function dcSet(field,val){
   var d=window._dc;
   d[field]=parseFloat(val)||0;
+  // Typing into Gross Price or Retail Price directly picks which one you're
+  // solving for — no separate mode click needed. Editing Discount% keeps
+  // whichever mode is already active.
+  if(field==='gross')d.mode='forward';
+  else if(field==='retail')d.mode='reverse';
   dcRecalc();
   rendered.dc=false;doR('dc');
 }
@@ -2904,10 +2909,10 @@ function rDC(){
       +th('Commission',NBG,'#27ae60')+th('Net Profit',NBG,'#27ae60')+th('NP%',NBG,'#27ae60')
     +'</tr>'
     +'</thead><tbody><tr>'
-      +td(d.mode==='forward'?inp('gross',d.gross,90):readCell('PKR '+Math.round(d.gross).toLocaleString(),'#c8a96e'),GBG)
+      +td(inp('gross',d.gross,90)+(d.mode==='reverse'?'<div style="font-size:8px;color:#c8a96e;margin-top:2px">= calculated</div>':''),GBG)
       +td(readCell('PKR '+discAmt.toLocaleString(),'#e74c3c'),GBG)
       +td(inp('discPct',d.discPct,55),GBG)
-      +td(d.mode==='reverse'?inp('retail',d.retail,90):readCell('PKR '+Math.round(d.retail).toLocaleString(),'#2980b9'),RBG,true)
+      +td(inp('retail',d.retail,90)+(d.mode==='forward'?'<div style="font-size:8px;color:#2980b9;margin-top:2px">= calculated</div>':''),RBG,true)
       +td(inp('cost',d.cost,80),PBG)
       +td(readCell(d.cost?'PKR '+Math.round(pnl.gp).toLocaleString():'—'),PBG)
       +td(readCell(d.cost?pnl.gpPct.toFixed(0)+'%':'—'),PBG)
@@ -2952,15 +2957,20 @@ function rDC(){
       +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
   }
 
-  // Breakeven — always shown once cost is known, from three angles.
+  // Breakeven — always shown once cost is known, from three angles. Placed
+  // right under the main row (not buried below the ladder) since this is the
+  // one number that must never be missed.
   var breakevenBox='';
   if(hasProduct&&d.cost>0){
     var beRetail=d.cost/(1-DC_COMM_RATE);
     var beDiscAtGross=d.gross>0?(1-beRetail/d.gross)*100:null;
     var beGrossAtDisc=(d.discPct<100)?beRetail/(1-d.discPct/100):null;
-    breakevenBox='<div style="background:#f0f7f0;border:1px solid #d5e8d5;border-radius:8px;padding:14px 16px;margin-top:14px">'
-      +'<div style="font-size:11px;font-weight:700;color:#2d6b3f;margin-bottom:8px">Break-Even Point</div>'
-      +'<div style="font-size:12px;color:#555;margin-bottom:4px">• Retail Price can never go below <strong>PKR '+Math.round(beRetail).toLocaleString()+'</strong> — below that, this item loses money no matter what the discount looks like.</div>'
+    breakevenBox='<div style="background:#f0f7f0;border:2px solid #a8d5b5;border-radius:8px;padding:14px 16px;margin-top:14px">'
+      +'<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
+      +'<span style="font-size:11px;font-weight:700;color:#2d6b3f;text-transform:uppercase;letter-spacing:.03em">Break-Even Retail Price</span>'
+      +'<span style="font-size:20px;font-weight:700;color:#1e5c33;font-family:monospace">PKR '+Math.round(beRetail).toLocaleString()+'</span>'
+      +'</div>'
+      +'<div style="font-size:12px;color:#555;margin-bottom:4px">Retail Price can never go below this — below it, this item loses money no matter what the discount looks like.</div>'
       +(beDiscAtGross!==null?'<div style="font-size:12px;color:#555;margin-bottom:4px">• At your current Gross Price (PKR '+Math.round(d.gross).toLocaleString()+'), the max safe discount is <strong>'+(beDiscAtGross>=0?beDiscAtGross.toFixed(1)+'%':'0% — already below breakeven')+'</strong>.</div>':'')
       +(beGrossAtDisc!==null?'<div style="font-size:12px;color:#555">• To run a <strong>'+d.discPct+'% discount</strong> and still break even, Gross Price needs to be at least <strong>PKR '+Math.round(beGrossAtDisc).toLocaleString()+'</strong>.</div>':'')
       +'</div>';
@@ -2979,7 +2989,7 @@ function rDC(){
       +modeTab('forward','I know Gross Price → find Retail Price')
       +modeTab('reverse','I know Retail Price → find Gross Price')
       +'</div>'
-      +costWarn+rowTable+ladder+breakevenBox)
+      +costWarn+rowTable+breakevenBox+ladder)
     +'</div>';
 }
 
