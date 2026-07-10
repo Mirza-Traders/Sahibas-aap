@@ -2737,15 +2737,17 @@ function deleteCost(name){
 function handleCostCsvUpload(inp){
   if(!CU||(CU.role!=='Owner'&&CU.role!=='Accountant')){showToast('Not authorized.');inp.value='';return;}
   var file=inp.files&&inp.files[0];if(!file){return;}
-  var r=new FileReader();
-  r.onload=function(e){
-    var rows=Papa.parse(e.target.result,{header:true,skipEmptyLines:true}).data;
+  // Position-based (col A = name, col B = cost) rather than named columns —
+  // works whether or not the file has a "Name,Cost" header row. A header row,
+  // if present, is skipped automatically because "Cost" isn't a valid number.
+  function apply(rows){
     if(!window.CM)window.CM={};
-    var added=0,updated=0;
+    var added=0,updated=0,skipped=0;
     rows.forEach(function(row){
-      var name=String(row['Name']||row['name']||'').trim();
-      var cost=parseFloat(row['Cost']||row['cost']||0)||0;
-      if(!name||cost<=0)return;
+      var name=String((row&&row[0])||'').trim();
+      var costRaw=String((row&&row[1])!=null?row[1]:'').replace(/[^0-9.]/g,''); // strips thousand-separator commas etc.
+      var cost=parseFloat(costRaw)||0;
+      if(!name||cost<=0){if(name)skipped++;return;}
       var lk=name.toLowerCase();
       var existingKey=Object.keys(window.CM).filter(function(k){return k.toLowerCase()===lk;})[0];
       if(existingKey){delete window.CM[existingKey];updated++;}else{added++;}
@@ -2753,10 +2755,26 @@ function handleCostCsvUpload(inp){
     });
     cloudSave('costs',window.CM);
     recomputeCosts();rendered={};
-    showToast('CSV processed: '+added+' added, '+updated+' updated');
+    showToast((added+updated)?('Processed: '+added+' added, '+updated+' updated'+(skipped?', '+skipped+' skipped':'')):'No valid Name+Cost rows found in that file.');
     rendered.co=false;doR('co');
-  };
-  r.readAsText(file);
+  }
+  if(isXLSX(file)){
+    var r=new FileReader();
+    r.onload=function(e){
+      try{
+        var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        apply(XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''}));
+      }catch(err){showToast('Could not read that file: '+err.message);}
+    };
+    r.onerror=function(){showToast('Could not read that file.');};
+    r.readAsArrayBuffer(file);
+  }else{
+    var r2=new FileReader();
+    r2.onload=function(e){apply(Papa.parse(e.target.result,{header:false,skipEmptyLines:true}).data);};
+    r2.onerror=function(){showToast('Could not read that file.');};
+    r2.readAsText(file);
+  }
   inp.value='';
 }
 function downloadCostsCsv(){
@@ -2796,8 +2814,8 @@ function rCO(){
     +'<div><label style="font-size:9px;color:#888;display:block;margin-bottom:4px">Cost (PKR)</label><input id="co-cost" type="number" placeholder="0" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:120px"></div>'
     +'<button onclick="saveCost(document.getElementById(\'co-name\').value,document.getElementById(\'co-cost\').value)" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:8px 18px;font-size:11px;font-weight:700;cursor:pointer">Save</button>'
     +'<div style="flex:1"></div>'
-    +'<input type="file" id="co-csv-file" accept=".csv" style="display:none" onchange="handleCostCsvUpload(this)">'
-    +'<button onclick="document.getElementById(\'co-csv-file\').click()" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:6px;padding:8px 14px;font-size:11px;font-weight:600;cursor:pointer;color:#555">⬆ Upload CSV</button>'
+    +'<input type="file" id="co-csv-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleCostCsvUpload(this)">'
+    +'<button onclick="document.getElementById(\'co-csv-file\').click()" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:6px;padding:8px 14px;font-size:11px;font-weight:600;cursor:pointer;color:#555">⬆ Upload CSV/Excel</button>'
     +'<button onclick="downloadCostsCsv()" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:6px;padding:8px 14px;font-size:11px;font-weight:600;cursor:pointer;color:#555">⬇ Download CSV</button>'
     +'</div>'
     +'<input id="co-search" type="text" placeholder="Search products..." value="'+(window._coSearch||'').replace(/"/g,'&quot;')+'" oninput="clearTimeout(window._coSearchTimer);window._coSearchTimer=setTimeout(function(){window._coSearch=document.getElementById(\'co-search\').value;rendered.co=false;doR(\'co\');var f=document.getElementById(\'co-search\');if(f){f.focus();f.selectionStart=f.selectionEnd=f.value.length;}},300);" style="border:1px solid #e0dcd4;border-radius:6px;padding:8px 12px;font-size:11px;width:280px;margin-bottom:10px;display:block">'
