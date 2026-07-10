@@ -2930,7 +2930,7 @@ function rDC(){
   // moving with it, exactly answering "what happens to retail price as discount rises."
   var ladder='';
   if(hasProduct&&d.mode==='forward'&&d.gross>0){
-    var levels=[0,5,10,15,20,25,30,40,50,60];
+    var levels=[0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85];
     if(levels.indexOf(d.discPct)<0)levels.push(d.discPct);
     levels=levels.filter(function(v,i,a){return a.indexOf(v)===i&&v>=0&&v<100;}).sort(function(a,b){return a-b;});
     var rows=levels.map(function(lvl){
