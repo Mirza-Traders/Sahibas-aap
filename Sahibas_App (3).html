@@ -2878,14 +2878,44 @@ function rDC(){
   var modeTab=function(m,lbl){return '<button onclick="dcSetMode(\''+m+'\')" style="padding:7px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid '+(d.mode===m?'var(--gold)':'#e0dcd4')+';background:'+(d.mode===m?'#fff8e6':'#f5f5f5')+';color:'+(d.mode===m?'var(--gold2)':'#777')+'">'+lbl+'</button>';};
 
   var pnl=dcPnl(d.retail,d.cost);
+  var discAmt=Math.max(0,Math.round(d.gross-d.retail));
 
-  var summaryBlock=!hasProduct?'':
-    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px">'
-    +'<div class="kpi b"><div class="kl">Retail Price</div><div class="kv">PKR '+Math.round(d.retail).toLocaleString()+'</div><div class="ks">Gross PKR '+Math.round(d.gross).toLocaleString()+' · '+d.discPct+'% off</div></div>'
-    +'<div class="kpi g"><div class="kl">GP</div><div class="kv">PKR '+Math.round(pnl.gp).toLocaleString()+'</div><div class="ks">'+pnl.gpPct.toFixed(1)+'% GP</div></div>'
-    +'<div class="kpi w"><div class="kl">Commission (25%)</div><div class="kv">PKR '+Math.round(pnl.commission).toLocaleString()+'</div><div class="ks">of retail price</div></div>'
-    +'<div class="kpi '+(pnl.netProfit<0?'r':'e')+'"><div class="kl">Net Profit</div><div class="kv" style="color:'+(pnl.netProfit<0?'var(--red)':'inherit')+'">PKR '+Math.round(pnl.netProfit).toLocaleString()+(pnl.netProfit<0?' ⚠':'')+'</div><div class="ks">'+pnl.netPct.toFixed(1)+'% NP</div></div>'
-    +'<div class="kpi b"><div class="kl">Cost</div><div class="kv">PKR '+Math.round(d.cost).toLocaleString()+'</div><div class="ks">'+(d.qty?d.qty+' in stock':'—')+'</div></div>'
+  // One continuous row, same column order/colors as the Summary Sheet:
+  // Gross Price → Discount → Disc% || Retail Price || Cost → GP → GP% || Commission → Net Profit → Net Profit%
+  var inp=function(field,val,w){return '<input type="number" value="'+val+'" onchange="dcSet(\''+field+'\',this.value)" style="border:1px solid #d8b96e;border-radius:4px;padding:5px 7px;font-size:11px;width:'+(w||70)+'px;background:#fffdf5;font-weight:700;text-align:right">';};
+  var readCell=function(txt,color){return '<span style="font-family:monospace;font-weight:700;'+(color?'color:'+color+';':'')+'">'+txt+'</span>';};
+  var th=function(txt,bg,color,br){return '<th style="padding:5px 8px;background:'+bg+';color:'+color+';font-size:8px;text-transform:uppercase;letter-spacing:.03em;text-align:right;white-space:nowrap;'+(br?'border-right:2px solid #c8a96e;':'')+'">'+txt+'</th>';};
+  var td=function(inner,bg,br){return '<td style="padding:6px 8px;background:'+bg+';text-align:right;white-space:nowrap;'+(br?'border-right:2px solid #c8a96e;':'')+'">'+inner+'</td>';};
+  var GBG='#fdf3e8',RBG='#eaf3fb',PBG='#ecfaec',NBG='#f0fff4';
+  var rowTable=!hasProduct?'':
+    '<div style="border:1px solid #e8e4dc;border-radius:8px;overflow:hidden;background:#fff;margin-top:14px;overflow-x:auto">'
+    +'<table style="border-collapse:collapse;width:100%">'
+    +'<thead>'
+    +'<tr>'
+      +'<th colspan="3" style="padding:4px;background:'+GBG+';color:#c8a96e;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #e8d8a8">Gross Price &amp; Disc%</th>'
+      +'<th style="padding:4px;background:'+RBG+';color:#2980b9;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #cfe3f5;border-right:2px solid #c8a96e">Retail Price</th>'
+      +'<th colspan="3" style="padding:4px;background:'+PBG+';color:#27ae60;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #c3e6cb">Gross Profit</th>'
+      +'<th colspan="3" style="padding:4px;background:'+NBG+';color:#27ae60;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #b8e8d0">Net P&amp;L</th>'
+    +'</tr>'
+    +'<tr>'
+      +th('Gross Price',GBG,'#c8a96e')+th('Discount',GBG,'#c8a96e')+th('Disc%',GBG,'#c8a96e')
+      +th('Retail Price',RBG,'#2980b9',true)
+      +th('Cost',PBG,'#27ae60')+th('GP',PBG,'#27ae60')+th('GP%',PBG,'#27ae60')
+      +th('Commission',NBG,'#27ae60')+th('Net Profit',NBG,'#27ae60')+th('NP%',NBG,'#27ae60')
+    +'</tr>'
+    +'</thead><tbody><tr>'
+      +td(d.mode==='forward'?inp('gross',d.gross,90):readCell('PKR '+Math.round(d.gross).toLocaleString(),'#c8a96e'),GBG)
+      +td(readCell('PKR '+discAmt.toLocaleString(),'#e74c3c'),GBG)
+      +td(inp('discPct',d.discPct,55),GBG)
+      +td(d.mode==='reverse'?inp('retail',d.retail,90):readCell('PKR '+Math.round(d.retail).toLocaleString(),'#2980b9'),RBG,true)
+      +td(inp('cost',d.cost,80),PBG)
+      +td(readCell(d.cost?'PKR '+Math.round(pnl.gp).toLocaleString():'—'),PBG)
+      +td(readCell(d.cost?pnl.gpPct.toFixed(0)+'%':'—'),PBG)
+      +td(readCell('PKR '+Math.round(pnl.commission).toLocaleString()),NBG)
+      +td(readCell((pnl.netProfit<0?'-':'')+'PKR '+Math.abs(Math.round(pnl.netProfit)).toLocaleString()+(pnl.netProfit<0?' ⚠':''),pnl.netProfit<0?'var(--red)':'#27ae60'),NBG)
+      +td(readCell((d.cost?pnl.netPct.toFixed(0):'—')+(d.cost?'%':'')),NBG)
+    +'</tr></tbody></table>'
+    +'<div style="padding:8px 12px;font-size:9px;color:#aaa;background:#f8f6f2;border-top:1px solid #e8e4dc">Gold cells are editable. Discount % always drives the calculation — the mode buttons below decide whether Gross Price or Retail Price is the one being solved for.</div>'
     +'</div>';
 
   // Forward-mode ladder: fixed Gross Price, vary Discount% — shows Retail Price
@@ -2945,21 +2975,11 @@ function rDC(){
     +thumb
     +'</div>'
     +(!hasProduct?'<div style="padding:16px;text-align:center;color:#aaa;font-size:11px;background:#faf9f6;border:1px dashed #e0dcd4;border-radius:8px">Pick a product above to start — cost, Gross Price, and Retail Price fill in automatically from your live data.</div>':
-      '<div style="display:flex;gap:8px;margin-bottom:10px">'
+      '<div style="display:flex;gap:8px;margin-bottom:0">'
       +modeTab('forward','I know Gross Price → find Retail Price')
       +modeTab('reverse','I know Retail Price → find Gross Price')
       +'</div>'
-      +'<div style="background:#fff;border:1px solid #e8e4dc;border-radius:8px;padding:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'
-      +(d.mode==='forward'
-        ?field('Gross Price','<input type="number" value="'+d.gross+'" onchange="dcSet(\'gross\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:120px">')
-        :field('Target Retail Price','<input type="number" value="'+d.retail+'" onchange="dcSet(\'retail\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:120px">')
-      )
-      +field('Discount %','<input type="number" value="'+d.discPct+'" onchange="dcSet(\'discPct\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:90px">')
-      +field(d.mode==='forward'?'→ Retail Price':'→ Required Gross Price','<div style="font-size:15px;font-weight:700;color:var(--gold2);padding:7px 0">PKR '+(d.mode==='forward'?Math.round(d.retail):Math.round(d.gross)).toLocaleString()+'</div>')
-      +field('Cost','<input type="number" value="'+d.cost+'" onchange="dcSet(\'cost\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:110px">')
-      +field('Stock qty','<input type="number" value="'+d.qty+'" onchange="dcSet(\'qty\',this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:90px">')
-      +'</div>'
-      +costWarn+summaryBlock+ladder+breakevenBox)
+      +costWarn+rowTable+ladder+breakevenBox)
     +'</div>';
 }
 
