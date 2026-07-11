@@ -958,7 +958,14 @@ function applyRoleNav(){
   if(role!=='Owner'&&role!=='Accountant'){
     nav.querySelectorAll('.sb-item').forEach(function(el){
       var id=el.getAttribute('data-id');
-      if(id==='ov'||id==='pl'||id==='co'||id==='dc')el.style.display='none';
+      if(id==='ov'||id==='pl'||id==='co')el.style.display='none';
+    });
+  }
+  // Discount Calculator: Owner + Accountant (Costs-level access) plus Editor,
+  // per explicit request — Editors don't get the Costs page itself.
+  if(role!=='Owner'&&role!=='Accountant'&&role!=='Editor'){
+    nav.querySelectorAll('.sb-item').forEach(function(el){
+      if(el.getAttribute('data-id')==='dc')el.style.display='none';
     });
   }
   if(role!=='Owner'&&role!=='Accountant'&&role!=='Editor'){
@@ -2971,7 +2978,7 @@ function dcPnl(retail,cost){
   return {gp,gpPct,commission,netProfit,netPct};
 }
 function rDC(){
-  var allowed=CU&&(CU.role==='Owner'||CU.role==='Accountant');
+  var allowed=CU&&(CU.role==='Owner'||CU.role==='Accountant'||CU.role==='Editor');
   if(!allowed){document.getElementById('pdc').innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Not authorized.</div>';return;}
   var d=window._dc;
   var hasProduct=!!d.name;
