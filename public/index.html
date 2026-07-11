@@ -4753,6 +4753,13 @@ function rxProductOptions(){
   if(DETAIL&&DETAIL.length)DETAIL.forEach(function(r){if(r[1])names[r[1]]=1;});
   return Object.keys(names).sort().map(function(n){return '<option value="'+n.replace(/"/g,'&quot;')+'">';}).join('');
 }
+// Live product thumbnail preview beside the New Refund/Exchange product fields.
+function rxnThumb(inputId,thumbId){
+  var v=(document.getElementById(inputId)||{}).value||'';
+  var img=findImg(v.toLowerCase().trim());
+  var el=document.getElementById(thumbId);if(!el)return;
+  el.innerHTML=img?'<img src="'+img+(img.indexOf('?')>=0?'&':'?')+'width=80" style="width:34px;height:44px;object-fit:cover;border-radius:5px;border:1px solid #e5e2db" onerror="this.parentNode.innerHTML=\'\'">':'';
+}
 function openRxNew(type){
   var isRef=type==='refund';
   var assignees=rxUsers().map(function(u){return '<option'+(u.name===rxAutoAssign(type)?' selected':'')+'>'+u.name+'</option>';}).join('');
@@ -4770,11 +4777,11 @@ function openRxNew(type){
    +'</div>'
    +fld('Address',inp('rxn-address','Delivery address'))
    +'<div style="display:grid;grid-template-columns:2fr 1fr;gap:0 12px">'
-   +'<div>'+fld('Product Returned *','<input id="rxn-product" list="rxn-prodlist" placeholder="Type to search…" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box"><datalist id="rxn-prodlist">'+rxProductOptions()+'</datalist>')+'</div>'
+   +'<div>'+fld('Product Returned *','<div style="display:flex;gap:8px;align-items:center"><span id="rxn-product-thumb"></span><input id="rxn-product" list="rxn-prodlist" oninput="rxnThumb(\'rxn-product\',\'rxn-product-thumb\')" placeholder="Type to search…" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box"></div><datalist id="rxn-prodlist">'+rxProductOptions()+'</datalist>')+'</div>'
    +'<div>'+fld('Size',szSel('rxn-size'))+'</div>'
    +'</div>'
    +(isRef?'':'<div style="display:grid;grid-template-columns:2fr 1fr;gap:0 12px">'
-   +'<div>'+fld('Product To Send *','<input id="rxn-psend" list="rxn-prodlist" placeholder="Type to search…" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box">')+'</div>'
+   +'<div>'+fld('Product To Send *','<div style="display:flex;gap:8px;align-items:center"><span id="rxn-psend-thumb"></span><input id="rxn-psend" list="rxn-prodlist" oninput="rxnThumb(\'rxn-psend\',\'rxn-psend-thumb\')" placeholder="Type to search…" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box"></div>')+'</div>'
    +'<div>'+fld('Size',szSel('rxn-szsend'))+'</div>'
    +'</div>')
    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">'
@@ -4826,20 +4833,39 @@ function openRxDetail(id){
   var bars=RX_STAGES.map(function(st,i){return '<div style="flex:1;height:7px;border-radius:3px;background:'+(i<=idx?'#0F6E56':'#e5e2db')+'"></div>';}).join('');
   var lbls=RX_STAGES.map(function(st,i){return '<div style="flex:1;font-size:8px;text-align:center;font-weight:'+(i===idx?'800':'400')+';color:'+(i<=idx?'#0F6E56':'#bbb')+'">'+rxStageLabel(st,t.type)+'</div>';}).join('');
   var g=function(l,val){return val?'<div style="font-size:9px;color:#999;font-weight:700;text-transform:uppercase;padding:5px 0 1px">'+l+'</div><div style="font-size:12px">'+val+'</div>':'';};
-  var hist=(t.history||[]).slice().reverse().map(function(h){
-    return '<div style="background:'+(h.sendBack?'#fde8e8':'#f8f6f2')+';border-radius:6px;padding:7px 10px;margin-bottom:4px;font-size:11px">'
-     +'<b>'+(h.sendBack?'↩ Sent back to '+rxStageLabel(h.stage,t.type):rxStageLabel(h.stage,t.type))+'</b>'
-     +' <span style="color:#aaa;font-size:9px">by '+h.by+' · '+h.at+'</span>'
-     +(h.note?'<div style="color:#555;margin-top:2px">'+String(h.note).replace(/</g,'&lt;')+'</div>':'')+'</div>';
+  // Action-oriented label for each logged step, so the trail reads as
+  // "who did what" rather than bare stage names.
+  var rxActionLabel=function(h,type){
+    if(h.sendBack)return '↩ Sent back to '+rxStageLabel(h.stage,type);
+    var m={initiated:'🆕 Ticket raised',received:'📦 Article received',approved:'✅ Approved after receipt',
+           paid:(type==='refund'?'💸 Refund paid':'🚚 Replacement dispatched'),
+           informed:'📞 Customer informed',closed:'🔒 Closed'};
+    // A note-only entry (added via "Add a note") keeps the current stage but
+    // isn't a transition — show it as a note.
+    return m[h.stage]||rxStageLabel(h.stage,type);
+  };
+  // Chronological, top→bottom, so it reads as the journey: raised → received
+  // → approved → paid → informed → closed. Numbered for clarity.
+  var histArr=(t.history||[]);
+  var stepNo=0;
+  var hist=histArr.map(function(h){
+    var isNoteOnly=h.noteOnly===true;
+    var label=isNoteOnly?'📝 Note':rxActionLabel(h,t.type);
+    var badge='';
+    if(!isNoteOnly){stepNo++;badge='<span style="display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;background:#0F6E56;color:#fff;border-radius:8px;font-size:9px;font-weight:700;margin-right:6px">'+stepNo+'</span>';}
+    return '<div style="background:'+(h.sendBack?'#fde8e8':'#f8f6f2')+';border-left:3px solid '+(h.sendBack?'#c0392b':'#0F6E56')+';border-radius:6px;padding:8px 11px;margin-bottom:5px;font-size:11px">'
+     +badge+'<b>'+label+'</b>'
+     +' <span style="color:#aaa;font-size:9px">by '+(h.by||'—')+' · '+h.at+'</span>'
+     +(h.note?'<div style="color:#555;margin-top:3px">'+String(h.note).replace(/</g,'&lt;')+'</div>':'')+'</div>';
   }).join('');
   var next=rxNextStage(t);
   var btns='';
   if(next&&rxCanAdvance(t,next)){
-    if(next==='received'){
-      // Photo is mandatory to mark Received — the button opens the camera/file
-      // picker rather than advancing directly.
-      btns+='<input type="file" id="rx-recv-photo" accept="image/*" capture="environment" style="display:none" onchange="rxReceivePhoto(\''+t.id+'\',this)">'
-        +'<button onclick="document.getElementById(\'rx-recv-photo\').click()" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer">📷 Attach photo &amp; Mark Received →</button>';
+    if(RX_PHOTO_REQ[next]){
+      // Photo mandatory for this step — the button opens the camera/file picker
+      // rather than advancing directly.
+      btns+='<input type="file" id="rx-stage-photo" accept="image/*" capture="environment" style="display:none" onchange="rxStagePhoto(\''+t.id+'\',this,\''+next+'\')">'
+        +'<button onclick="document.getElementById(\'rx-stage-photo\').click()" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer">📷 Attach photo &amp; Mark '+rxStageLabel(next,t.type)+' →</button>';
     }else{
       btns+='<button onclick="rxAdvance(\''+t.id+'\')" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer">Mark '+rxStageLabel(next,t.type)+' →</button>';
     }
@@ -4855,7 +4881,18 @@ function openRxDetail(id){
    +'<div>'+g('Returned',(t.product||'')+(t.size?' ('+t.size+')':''))+(t.productToSend?g('To Send',t.productToSend+(t.sizeToSend?' ('+t.sizeToSend+')':'')):'')+g('Amount',t.amount?'PKR '+NF(t.amount):'')+g('Assigned To',t.assignedTo)+g('Created',(t.createdAt||'')+' by '+(t.createdBy||''))+'</div>'
    +'</div>'
    +g('Address',t.customerAddress)
-   +(t.receivedPhoto?'<div style="margin-top:12px"><div style="font-size:9px;color:#999;font-weight:700;text-transform:uppercase;padding:5px 0 5px">📷 Received Article Photo'+(t.receivedPhotoBy?' <span style="color:#bbb;font-weight:400;text-transform:none">— by '+t.receivedPhotoBy+(t.receivedPhotoAt?' · '+t.receivedPhotoAt:'')+'</span>':'')+'</div><img src="'+t.receivedPhoto+'" onclick="rxViewPhoto(this.src)" style="max-width:150px;max-height:190px;object-fit:cover;border-radius:8px;border:1px solid #e5e2db;cursor:zoom-in" title="Click to enlarge"></div>':'')
+   +(function(){
+       var photos=[
+         {key:'receivedPhoto',lbl:'Received Article'},
+         {key:'paidPhoto',lbl:(t.type==='refund'?'Payment Voucher':'Dispatch Proof')},
+         {key:'informedPhoto',lbl:'Customer Informed (chat)'}
+       ].filter(function(p){return t[p.key];});
+       if(!photos.length)return '';
+       return '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">'+photos.map(function(p){
+         return '<div><div style="font-size:9px;color:#999;font-weight:700;text-transform:uppercase;padding:5px 0 4px">📷 '+p.lbl+(t[p.key+'By']?' <span style="color:#bbb;font-weight:400;text-transform:none">— '+t[p.key+'By']+(t[p.key+'At']?' · '+t[p.key+'At']:'')+'</span>':'')+'</div>'
+           +'<img src="'+t[p.key]+'" onclick="rxViewPhoto(this.src)" style="width:120px;height:150px;object-fit:cover;border-radius:8px;border:1px solid #e5e2db;cursor:zoom-in" title="Click to enlarge"></div>';
+       }).join('')+'</div>';
+     })()
    +(canBank&&(t.bankName||t.accountNumber)?'<div style="background:#faf8f3;border:1px solid #eee;border-radius:8px;padding:8px 12px;margin-top:10px">'+g('Bank',t.bankName)+g('Account Title',t.accountTitle)+g('IBAN',t.accountNumber)+'</div>':'')
    +'<div style="display:flex;gap:8px;margin:16px 0;flex-wrap:wrap">'+btns+'</div>'
    +'<div style="font-size:9px;color:#999;font-weight:700;text-transform:uppercase;margin-bottom:6px">History</div>'+hist
@@ -4864,36 +4901,41 @@ function openRxDetail(id){
   var old=document.getElementById('rx-detail');if(old)old.remove();
   document.body.insertAdjacentHTML('beforeend',html);
 }
+// Stages that require photo proof before the ticket can advance into them.
+// key = where the image is stored on the ticket; what() = what to photograph.
+var RX_PHOTO_REQ={
+  received:{key:'receivedPhoto',what:function(t){return 'the received article';},done:'Received article photo attached'},
+  paid:{key:'paidPhoto',what:function(t){return t.type==='refund'?'the bank payment voucher':'the dispatch proof';},done:'Payment / dispatch proof attached'},
+  informed:{key:'informedPhoto',what:function(t){return 'the customer chat screenshot (proof the customer was informed)';},done:'Customer-informed screenshot attached'}
+};
 function rxAdvance(id){
   var t=(window.TICKETS||[]).find(function(x){return x.id===id;});if(!t)return;
   var next=rxNextStage(t);
   if(!next||!rxCanAdvance(t,next)){showToast('You do not have permission for this step.');return;}
-  // Receiving the returned article REQUIRES a photo as proof — the person at
-  // the receipt level must attach it before the ticket can move to Received.
-  if(next==='received'&&!t.receivedPhoto){showToast('Attach a photo of the received article first.');return;}
+  var req=RX_PHOTO_REQ[next];
+  if(req&&!t[req.key]){showToast('Attach a photo of '+req.what(t)+' first.');return;}
   t.status=next;
   t.history=t.history||[];
   t.history.push({stage:next,by:CU?CU.name:'',at:rxNow(),note:''});
   rxSaveAll();rendered.rx=false;doR('rx');openRxDetail(id);
   showToast(t.id+' → '+rxStageLabel(next,t.type));
 }
-// Handles the mandatory received-article photo: compress, store on the ticket,
-// then advance to Received in one step.
-function rxReceivePhoto(id,input){
+// Generic mandatory-photo handler for any RX_PHOTO_REQ stage: compress, store
+// the image + who/when on the ticket, then advance in one step.
+function rxStagePhoto(id,input,stage){
   var file=input&&input.files&&input.files[0];if(!file)return;
   var t=(window.TICKETS||[]).find(function(x){return x.id===id;});if(!t)return;
-  var next=rxNextStage(t);
-  if(next!=='received'||!rxCanAdvance(t,next)){showToast('You do not have permission for this step.');return;}
+  var next=rxNextStage(t),req=RX_PHOTO_REQ[stage];
+  if(next!==stage||!req||!rxCanAdvance(t,next)){showToast('You do not have permission for this step.');return;}
   var reader=new FileReader();
   reader.onload=function(e){
     compressImg(e.target.result,1000,0.8,function(compressed){
-      t.receivedPhoto=compressed;
-      t.receivedPhotoBy=CU?CU.name:'';t.receivedPhotoAt=rxNow();
-      t.status='received';
+      t[req.key]=compressed;t[req.key+'By']=CU?CU.name:'';t[req.key+'At']=rxNow();
+      t.status=stage;
       t.history=t.history||[];
-      t.history.push({stage:'received',by:CU?CU.name:'',at:rxNow(),note:'📷 Received article photo attached'});
+      t.history.push({stage:stage,by:CU?CU.name:'',at:rxNow(),note:'📷 '+req.done});
       rxSaveAll();rendered.rx=false;doR('rx');openRxDetail(id);
-      showToast(t.id+' → Received (photo attached)');
+      showToast(t.id+' → '+rxStageLabel(stage,t.type)+' (photo attached)');
     });
   };
   reader.readAsDataURL(file);
@@ -4927,7 +4969,7 @@ function rxAddNote(id){
   var inp=document.getElementById('rx-note-inp');if(!inp||!inp.value.trim())return;
   var t=(window.TICKETS||[]).find(function(x){return x.id===id;});if(!t)return;
   t.history=t.history||[];
-  t.history.push({stage:t.status,by:CU?CU.name:'',at:rxNow(),note:inp.value.trim()});
+  t.history.push({stage:t.status,by:CU?CU.name:'',at:rxNow(),note:inp.value.trim(),noteOnly:true});
   rxSaveAll();openRxDetail(id);
 }
 function rxDelete(id){
