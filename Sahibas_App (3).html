@@ -449,12 +449,17 @@ function parseRatings(rows){
   return out;
 }
 function ratingOf(name){return RATINGS[String(name).toLowerCase().trim()]||null;}
-// Small "★ 4.2 (341)" chip, colour-graded; red ⛔ pill when Laam has blocked the product.
-function ratingChip(name){
+// Small "★ 4.2 (341)" chip, colour-graded; red ⛔ pill when Laam has blocked
+// the product. mini=true renders a tighter version (no feedback count, ⛔ only)
+// for fixed-height rows like the virtualised Production Orders table.
+function ratingChip(name,mini){
   var rt=ratingOf(name);if(!rt)return '';
   var blocked=/block/i.test(rt.st||'');
   var col=rt.r>=4.5?'background:#e8f8ee;color:#1e8449':rt.r>=4?'background:#f4f2ec;color:#555':rt.r>=3.5?'background:#fff3e0;color:#a35b00':'background:#fde8e8;color:#c0392b';
-  var tip=('★ '+rt.r+' from '+rt.n+' feedbacks · NPS '+rt.nps+(rt.iss?' · Top issues: '+rt.iss:'')).replace(/"/g,'&quot;');
+  var tip=('★ '+rt.r+' from '+rt.n+' feedbacks · NPS '+rt.nps+(rt.iss?' · Top issues: '+rt.iss:'')+(blocked?' · ⛔ BLOCKED by Laam':'')).replace(/"/g,'&quot;');
+  if(mini){
+    return '<span title="'+tip+'" style="'+col+';border-radius:8px;padding:0 5px;font-size:9px;font-weight:700;white-space:nowrap;cursor:help">★ '+rt.r.toFixed(1)+(blocked?' ⛔':'')+'</span>';
+  }
   var chip='<span title="'+tip+'" style="'+col+';border-radius:9px;padding:1px 7px;font-size:9px;font-weight:700;white-space:nowrap;cursor:help">★ '+rt.r.toFixed(1)+' <span style="font-weight:400;opacity:.75">('+rt.n+')</span></span>';
   if(blocked)chip+=' <span title="Laam has BLOCKED this product (status: '+rt.st.replace(/"/g,'')+')" style="background:#c0392b;color:#fff;border-radius:9px;padding:1px 7px;font-size:9px;font-weight:800;white-space:nowrap;cursor:help">⛔ BLOCKED</span>';
   return chip;
@@ -3074,7 +3079,7 @@ function rDC(){
     +'<div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px">Discount Calculator</div>'
     +'<div style="font-size:10px;color:#aaa;margin-bottom:14px">Same Gross Price / Retail Price / Commission(25%) math as the Summary Sheet — plan a discount before you run it.</div>'
     +'<div style="background:#fff;border:1px solid #e8e4dc;border-radius:8px;padding:14px;margin-bottom:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'
-    +'<div style="flex:1;min-width:220px">'+field('Product','<input list="dc-prodlist" value="'+(d.name||'').replace(/"/g,'&quot;')+'" placeholder="Type to search a product…" onchange="dcPick(this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:100%;box-sizing:border-box"><datalist id="dc-prodlist">'+dcProductOptions()+'</datalist>')+'</div>'
+    +'<div style="flex:1;min-width:220px">'+field('Product','<input list="dc-prodlist" value="'+(d.name||'').replace(/"/g,'&quot;')+'" placeholder="Type to search a product…" onchange="dcPick(this.value)" style="border:1px solid #e0dcd4;border-radius:4px;padding:7px 10px;font-size:11px;width:100%;box-sizing:border-box"><datalist id="dc-prodlist">'+dcProductOptions()+'</datalist>'+(hasProduct&&ratingChip(d.name)?'<div style="margin-top:6px">Laam rating: '+ratingChip(d.name)+'</div>':''))+'</div>'
     +thumb
     +'</div>'
     +(!hasProduct?'<div style="padding:16px;text-align:center;color:#aaa;font-size:11px;background:#faf9f6;border:1px dashed #e0dcd4;border-radius:8px">Pick a product above to start — cost, Gross Price, and Retail Price fill in automatically from your live data.</div>':
@@ -3422,8 +3427,11 @@ function rAC(){
   function thumb(r){return r.img?'<img src="'+r.img+(r.img.indexOf('?')>=0?'&':'?')+'width=60" loading="lazy" data-n="'+r.name.replace(/"/g,'')+'" onerror="imgFail(this)" style="width:30px;height:38px;object-fit:cover;object-position:top center;border-radius:4px;display:block">':prodPH(r.name).replace('width:52px;height:52px;font-size:14px','width:30px;height:38px;font-size:10px;border-radius:4px');}
   // Product name opens the full-size photo, same convention as the Summary Sheet
   function acName(r){
-    if(r.img&&String(r.img).indexOf('http')===0)return '<a href="'+r.img+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+r.name+'</a>';
-    return r.name;
+    // Name link (photo opens in new tab) + the Laam rating chip, so every
+    // Insights section shows the rating wherever a product is mentioned.
+    var chip=ratingChip(r.name);
+    var base=(r.img&&String(r.img).indexOf('http')===0)?'<a href="'+r.img+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+r.name+'</a>':r.name;
+    return chip?base+' '+chip:base;
   }
   function secHead(ico,title,count,color,sub,expId){
     return '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:2px solid '+color+';background:#fff">'
@@ -3832,7 +3840,9 @@ function poProdHint(name){
   var curM=parseInt(document.getElementById('po-m').value)||0;
   var curL=parseInt(document.getElementById('po-l').value)||0;
   var curXL=parseInt(document.getElementById('po-xl').value)||0;
-  h.innerHTML=poStockPositionHtml(k,{S:curS,M:curM,L:curL,XL:curXL},'+ Current Order (this form)');
+  var chip=ratingChip(name);
+  h.innerHTML=(chip?'<div style="margin:6px 0 2px;font-size:11px;color:#888">Laam rating: '+chip+'</div>':'')
+    +poStockPositionHtml(k,{S:curS,M:curM,L:curL,XL:curXL},'+ Current Order (this form)');
 }
 // Shared by the New Order form (live inputs as "current order") and the
 // Pending-Approval Review modal (the order's own recorded S/M/L/XL) so both
@@ -4057,7 +4067,7 @@ function openPoReview(oid){
    +'<div style="display:flex;gap:14px;margin-bottom:16px">'
    +thumb
    +'<div style="flex:1">'
-   +'<div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:4px">'+o.product+'</div>'
+   +'<div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:4px">'+o.product+' '+ratingChip(o.product)+'</div>'
    +'<div style="font-size:11px;color:#888;line-height:1.7">Fabric: <span style="color:#ccc">'+(o.fabric||'—')+'</span><br>'
    +'Customer: <span style="color:#ccc">'+(o.customer||'—')+'</span><br>'
    +'Requirement: <span style="color:#ccc">'+(o.urgency||'ROUTINE')+'</span> · Target: <span style="color:#ccc">'+(o.targetDate?fmtD(o.targetDate):'—')+'</span><br>'
@@ -4546,7 +4556,7 @@ function rPO(){
   // no matter how many orders accumulate.
   var PO_COLS=[36,92,78,190,92,92,62,62,74,44,44,44,44,92,92,92,92,92,106,96,170,130];
   var PO_TOT=PO_COLS.reduce(function(a,b){return a+b;},0);
-  var PO_RH=70;
+  var PO_RH=76; // tallest row = Pending Approval with 6 action buttons (2 lines of 3)
   var colgroup='<colgroup>'+PO_COLS.map(function(w){return '<col style="width:'+w+'px">';}).join('')+'</colgroup>';
   var hdr='<table style="border-collapse:collapse;table-layout:fixed;width:'+PO_TOT+'px;background:#fff">'+colgroup
    +'<thead>'
@@ -4638,21 +4648,21 @@ function rPO(){
       // fits the fixed virtual row height.
       var actCell='<td style="'+TD+'"><div style="display:flex;flex-wrap:wrap;gap:3px">';
       if(o.status==='Pending Approval'&&isOwner){
-        actCell+='<button onclick="openPoReview(\''+o.id+'\')" style="flex:1 1 45%;background:#f0f5fb;border:1px solid #a0c0e0;color:#2471a3;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:600;white-space:nowrap">👁 Review</button>';
-        actCell+='<button onclick="approvePO(\''+o.id+'\')" style="flex:1 1 45%;background:#27ae60;color:#fff;border:none;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:700;white-space:nowrap">✓ Approve</button>';
-        actCell+='<button onclick="rejectPO(\''+o.id+'\')" style="flex:1 1 45%;background:#fff;border:1px solid #c0392b;color:#c0392b;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">✗ Reject</button>';
+        actCell+='<button onclick="openPoReview(\''+o.id+'\')" style="flex:1 1 30%;background:#f0f5fb;border:1px solid #a0c0e0;color:#2471a3;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:600;white-space:nowrap">👁 Review</button>';
+        actCell+='<button onclick="approvePO(\''+o.id+'\')" style="flex:1 1 30%;background:#27ae60;color:#fff;border:none;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:700;white-space:nowrap">✓ Approve</button>';
+        actCell+='<button onclick="rejectPO(\''+o.id+'\')" style="flex:1 1 30%;background:#fff;border:1px solid #c0392b;color:#c0392b;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">✗ Reject</button>';
       }
-      if(poCanEdit(o))actCell+='<button onclick="openEditPO(\''+o.id+'\')" style="flex:1 1 45%;background:#f5f0fb;border:1px solid #c0a8e0;color:#7040a0;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:600;white-space:nowrap">✏️ Edit</button>';
-      if(sizesMissing(o)&&poCanSetSizes(o))actCell+='<button onclick="openSetSizes(\''+o.id+'\')" style="flex:1 1 45%;background:#fff6e8;border:1px solid #e8c080;color:#a06010;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:700;white-space:nowrap">📐 Set Sizes</button>';
-      else if(poCanSetSizes(o)&&o.status!=='Completed')actCell+='<button onclick="openSetSizes(\''+o.id+'\')" style="flex:1 1 45%;background:#faf8f2;border:1px solid #ddd;color:#888;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">📐 Sizes</button>';
-      if(canPrint)actCell+='<button onclick="printPO(\''+o.id+'\')" style="flex:1 1 45%;background:#f0f5fb;border:1px solid #a0c0e0;color:#2471a3;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:600;white-space:nowrap">🖨️ Print</button>';
-      if((isOwner||isInit)&&o.status!=='Completed'&&o.status!=='Cancelled'&&o.status!=='Rejected')actCell+='<button onclick="cancelPO(\''+o.id+'\')" style="flex:1 1 45%;background:none;border:1px solid #eee;color:#c0392b;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">Cancel</button>';
+      if(poCanEdit(o))actCell+='<button onclick="openEditPO(\''+o.id+'\')" style="flex:1 1 30%;background:#f5f0fb;border:1px solid #c0a8e0;color:#7040a0;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:600;white-space:nowrap">✏️ Edit</button>';
+      if(sizesMissing(o)&&poCanSetSizes(o))actCell+='<button onclick="openSetSizes(\''+o.id+'\')" style="flex:1 1 30%;background:#fff6e8;border:1px solid #e8c080;color:#a06010;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:700;white-space:nowrap">📐 Set Sizes</button>';
+      else if(poCanSetSizes(o)&&o.status!=='Completed')actCell+='<button onclick="openSetSizes(\''+o.id+'\')" style="flex:1 1 30%;background:#faf8f2;border:1px solid #ddd;color:#888;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">📐 Sizes</button>';
+      if(canPrint)actCell+='<button onclick="printPO(\''+o.id+'\')" style="flex:1 1 30%;background:#f0f5fb;border:1px solid #a0c0e0;color:#2471a3;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;font-weight:600;white-space:nowrap">🖨️ Print</button>';
+      if((isOwner||isInit)&&o.status!=='Completed'&&o.status!=='Cancelled'&&o.status!=='Rejected')actCell+='<button onclick="cancelPO(\''+o.id+'\')" style="flex:1 1 30%;background:none;border:1px solid #eee;color:#c0392b;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">Cancel</button>';
       actCell+='</div></td>';
       return '<tr style="height:'+PO_RH+'px;background:'+bg+'">'
        +'<td style="'+TD+'"><input type="checkbox" '+(isSel?'checked':'')+' onchange="togglePoSel(\''+o.id+'\')" style="cursor:pointer;accent-color:var(--gold)"></td>'
        +'<td style="'+TDL+'color:#888;white-space:nowrap">'+fmtDMY(o.date)+'</td>'
        +'<td style="'+TD+'font-weight:700;color:var(--gold2)">'+o.id+'</td>'
-       +'<td style="'+TDL+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+o.product+'</div><span style="'+stBadge+'">'+o.status+'</span></td>'
+       +'<td style="'+TDL+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+o.product+'</div><div style="white-space:nowrap;overflow:hidden"><span style="'+stBadge+'">'+o.status+'</span> '+ratingChip(o.product,true)+'</div></td>'
        +'<td style="'+TD+'">'+  (o.customer||'—')+'</td>'
        +'<td style="'+TD+'">'+  (o.fabric||'—')+'</td>'
        +imgCell+scCell
@@ -4801,7 +4811,7 @@ function rRX(){
      +'<td style="'+TD2+'"><span style="'+(t.type==='refund'?'background:#fde8e8;color:#c0392b':'background:#e8f8ee;color:#0F6E56')+';padding:2px 8px;border-radius:3px;font-size:8px;font-weight:800">'+(t.type==='refund'?'REFUND':'EXCHANGE')+'</span></td>'
      +'<td style="'+TD2+'font-family:monospace;font-size:10px">#'+(t.order||'')+'</td>'
      +'<td style="'+TD2+'font-weight:600">'+(t.customer||'')+'</td>'
-     +'<td style="'+TD2+'">'+thumb+(t.product||'')+(t.productToSend?'<br><span style="color:#0F6E56;font-size:10px">→ '+t.productToSend+(t.sizeToSend?' ('+t.sizeToSend+')':'')+'</span>':'')+'</td>'
+     +'<td style="'+TD2+'">'+thumb+(t.product||'')+' '+ratingChip(t.product)+(t.productToSend?'<br><span style="color:#0F6E56;font-size:10px">→ '+t.productToSend+(t.sizeToSend?' ('+t.sizeToSend+')':'')+'</span>':'')+'</td>'
      +'<td style="'+TD2+'text-align:right;font-weight:700">'+(t.amount?NF(t.amount):'—')+'</td>'
      +'<td style="'+TD2+'font-size:10px;color:#666">'+(t.platform||'')+'</td>'
      +'<td style="'+TD2+'font-size:10px">'+(t.assignedTo||'')+'</td>'
