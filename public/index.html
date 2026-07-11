@@ -286,6 +286,13 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
       <div class="dz-info" style="color:#2980b9" id="si-sh">Not selected (optional — 651 products embedded)</div>
     </div>
 
+    <div class="dz" id="dz-r" style="border-color:#3a2a10" ondragover="dzo(event,'dz-r')" ondragleave="dzl('dz-r')" ondrop="dzd(event,'r')" onclick="document.getElementById('fi-r').click()">
+      <input type="file" id="fi-r" accept=".csv,.xlsx,.xls" onchange="fsel(this,'r')">
+      <div class="dz-ico">⭐</div>
+      <div class="dz-lbl">Product Ratings File (Laam Feedback Export)</div>
+      <div class="dz-hint">CSV or Excel — ratings show beside product names (optional)</div>
+      <div class="dz-info" style="color:#b8863a" id="si-r">Not selected (optional — previous ratings stay)</div>
+    </div>
 
     <button class="gen-btn" id="gen-btn" onclick="generate()" disabled>Generate Dashboard →</button>
     <div class="gen-prog"><div class="gen-prog-bar" id="pbar"></div></div>
@@ -414,7 +421,44 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
 // ═══════════════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════════════
-var salesFiles=[], stockFile=null, shopFile=null;
+var salesFiles=[], stockFile=null, shopFile=null, ratingsFile=null;
+// Laam product ratings, keyed by lowercase product title:
+// {r:4.2, n:341, nps:72, st:'Healthy'|'NPS block', iss:'top complaint reasons'}
+var RATINGS={};
+function parseRatings(rows){
+  var out={};
+  rows.forEach(function(row){
+    var lk={};Object.keys(row).forEach(function(h){lk[h.toLowerCase().trim()]=row[h];});
+    var title=String(lk['title']||lk['product']||lk['product name']||'').trim();
+    var r=parseFloat(lk['average_rating']||lk['rating']||0)||0;
+    if(!title||!r)return;
+    var iss=String(lk['issues']||'');
+    // Collapse the raw issues list ("fabric quality 2,Fabric Quality 16,...")
+    // into deduped totals, keep the top 3 complaint reasons.
+    var agg={};
+    iss.split(',').forEach(function(part){
+      var m=part.trim().match(/^(.*?)\s+(\d+)$/);
+      if(m){var key=m[1].toLowerCase().trim();agg[key]=(agg[key]||0)+parseInt(m[2]);}
+    });
+    var top=Object.keys(agg).sort(function(a,b){return agg[b]-agg[a];}).slice(0,3)
+      .map(function(k){return k.replace(/\b\w/g,function(c){return c.toUpperCase();})+' ('+agg[k]+')';}).join(', ');
+    out[title.toLowerCase()]={r:r,n:parseInt(lk['number_of_feedbacks']||0)||0,
+      nps:Math.round(parseFloat(lk['nps']||0))||0,
+      st:String(lk['status']||'').trim(),iss:top};
+  });
+  return out;
+}
+function ratingOf(name){return RATINGS[String(name).toLowerCase().trim()]||null;}
+// Small "★ 4.2 (341)" chip, colour-graded; red ⛔ pill when Laam has blocked the product.
+function ratingChip(name){
+  var rt=ratingOf(name);if(!rt)return '';
+  var blocked=/block/i.test(rt.st||'');
+  var col=rt.r>=4.5?'background:#e8f8ee;color:#1e8449':rt.r>=4?'background:#f4f2ec;color:#555':rt.r>=3.5?'background:#fff3e0;color:#a35b00':'background:#fde8e8;color:#c0392b';
+  var tip=('★ '+rt.r+' from '+rt.n+' feedbacks · NPS '+rt.nps+(rt.iss?' · Top issues: '+rt.iss:'')).replace(/"/g,'&quot;');
+  var chip='<span title="'+tip+'" style="'+col+';border-radius:9px;padding:1px 7px;font-size:9px;font-weight:700;white-space:nowrap;cursor:help">★ '+rt.r.toFixed(1)+' <span style="font-weight:400;opacity:.75">('+rt.n+')</span></span>';
+  if(blocked)chip+=' <span title="Laam has BLOCKED this product (status: '+rt.st.replace(/"/g,'')+')" style="background:#c0392b;color:#fff;border-radius:9px;padding:1px 7px;font-size:9px;font-weight:800;white-space:nowrap;cursor:help">⛔ BLOCKED</span>';
+  return chip;
+}
 var DETAIL=[], STOCK=[], META={}, STATUSES=[], MONTHS=[];
 var filters={from:'',to:'',stats:[],pf:'',dst:''};
 var SHOP_STOCK={};
@@ -532,6 +576,7 @@ async function initCloud(){
     var r4=await apiGet('/sales-data');var data4=await r4.json();
     if(data4&&Array.isArray(data4.d)&&data4.d.length){
       DETAIL=data4.d;STOCK=data4.s||[];META=data4.m||{};STATUSES=data4.st||[];MONTHS=data4.mo||[];
+      if(data4.r&&typeof data4.r==='object')RATINGS=data4.r;
       if(STOCK.length)buildStockProds();
     }
   }catch(e){}})(),
@@ -567,14 +612,15 @@ var PROD_IMG={"kriti black":"https://cdn.shopify.com/s/files/1/0648/4213/7654/fi
 // ═══════════════════════════════════════════════════════════════════
 function dzo(e,id){e.preventDefault();document.getElementById(id).classList.add('over');}
 function dzl(id){document.getElementById(id).classList.remove('over');}
-function dzd(e,t){e.preventDefault();var id='dz-'+t;document.getElementById(id).classList.remove('over');var fs=Array.from(e.dataTransfer.files).filter(f=>{var n=f.name.toLowerCase();return n.endsWith('.csv')||n.endsWith('.xlsx')||n.endsWith('.xls');});if(t==='s'){salesFiles=fs;}else if(t==='sh'){shopFile=fs[0]||null;}else{stockFile=fs[0]||null;}updLabels();}
-function fsel(inp,t){if(t==='s'){salesFiles=Array.from(inp.files);}else if(t==='sh'){shopFile=inp.files[0]||null;}else{stockFile=inp.files[0]||null;}updLabels();}
+function dzd(e,t){e.preventDefault();var id='dz-'+t;document.getElementById(id).classList.remove('over');var fs=Array.from(e.dataTransfer.files).filter(f=>{var n=f.name.toLowerCase();return n.endsWith('.csv')||n.endsWith('.xlsx')||n.endsWith('.xls');});if(t==='s'){salesFiles=fs;}else if(t==='sh'){shopFile=fs[0]||null;}else if(t==='r'){ratingsFile=fs[0]||null;}else{stockFile=fs[0]||null;}updLabels();}
+function fsel(inp,t){if(t==='s'){salesFiles=Array.from(inp.files);}else if(t==='sh'){shopFile=inp.files[0]||null;}else if(t==='r'){ratingsFile=inp.files[0]||null;}else{stockFile=inp.files[0]||null;}updLabels();}
 function updLabels(){
   document.getElementById('si-s').textContent=salesFiles.length?salesFiles.length+' file'+(salesFiles.length>1?'s':'')+' selected':'No files selected';
   document.getElementById('si-k').textContent=stockFile?'✓ '+stockFile.name:'Not selected (optional)';
   document.getElementById('si-sh').textContent=shopFile?'✓ '+shopFile.name:'Not selected (optional — '+Object.keys(SHOP_STATUS).length+' products embedded)';
+  var sir=document.getElementById('si-r');if(sir)sir.textContent=ratingsFile?'✓ '+ratingsFile.name:'Not selected (optional — previous ratings stay)';
   document.getElementById('gen-btn').disabled=salesFiles.length===0;
-  document.getElementById('gstatus').textContent=salesFiles.length?salesFiles.length+' sales file(s) ready'+(stockFile?' + stock file ✓':'')+(shopFile?' + shopify ✓':''):'Select at least one sales file (CSV or Excel) to begin';
+  document.getElementById('gstatus').textContent=salesFiles.length?salesFiles.length+' sales file(s) ready'+(stockFile?' + stock file ✓':'')+(shopFile?' + shopify ✓':'')+(ratingsFile?' + ratings ✓':''):'Select at least one sales file (CSV or Excel) to begin';
 }
 function setProg(pct,msg){document.getElementById('pbar').style.width=pct+'%';if(msg)document.getElementById('gstatus').textContent=msg;}
 
@@ -609,6 +655,18 @@ async function generate(){
       });
       setProg(12,'Shopify: '+Object.keys(SHOP_STATUS).length+' products loaded');
       window._shopFresh=true; // freshly parsed from a real export — safe to publish to cloud
+    }
+
+    // Product ratings (Laam feedback export) — optional; replaces previous
+    // ratings when supplied, otherwise the cloud copy stays as-is.
+    if(ratingsFile){
+      setProg(13,'Loading ratings file...');
+      var rt=await readFile(ratingsFile);
+      var rtRows=Array.isArray(rt)?rt:Papa.parse(rt,{header:true,skipEmptyLines:true}).data;
+      var parsed=parseRatings(rtRows);
+      var pn=Object.keys(parsed).length;
+      if(pn){RATINGS=parsed;setProg(14,'Ratings: '+pn+' products loaded');}
+      else setProg(14,'Ratings file had no usable rows — kept previous ratings');
     }
 
     // Stock
@@ -1409,7 +1467,9 @@ function rCS(){
     // keep the sign so the sheet can show losses instead of hiding them.
     var netPat=(retailPrice>0&&p.cost>0)?gpUnit-commission:0;
     var netPatPct=(retailPrice>0&&p.cost>0)?Math.round(netPat/retailPrice*100):0;
+    var _rt=RATINGS[k]||null;
     return Object.assign(p,{
+      rating:_rt?_rt.r:0,ratingN:_rt?_rt.n:0,
       sp:sp,img:(sp&&sp.img)?sp.img:findImg(k),grossPrice:grossPrice,retailPrice:retailPrice,shopPrice:SHOP_PRICE[k]||null,priceDiff:(retailPrice>0&&SHOP_PRICE[k]>0)?retailPrice-SHOP_PRICE[k]:null,stockStatus:sp?sp.status:'',shopStatus:SHOP_STATUS[k]||'',statusDiff:(function(){var ls=sp?sp.status:'';var ss=SHOP_STATUS[k]||'';if(!ss||!ls)return '';if(ls===ss)return 'SAME';return ls+'/'+ss;})(),shopStock:SHOP_STOCK[k]!=null?SHOP_STOCK[k]:null,createdAt:sp?sp.createdAt||'':'',createdAtTs:sp&&sp.createdAt?(new Date(sp.createdAt).getTime()||0):0,
       laamS:sp?sp.S:0,laamM:sp?sp.M:0,laamL:sp?sp.L:0,laamXL:sp?sp.XL:0,laamTotal:sp?sp.total:null,stockDiff:(sp?sp.total:0)-(SHOP_STOCK[k]!=null?SHOP_STOCK[k]:0),saS:sp?sp.saS:0,saM:sp?sp.saM:0,saL:sp?sp.saL:0,saXL:sp?sp.saXL:0,saTotal:sp?sp.saTotal:null,
       total10:t10,total20:t20,total30:t30,daily:Math.round(t30/30*10)/10,
@@ -1538,7 +1598,7 @@ function rCS(){
 
   // Row 1: Group label row — no per-cell top sticky; <thead> handles vertical freeze
   var gRow='<tr style="font-size:9px;font-weight:700">';
-  gRow+='<th colspan="4" style="background:#f0ede8;padding:3px 9px;position:sticky;left:0;z-index:9;border-bottom:1px solid #e0dcd4;text-align:left;color:var(--gold2);font-size:10px">Summary Sheet</th>';
+  gRow+='<th colspan="5" style="background:#f0ede8;padding:3px 9px;position:sticky;left:0;z-index:9;border-bottom:1px solid #e0dcd4;text-align:left;color:var(--gold2);font-size:10px">Summary Sheet</th>';
   if(hasStock&&G.pricing){gRow+='<th colspan="3" style="background:#fdf3e8;color:#c8a96e;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8">Gross Price &amp; Disc%</th>';}
   if(hasStock){gRow+='<th colspan="3" style="background:#fdf3e8;color:#2980b9;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8;border-right:2px solid #c8a96e">Retail Price</th>';}
   if(G.gp){
@@ -1572,6 +1632,7 @@ function rCS(){
   cRow+='<th data-fl="1" data-c="createdAtTs" onclick="csSort(this)" style="padding:6px 8px;background:'+hbg+';border-bottom:2px solid #e8e4dc;text-align:center;min-width:75px;white-space:nowrap;cursor:pointer;user-select:none">Created'+((_csSortCol==='createdAtTs'&&_csSortAsc)?' ↑':(_csSortCol==='createdAtTs'&&!_csSortAsc)?' ↓':'')+'</th>';
   cRow+='<th data-fl="1" data-c="name" onclick="csSort(this)" style="padding:6px 8px;background:'+hbg+';border-bottom:2px solid #e8e4dc;text-align:left;min-width:140px;white-space:nowrap;cursor:pointer;user-select:none">Product'+((_csSortCol==='name'&&_csSortAsc)?' ↑':(_csSortCol==='name'&&!_csSortAsc)?' ↓':'')+'</th>';
   cRow+='<th data-fl="1" style="padding:6px 6px;background:'+hbg+';border-bottom:2px solid #e8e4dc;width:64px;min-width:64px">IMG</th>';
+  cRow+='<th data-fl="1" data-c="rating" onclick="csSort(this)" style="padding:6px 8px;background:'+hbg+';border-bottom:2px solid #e8e4dc;text-align:center;min-width:78px;white-space:nowrap;cursor:pointer;user-select:none" title="Laam customer rating — click to sort">★ Rating'+((_csSortCol==='rating'&&_csSortAsc)?' ↑':(_csSortCol==='rating'&&!_csSortAsc)?' ↓':'')+'</th>';
   if(hasStock&&G.pricing){
     cRow+='<th data-fl="1" data-c="grossPrice" onclick="csSort(this)" style="padding:6px 8px;background:#fdf8f0;border-bottom:2px solid #e8e4dc;text-align:right;min-width:80px;white-space:nowrap;cursor:pointer;user-select:none">Gross Price'+((_csSortCol==='grossPrice'&&_csSortAsc)?' ↑':(_csSortCol==='grossPrice'&&!_csSortAsc)?' ↓':'')+'</th>';
     cRow+='<th data-fl="1" data-c="discountAmt" onclick="csSort(this)" style="padding:6px 8px;background:#fdf8f0;border-bottom:2px solid #e8e4dc;text-align:right;min-width:75px;white-space:nowrap;cursor:pointer;user-select:none">Discount'+((_csSortCol==='discountAmt'&&_csSortAsc)?' ↑':(_csSortCol==='discountAmt'&&!_csSortAsc)?' ↓':'')+'</th>';
@@ -1633,6 +1694,7 @@ function rCS(){
    +'<td data-fl="1" style="padding:4px 6px;background:'+totBg+';text-align:center;font-size:9px;font-style:italic;color:var(--gold2)">TOT</td>'
    +'<td data-fl="1" style="padding:5px 8px;background:'+totBg+';font-weight:800;white-space:nowrap;color:var(--gold2)">SUBTOTAL — '+arr.length+' products</td>'
    +'<td data-fl="1" style="padding:5px 8px;background:'+totBg+'"></td>'
+   +'<td data-fl="1" style="padding:5px 8px;background:'+totBg+';text-align:center;color:#bbb">—</td>'
    +(hasStock&&G.pricing?'<td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td>':'')
    +(hasStock?'<td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td>':'')
    +(G.gp?tdc('—','color:#bbb')+tdc('—','background:#ecfaec;color:#bbb')+tdc('—','background:#ecfaec;color:#bbb')+tdc('—','background:#f9f5ff;color:#bbb'):'')
@@ -1687,6 +1749,7 @@ function rCS(){
      +'<td data-fl="1" style="padding:4px 6px;background:'+bg+';width:75px;min-width:75px;text-align:center;font-size:10px;color:#888;white-space:nowrap">'+fmtCDate(p.createdAt)+'</td>'
      +'<td data-fl="1" style="padding:6px 8px;background:'+bg+';font-weight:700;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">'+nameCell+'</td>'
      +'<td data-fl="1" style="padding:4px 6px;background:'+bg+';width:64px;min-width:64px;max-width:64px">'+imgHtml+'</td>'
+     +'<td data-fl="1" style="padding:4px 6px;background:'+bg+';text-align:center;white-space:nowrap">'+(ratingChip(p.name)||'<span style="color:#ccc;font-size:9px">—</span>')+'</td>'
      +(hasStock&&G.pricing?'<td data-fl="1" class="cs-c cs-bg1 cs-gd cs-fw6">'+(p.grossPrice>0?NF(p.grossPrice):'-')+'</td>':'')
      +(hasStock&&G.pricing?'<td data-fl="1" class="cs-c cs-bg1 cs-fw6" style="color:'+(p.discountAmt>0?'#e74c3c':'#bbb')+'">'+(p.discountAmt>0?NF(p.discountAmt):'-')+'</td>':'')
      +(hasStock&&G.pricing?'<td data-fl="1" class="cs-c cs-bg1 cs-fw6" style="color:'+(p.discountPct>0?'#e74c3c':'#bbb')+'">'+(p.discountPct>0?p.discountPct+'%':'-')+'</td>':'')
@@ -2549,7 +2612,7 @@ async function publishSnapshot(){
   var btn=document.getElementById('pub-btn');var old=btn.textContent;btn.textContent='⏳ Publishing…';btn.disabled=true;
   try{
     var res=await fetch(CLOUD_API+'/sales-data',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),
-      body:JSON.stringify({d:DETAIL,s:STOCK,m:META,st:STATUSES,mo:MONTHS})});
+      body:JSON.stringify({d:DETAIL,s:STOCK,m:META,st:STATUSES,mo:MONTHS,r:RATINGS})});
     var j=await res.json();
     if(!res.ok||!j.ok)throw new Error(j.error||('HTTP '+res.status));
     var msg='Sales data published to cloud ✓ ('+NF(DETAIL.length)+' rows through '+(META.max_date||'?')+')';
