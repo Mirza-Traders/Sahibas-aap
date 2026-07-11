@@ -4554,7 +4554,7 @@ function rPO(){
   // Table — virtualized: header lives in its own div, body renders only the
   // visible slice of rows (like the Detail Report), so the page stays fast
   // no matter how many orders accumulate.
-  var PO_COLS=[36,92,78,190,92,92,62,62,74,44,44,44,44,92,92,92,92,92,106,96,170,130];
+  var PO_COLS=[36,92,78,225,92,92,62,62,74,44,44,44,44,92,92,92,92,92,106,96,170,130];
   var PO_TOT=PO_COLS.reduce(function(a,b){return a+b;},0);
   var PO_RH=76; // tallest row = Pending Approval with 6 action buttons (2 lines of 3)
   var colgroup='<colgroup>'+PO_COLS.map(function(w){return '<col style="width:'+w+'px">';}).join('')+'</colgroup>';
@@ -4662,7 +4662,7 @@ function rPO(){
        +'<td style="'+TD+'"><input type="checkbox" '+(isSel?'checked':'')+' onchange="togglePoSel(\''+o.id+'\')" style="cursor:pointer;accent-color:var(--gold)"></td>'
        +'<td style="'+TDL+'color:#888;white-space:nowrap">'+fmtDMY(o.date)+'</td>'
        +'<td style="'+TD+'font-weight:700;color:var(--gold2)">'+o.id+'</td>'
-       +'<td style="'+TDL+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+o.product+'</div><div style="white-space:nowrap;overflow:hidden"><span style="'+stBadge+'">'+o.status+'</span> '+ratingChip(o.product,true)+'</div></td>'
+       +'<td style="'+TDL+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+o.product+'</div><div style="white-space:nowrap;overflow:hidden"><span style="'+stBadge+'">'+o.status+'</span> '+ratingChip(o.product)+'</div></td>'
        +'<td style="'+TD+'">'+  (o.customer||'—')+'</td>'
        +'<td style="'+TD+'">'+  (o.fabric||'—')+'</td>'
        +imgCell+scCell
