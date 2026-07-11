@@ -1337,8 +1337,13 @@ function findImg(k){
   Object.keys(PROD_IMG).forEach(function(pk){
     if(pk.length>bestK.length&&(k.indexOf(pk+' ')===0||k===pk||k.indexOf(pk+' -')===0)){bestK=pk;best=PROD_IMG[pk];}
   });
+  // Remember that this photo is BORROWED from a similar-named product, so
+  // thumbnails can flag it — the product has no photo of its own anywhere.
+  if(best)_IMG_BORROWED[k]=bestK;
   return best||'';
 }
+var _IMG_BORROWED={};
+function imgBorrowedParent(name){return _IMG_BORROWED[String(name).toLowerCase().trim()]||'';}
 function csToggle(el){var n=el.getAttribute('data-n');if(el.checked)_csSelProds.add(n);else _csSelProds.delete(n);var b=document.getElementById('cs-exp-sel');if(b)b.style.display=_csSelProds.size>0?'':'none';}
 function csSelAll(){var allC=document.querySelectorAll('#pcs-tbody input[type=checkbox]');var doAdd=_csSelProds.size<(window._csArr||[]).length;_csSelProds.clear();allC.forEach(function(cb){cb.checked=doAdd;if(doAdd)_csSelProds.add(cb.getAttribute('data-n'));});var b=document.getElementById('cs-exp-sel');if(b)b.style.display=_csSelProds.size>0?'':'none';}
 function csSort(el){var c=el.getAttribute('data-c');if(_csSortCol===c)_csSortAsc=!_csSortAsc;else{_csSortCol=c;_csSortAsc=false;}rendered.cs=false;doR('cs');}
@@ -1672,6 +1677,10 @@ function rCS(){
     var isSel=_csSelProds.has(p.name);
     var simg=p.img&&p.img.startsWith('http')?(p.img.indexOf('?')>=0?p.img+'&width=120':p.img+'?width=120'):'';
     var imgHtml=simg?'<img src="'+simg+'" loading="lazy" data-n="'+p.name.replace(/"/g,'')+'" onerror="imgFail(this)" style="width:52px;height:65px;object-fit:cover;object-position:top center;border-radius:6px;display:block">':prodPH(p.name);
+    // "≈" badge on borrowed photos: this product has no photo of its own, so a
+    // similar-named product's photo is shown in its place.
+    var _bp=simg?imgBorrowedParent(p.name):'';
+    if(_bp)imgHtml='<div style="position:relative;width:52px">'+imgHtml+'<span title="Not this product\'s own photo — showing &quot;'+_bp.replace(/"/g,'')+'&quot; (no photo exists for '+p.name.replace(/"/g,'')+')" style="position:absolute;top:2px;right:2px;background:rgba(30,30,30,.78);color:#ffd76e;font-size:11px;font-weight:700;border-radius:4px;padding:0 4px;line-height:15px;cursor:help">≈</span></div>';
     var nameCell=simg?'<a href="'+p.img+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+p.name+'</a>':p.name;
     tbody+='<tr style="background:'+bg+';border-bottom:1px solid #f2efe9'+(isSel?';outline:2px solid var(--gold)':'')+'">'
      +'<td data-fl="1" style="padding:6px 8px;background:'+bg+'"><input type="checkbox" data-n="'+p.name.replace(/"/g,'')+'" '+(isSel?'checked':'')+' onchange="csToggle(this)" style="cursor:pointer;accent-color:var(--gold)"></td>'
