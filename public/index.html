@@ -3921,7 +3921,10 @@ var _ssId=null;
 function poCanSetSizes(o){
   if(!o||!CU)return false;
   if(o.status==='Cancelled'||o.status==='Rejected')return false;
-  if(CU.role==='Owner'||CU.role==='Production')return true;
+  // The person who placed the order decides the size ratio — they know the
+  // demand it must fulfil. Owner can also set it as an override. Production-
+  // floor users who didn't place the order cannot (they lack that context).
+  if(CU.role==='Owner')return true;
   return (o.placedBy===CU.name||o.placedByEmail===CU.email);
 }
 function sizesMissing(o){return o&&(o.total>0)&&((o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0)===0);}
