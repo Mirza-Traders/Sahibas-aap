@@ -468,6 +468,10 @@ function ratingChip(name,mini){
   return chip;
 }
 var DETAIL=[], STOCK=[], META={}, STATUSES=[], MONTHS=[];
+// Photo URLs pulled from the daily Laam sales export's own "Image Url" column
+// (real product photos, present on every sold line) — keyed by lowercase
+// product name. Fills the gap for products that have no Shopify listing yet.
+var SALES_IMG={};
 var filters={from:'',to:'',stats:[],pf:'',dst:''};
 var SHOP_STOCK={};
 var SHOP_PRICE={};
@@ -585,6 +589,7 @@ async function initCloud(){
     if(data4&&Array.isArray(data4.d)&&data4.d.length){
       DETAIL=data4.d;STOCK=data4.s||[];META=data4.m||{};STATUSES=data4.st||[];MONTHS=data4.mo||[];
       if(data4.r&&typeof data4.r==='object')RATINGS=data4.r;
+      if(data4.si&&typeof data4.si==='object')SALES_IMG=data4.si;
       if(STOCK.length)buildStockProds();
     }
   }catch(e){}})(),
@@ -609,6 +614,14 @@ async function initCloud(){
   }catch(e){}})()
 
   ]);
+  // Fill in photos for products with no Shopify listing yet, using the real
+  // photo URL from the daily sales export. Runs after both fetches above have
+  // settled (order-independent), so Shopify's own photo always takes priority
+  // over a sales-export photo when both exist.
+  if(SALES_IMG&&typeof SALES_IMG==='object'){
+    Object.keys(SALES_IMG).forEach(function(k){if(!PROD_IMG[k])PROD_IMG[k]=SALES_IMG[k];});
+    _PIDX=null;
+  }
 }
 // Passwords are handled server-side now (no localStorage password merge).
 // merge saved roles (admin can assign roles via UI) — never override hardcoded Owners
@@ -688,7 +701,7 @@ async function generate(){
     }
 
     // Sales (chunked for performance)
-    DETAIL=[];
+    DETAIL=[];SALES_IMG={};
     for(var i=0;i<salesFiles.length;i++){
       setProg(15+Math.round((i/salesFiles.length)*70),'Reading '+salesFiles[i].name+' ('+(i+1)+'/'+salesFiles.length+')...');
       var txt=await readFile(salesFiles[i]);
@@ -697,6 +710,10 @@ async function generate(){
       await tick(); // yield to browser so UI stays responsive
     }
     if(!DETAIL.length){setProg(0,'No valid rows found in sales files.');document.getElementById('gen-btn').disabled=false;return;}
+    // Fill in photos for products with no Shopify listing yet, using the real
+    // photo URL from the sales export — Shopify's own photo always wins if set.
+    Object.keys(SALES_IMG).forEach(function(k){if(!PROD_IMG[k])PROD_IMG[k]=SALES_IMG[k];});
+    _PIDX=null;
 
     setProg(90,'Computing metrics for '+DETAIL.length.toLocaleString()+' rows...');
     await tick();
@@ -780,6 +797,8 @@ function parseSales(txt,cm){
     var ov=parseFloat(String(row['Original Value']||row['Original Price']||'').replace(/,/g,''))||0;
     var av=parseFloat(String(row['Actual Price']||row['Updated Value']||'').replace(/,/g,''))||0;
     var rfd=(row['Refund Date']||row['Refund date']||row['Refunded Date']||'').trim();
+    var imgUrl=(row['Image Url']||row['Image URL']||row['image_url']||row['Item Image']||row['Image']||'').trim();
+    if(imgUrl&&imgUrl.indexOf('http')===0){var ik=prd.toLowerCase().trim();if(!SALES_IMG[ik])SALES_IMG[ik]=imgUrl;}
     // [0]date [1]prd [2]sku [3]sz [4]stat [5]pf [6]dst [7]pay [8]dp
     // [9]ret [10]cost [11]cpct [12]comm [13]tax [14]gp [15]pat
     // [16]isX [17]xa [18]onum [19]mk [20]gross(orig) [21]actualPrice [22]isRefunded
@@ -2627,7 +2646,7 @@ async function publishSnapshot(){
   var btn=document.getElementById('pub-btn');var old=btn.textContent;btn.textContent='⏳ Publishing…';btn.disabled=true;
   try{
     var res=await fetch(CLOUD_API+'/sales-data',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),
-      body:JSON.stringify({d:DETAIL,s:STOCK,m:META,st:STATUSES,mo:MONTHS,r:RATINGS})});
+      body:JSON.stringify({d:DETAIL,s:STOCK,m:META,st:STATUSES,mo:MONTHS,r:RATINGS,si:SALES_IMG})});
     var j=await res.json();
     if(!res.ok||!j.ok)throw new Error(j.error||('HTTP '+res.status));
     var msg='Sales data published to cloud ✓ ('+NF(DETAIL.length)+' rows through '+(META.max_date||'?')+')';
