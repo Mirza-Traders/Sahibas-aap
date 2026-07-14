@@ -1425,6 +1425,12 @@ function rST(){
 // ── PRODUCT SUMMARY — built from sales data ──
 var _csSortCol='total10',_csSortAsc=false,_csSelProds=new Set(),_csActiveRow=-1;
 var _csFilters={search:'',status:'',shopSt:'',stDiff:'',min10d:0,minStk:0,minRate:0};
+// Discontinued products (inactive/draft on BOTH platforms, zero stock
+// everywhere, can never sell again) clutter the default view with dead SKUs
+// that still show up because they have historical orders. Hidden by default;
+// the toggle brings the full all-time ledger back.
+var _csHideDiscontinued=true;
+function csToggleDiscontinued(){_csHideDiscontinued=!_csHideDiscontinued;rendered.cs=false;doR('cs');}
 var _csGroups={pricing:false,gp:false,s_sales:false,totals:false,orders:false,s_stock:false,vel20:false};
 function csToggleGroup(g){_csGroups[g]=!_csGroups[g];rendered.cs=false;doR('cs');}
 function csToggleAll(){var allOn=Object.values(_csGroups).every(Boolean);Object.keys(_csGroups).forEach(function(k){_csGroups[k]=!allOn;});rendered.cs=false;doR('cs');}
@@ -1542,6 +1548,9 @@ function rCS(){
     if(cf.minRate&&p.daily<cf.minRate)return false;
     return true;
   });
+  var isDiscontinued=function(p){return p.stockStatus!=='ACTIVE'&&p.shopStatus!=='ACTIVE'&&(p.laamTotal||0)===0&&(p.shopStock||0)===0&&(p.saTotal||0)===0;};
+  var discontinuedCount=arr.filter(isDiscontinued).length;
+  if(_csHideDiscontinued)arr=arr.filter(function(p){return !isDiscontinued(p);});
   arr.sort(function(a,b){var av=a[_csSortCol],bv=b[_csSortCol];if(typeof av==='string'||typeof bv==='string'){av=(av||'').toLowerCase();bv=(bv||'').toLowerCase();return _csSortAsc?(av<bv?-1:av>bv?1:0):(bv<av?-1:bv>av?1:0);}av=av||0;bv=bv||0;return _csSortAsc?av-bv:bv-av;});
   // ── PO pipeline data per product ──
   var _poMap={};
@@ -1629,6 +1638,7 @@ function rCS(){
    +sel('min10d',[['1','>1'],['5','>5'],['10','>10'],['20','>20'],['30','>30']],'10d Sales: All')
    +(hasStock?sel('minStk',[['1','In Stock'],['10','>10'],['20','>20'],['50','>50']],'Laam Stock: All'):'')
    +sel('minRate',[['0.5','>0.5/d'],['1','>1/d'],['2','>2/d'],['5','>5/d']],'Daily Rate: All')
+   +(discontinuedCount>0?'<button onclick="csToggleDiscontinued()" title="Discontinued = inactive/draft on both Laam and Shopify, zero stock everywhere" style="border:1px solid '+(_csHideDiscontinued?'#ccc':'#c0392b')+';background:'+(_csHideDiscontinued?'#fff':'#fdf0f0')+';color:'+(_csHideDiscontinued?'#888':'#c0392b')+';border-radius:4px;padding:5px 10px;font-size:10px;cursor:pointer;font-weight:600">'+(_csHideDiscontinued?'Show discontinued ('+discontinuedCount+' hidden)':'Hide discontinued ('+discontinuedCount+')')+'</button>':'')
    +'<span style="color:#ccc;margin:0 2px">|</span>'
    +'<span style="font-size:10px;color:#888;font-weight:600">Expand:</span>'
    +(hasStock?ghBtn('pricing','Price','#c8a96e'):'')
