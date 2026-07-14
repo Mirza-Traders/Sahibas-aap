@@ -4783,7 +4783,11 @@ function rxCanAdvance(t,next){
   if(next==='received')return r==='warehouse';
   if(next==='approved')return false;
   if(next==='paid')return t.type==='refund'?(r==='accountant'):(r==='dispatch'||r==='warehouse');
-  if(next==='informed')return t.assignedTo===CU.name;
+  // Informing the customer is Sana/Bano's job specifically (rexRole "member"),
+  // not whoever a ticket happened to be auto-assigned to at creation. Keep the
+  // original assignee able to do it too, for whoever a ticket is deliberately
+  // assigned to.
+  if(next==='informed')return r==='member'||t.assignedTo===CU.name;
   if(next==='closed')return false;
   return false;
 }
