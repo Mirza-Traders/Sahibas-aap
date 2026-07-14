@@ -3381,7 +3381,7 @@ function rAC(){
       else verdict=(sellThrough>=0.7&&cover<cfg.lead)?'THINOUT':'THIN';
     }else if(rate<0.15&&np.daysLive>=14)verdict='SLOW';
     else verdict='OK';
-    return {name:np.title,img:(sp&&sp.img)?sp.img:findImg(k),launch:np.launch,daysLive:np.daysLive,first14:np.first14,sold:np.sold,rate:rate,sellThrough:sellThrough,stk:stk,sa:sa,inc:inc.qty,eta:inc.eta,rev:np.rev,net:net,verdict:verdict};
+    return {name:np.title,img:(sp&&sp.img)?sp.img:findImg(k),launch:np.launch,daysLive:np.daysLive,first14:np.first14,sold:np.sold,rate:rate,sellThrough:sellThrough,stk:stk,sa:sa,inc:inc.qty,eta:inc.eta,price:price,rev:np.rev,net:net,verdict:verdict};
   });
   newRows.sort(function(a,b){return b.rate-a.rate;});
   var nBest=newRows.filter(function(r){return r.verdict==='BEST'||r.verdict==='SELLOUT';}).length;
@@ -3643,12 +3643,13 @@ function rAC(){
      +'<td style="'+TD+'">'+Math.round(r.sellThrough*100)+'%</td>'
      +'<td style="'+TD+'">'+NF(r.stk)+(r.sa>0?' <span style="color:#5050b0;font-size:9px">+SA '+r.sa+'</span>':'')+'</td>'
      +'<td style="'+TD+'">'+(r.inc>0?NF(r.inc)+(r.eta?' <span style="color:#888;font-size:9px">('+fmtDMY(r.eta)+')</span>':''):'—')+'</td>'
+     +'<td style="'+TD+'font-weight:600">'+(r.price>0?NF(r.price):'—')+'</td>'
      +'<td style="'+TD+'">'+N(r.rev)+'</td>'
      +'<td style="'+TD+'font-weight:700;color:'+(r.net===null?'#bbb':r.net<0?'#c0392b':r.net<cfg.minNet?'#b06000':'#27ae60')+'">'+(r.net===null?'—':NF(r.net))+'</td>'
      +'<td style="'+TD+'text-align:center"><span style="background:'+v.bg+';color:'+v.fg+';padding:2px 8px;border-radius:3px;font-size:8px;font-weight:800;white-space:nowrap">'+v.lbl+'</span></td></tr>';
   }).join('');
   var sec7=box(secHead('🚀','New Arrivals Scorecard — launched in the last '+cfg.newDays+' days',newRows.length,'#c8a96e',nBest+' bestseller'+(nBest===1?'':'s')+' · '+nSlow+' slow · Bestseller = ≥1/day AND nets ≥PKR '+cfg.minNet+'/pc after the 25% load','acExpNew')
-   +(newRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Launched</th><th style="'+TH+'">First 14d</th><th style="'+TH+'">Sold</th><th style="'+TH+'">Rate</th><th style="'+TH+'">Sell-Through</th><th style="'+TH+'">Stock</th><th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Revenue</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'text-align:center">Verdict</th></tr></thead><tbody>'+h7rows+'</tbody></table>'):empty('No new arrivals in the last '+cfg.newDays+' days')),'ac-sec-new');
+   +(newRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Launched</th><th style="'+TH+'">First 14d</th><th style="'+TH+'">Sold</th><th style="'+TH+'">Rate</th><th style="'+TH+'">Sell-Through</th><th style="'+TH+'">Stock</th><th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Revenue</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'text-align:center">Verdict</th></tr></thead><tbody>'+h7rows+'</tbody></table>'):empty('No new arrivals in the last '+cfg.newDays+' days')),'ac-sec-new');
 
   // Section 6 — Broken size runs
   var VC={BROKEN:{bg:'#fdeaea',bd:'#e74c3c',fg:'#c0392b',lbl:'BROKEN'},SELLAHEAD:{bg:'#fff3e0',bd:'#e8a030',fg:'#b06000',lbl:'SELL-AHEAD'},COVERED:{bg:'#e8f8ee',bd:'#27ae60',fg:'#1e8449',lbl:'PO INCOMING'},UNKNOWN:{bg:'#fff8e0',bd:'#d4b040',fg:'#8a6800',lbl:'CHECK PO'},OK:{bg:'#fafaf8',bd:'transparent',fg:'#999',lbl:''}};
@@ -3721,7 +3722,7 @@ function acExpPW(){csvDL((window._acData.priceWatchRows||[]).map(function(r){ret
 function acExpMov(){csvDL((window._acData.moverRows||[]).map(function(r){return[r.name,r.dir,r.v7,r.prevWk,r.chg===null?'NEW':r.chg+'%',r.stk,r.coverNew===null?'':r.coverNew];}),['Product','Direction','Sold 7d','Prev Weekly Pace','Change','Stock','Days Cover at New Pace'],'movers_shakers.csv');}
 function acExpDrain(){csvDL((window._acData.drainRows||[]).map(function(r){return[r.name,r.revDel,r.exc,r.refD,r.refLoss,r.canPct+'%',r.bleed,r.total];}),['Product','Delivered Revenue','Excess Commission','Refunded Orders','Refund Loss Est','Cancel%','Loss Bleed Per Month','Total Drain PKR'],'profit_drains.csv');}
 function acExpRecv(){csvDL((window._acData.recvRows||[]).map(function(r){return[r.onum,r.date,r.prd,r.ret,r.days];}),['Order#','Date','Product','Retail','Days Pending'],'receivables_pending.csv');}
-function acExpNew(){csvDL((window._acData.newRows||[]).map(function(r){return[r.name,r.launch.toISOString().split('T')[0],r.daysLive,r.first14,r.sold,Math.round(r.rate*100)/100,Math.round(r.sellThrough*100)+'%',r.stk,r.sa,r.inc,r.rev,r.net===null?'':r.net,r.verdict];}),['Product','Launched','Days Live','First 14d Sold','Total Sold','Daily Rate','Sell-Through','Stock','Sell-Ahead','Incoming PO','Revenue','Net Per Piece','Verdict'],'new_arrivals.csv');}
+function acExpNew(){csvDL((window._acData.newRows||[]).map(function(r){return[r.name,r.launch.toISOString().split('T')[0],r.daysLive,r.first14,r.sold,Math.round(r.rate*100)/100,Math.round(r.sellThrough*100)+'%',r.stk,r.sa,r.inc,r.price||'',r.rev,r.net===null?'':r.net,r.verdict];}),['Product','Launched','Days Live','First 14d Sold','Total Sold','Daily Rate','Sell-Through','Stock','Sell-Ahead','Incoming PO','Retail Price','Revenue','Net Per Piece','Verdict'],'new_arrivals.csv');}
 function acExpSize(){csvDL((window._acData.sizeRows||[]).map(function(r){var f={};r.cells.forEach(function(c){f[c.sz]=c.share+'% | stk '+c.st+' | SA '+c.sa+' | PO '+(c.po||0)+' | '+c.verdict;});return[r.name,r.retail,r.v30,f.S,f.M,f.L,f.XL,r.broken.join('/'),r.unsized,r.risk];}),['Product','Retail','Sold 30d','S','M','L','XL','Broken Sizes','Unsized Incoming PO','Monthly Revenue at Risk'],'broken_size_runs.csv');}
 function acExpLoss(){csvDL((window._acData.lossRows||[]).map(function(r){return[r.name,r.gross,r.disc?r.disc+'%':'',r.retail,r.cost,r.gp,r.loss,r.breakeven,r.v30,r.bleed,r.stk];}),['Product','Gross Price','Discount%','Retail','Cost','GP/pc','Net Loss/pc','Breakeven Price','Sold 30d','Monthly Bleed PKR','Stock'],'selling_at_loss.csv');}
 
