@@ -3305,7 +3305,7 @@ function rAC(){
       if(cover<(cfg.lead+cfg.safety)){
         var sug=Math.max(0,Math.ceil(rate*(cfg.lead+cfg.cover)-stk-inc.qty));
         var rNet=(laamPrice>0&&cost>0)?Math.round(laamPrice-cost-laamPrice*0.25):null;
-        reorderRows.push({name:p.name,img:img,v30:p.v30,rate:rate,stk:stk,inc:inc.qty,eta:inc.eta,cover:cover,sug:sug,net:rNet,laamStatus:laamStatus});
+        reorderRows.push({name:p.name,img:img,v30:p.v30,rate:rate,stk:stk,inc:inc.qty,eta:inc.eta,cover:cover,price:laamPrice,sug:sug,net:rNet,laamStatus:laamStatus});
       }
     }
     // 4. Ageing — has stock, hasn't sold recently
@@ -3397,8 +3397,10 @@ function rAC(){
     else if(rP>=0.35&&r7<=0.5*rP)dir='COOLING';
     if(!dir)return;
     var chg=rP>0?Math.round((r7/rP-1)*100):null;
+    var mPrice=sp?sp.price:0,mCost=window._costIdx[k]||0;
+    var mNet=(mPrice>0&&mCost>0)?Math.round(mPrice-mCost-mPrice*0.25):null;
     moverRows.push({name:p.name,img:(sp&&sp.img)?sp.img:findImg(k),dir:dir,v7:p.v7,prevWk:Math.round(rP*7*10)/10,r7:r7,rP:rP,chg:chg,
-      stk:sp?sp.total:0,coverNew:r7>0?Math.round((sp?sp.total:0)/r7):null,laamStatus:sp?sp.status:''});
+      stk:sp?sp.total:0,coverNew:r7>0?Math.round((sp?sp.total:0)/r7):null,price:mPrice,net:mNet,laamStatus:sp?sp.status:''});
   });
   moverRows.sort(function(a,b){
     if(a.dir!==b.dir)return a.dir==='RISING'?-1:1;
@@ -3523,13 +3525,14 @@ function rAC(){
      +'<td style="'+TD+'font-weight:700;color:'+(r.stk===0?'#c0392b':'#333')+'">'+NF(r.stk)+'</td>'
      +'<td style="'+TD+'">'+(r.inc>0?NF(r.inc)+(r.eta?' <span style="color:#888;font-size:9px">('+fmtDMY(r.eta)+')</span>':''):'—')+'</td>'
      +'<td style="'+TD+'font-weight:800;color:'+cvColor+'">'+cv+' days</td>'
+     +'<td style="'+TD+'font-weight:600">'+(r.price>0?NF(r.price):'—')+'</td>'
      +'<td style="'+TD+'font-weight:700;color:'+(r.net===null?'#bbb':r.net<0?'#c0392b':r.net<cfg.minNet?'#b06000':'#27ae60')+'">'+(r.net===null?'no cost':NF(r.net))+'</td>'
      +(r.net!==null&&r.net<cfg.minNet
         ?'<td style="'+TD+'background:#fff3e0;color:#b06000;font-weight:700;font-size:9px">⚠ fix price first'+(r.sug>0?' ('+NF(r.sug)+' pcs)':'')+'</td>'
         :'<td style="'+TD+'font-weight:800;color:var(--gold2);background:#fdf8f0">'+(r.sug>0?NF(r.sug)+' pcs':'—')+'</td>')+'</tr>';
   }).join('');
   var sec3=box(secHead('🏭','Reorder Now — will stock out within lead time',reorderRows.length,'#8e44ad','Cover = (stock + incoming PO) ÷ daily rate. Alert below '+(cfg.lead+cfg.safety)+' days; suggestion refills to '+(cfg.lead+cfg.cover)+' days','acExpReorder')
-   +(reorderRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Rate</th><th style="'+TH+'">Stock</th><th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Days Cover</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'">Suggested Order</th></tr></thead><tbody>'+h3rows+'</tbody></table>'):empty('Nothing needs reordering — all fast movers have enough cover')),'ac-sec-reorder');
+   +(reorderRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Rate</th><th style="'+TH+'">Stock</th><th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Days Cover</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'">Suggested Order</th></tr></thead><tbody>'+h3rows+'</tbody></table>'):empty('Nothing needs reordering — all fast movers have enough cover')),'ac-sec-reorder');
 
   // Section 4 — Ageing
   var h4rows=ageRows.map(function(r){
@@ -3572,10 +3575,12 @@ function rAC(){
      +'<td style="'+TD+'color:#888">'+r.prevWk+'/wk</td>'
      +'<td style="'+TD+'font-weight:800;color:'+(up?'#27ae60':'#c0392b')+'">'+(r.chg===null?'NEW':(r.chg>0?'+':'')+r.chg+'%')+'</td>'
      +'<td style="'+TD+'">'+NF(r.stk)+'</td>'
-     +'<td style="'+TD+'font-weight:700;color:'+(up&&r.coverNew!==null&&r.coverNew<45?'#c0392b':'#333')+'">'+(r.coverNew===null?'—':r.coverNew+' days')+(up&&r.coverNew!==null&&r.coverNew<45?' ⚠':'')+'</td></tr>';
+     +'<td style="'+TD+'font-weight:700;color:'+(up&&r.coverNew!==null&&r.coverNew<45?'#c0392b':'#333')+'">'+(r.coverNew===null?'—':r.coverNew+' days')+(up&&r.coverNew!==null&&r.coverNew<45?' ⚠':'')+'</td>'
+     +'<td style="'+TD+'font-weight:600">'+(r.price>0?NF(r.price):'—')+'</td>'
+     +'<td style="'+TD+'font-weight:700;color:'+(r.net===null?'#bbb':r.net<0?'#c0392b':r.net<cfg.minNet?'#b06000':'#27ae60')+'">'+(r.net===null?'no cost':NF(r.net))+'</td></tr>';
   }).join('');
   var sec8=box(secHead('⚡','Movers &amp; Shakers — momentum this week',moverRows.length,'#e67e22','Last 7 days\u2019 pace vs the previous 21 days \u00b7 '+nRise+' rising, '+nCool+' cooling \u00b7 Rising with short cover = order before the reorder alert even fires','acExpMov')
-   +(moverRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'text-align:center">Direction</th><th style="'+TH+'">Sold 7d</th><th style="'+TH+'">Prev Pace</th><th style="'+TH+'">Change</th><th style="'+TH+'">Stock</th><th style="'+TH+'">Cover at New Pace</th></tr></thead><tbody>'+h8rows+'</tbody></table>'):empty('No significant acceleration or slowdown this week')),'ac-sec-mov');
+   +(moverRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'text-align:center">Direction</th><th style="'+TH+'">Sold 7d</th><th style="'+TH+'">Prev Pace</th><th style="'+TH+'">Change</th><th style="'+TH+'">Stock</th><th style="'+TH+'">Cover at New Pace</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Net/pc</th></tr></thead><tbody>'+h8rows+'</tbody></table>'):empty('No significant acceleration or slowdown this week')),'ac-sec-mov');
 
   // Section 9 — Profit drains
   var h9rows=drainRows.slice(0,150).map(function(r){
@@ -3716,10 +3721,10 @@ function rAC(){
 }
 function acExpPrice(){csvDL((window._acData.priceRows||[]).map(function(r){return[r.name,r.laam,r.shop,r.diff];}),['Product','Laam Price','Shopify Price','Diff (Laam-Shopify)'],'price_mismatch.csv');}
 function acExpStatus(){csvDL((window._acData.statusRows||[]).map(function(r){return[r.name,r.laamStatus,r.shopStatus,r.stk,r.shopStk!=null?r.shopStk:'',r.blocked?'BLOCKED REVENUE':''];}),['Product','Laam Status','Shopify Status','Laam Stock','Shopify Stock','Flag'],'status_mismatch.csv');}
-function acExpReorder(){csvDL((window._acData.reorderRows||[]).map(function(r){return[r.name,r.v30,Math.round(r.rate*100)/100,r.stk,r.inc,r.eta,Math.round(r.cover),r.net===null?'':r.net,r.sug];}),['Product','Sold 30d','Daily Rate','Stock','Incoming PO','PO ETA','Days Cover','Net Per Piece','Suggested Order Qty'],'reorder_list.csv');}
+function acExpReorder(){csvDL((window._acData.reorderRows||[]).map(function(r){return[r.name,r.v30,Math.round(r.rate*100)/100,r.stk,r.inc,r.eta,Math.round(r.cover),r.price||'',r.net===null?'':r.net,r.sug];}),['Product','Sold 30d','Daily Rate','Stock','Incoming PO','PO ETA','Days Cover','Retail Price','Net Per Piece','Suggested Order Qty'],'reorder_list.csv');}
 function acExpAge(){csvDL((window._acData.ageRows||[]).map(function(r){return[r.name,r.lastSale||'never',r.days===null?'':r.days,r.stk,r.cost,r.val];}),['Product','Last Sale','Days Since Sale','Stock','Unit Cost','Value at Cost'],'stock_ageing.csv');}
 function acExpPW(){csvDL((window._acData.priceWatchRows||[]).map(function(r){return[r.name,r.gross,r.listed,r.listedDisc+'%',r.effDisc+'%',r.extra+'pp',r.avg30,r.drift===null?'':r.drift+'%',r.v30,r.net===null?'':r.net,r.given,r.tags.join('+')];}),['Product','Original Price','Current Price','Listed Disc%','Effective Disc%','Extra Given pp','Avg Paid 30d','Price Drift%','Sold 30d','Net Per Piece','Given Away Per Month','Verdicts'],'discount_price_watch.csv');}
-function acExpMov(){csvDL((window._acData.moverRows||[]).map(function(r){return[r.name,r.dir,r.v7,r.prevWk,r.chg===null?'NEW':r.chg+'%',r.stk,r.coverNew===null?'':r.coverNew];}),['Product','Direction','Sold 7d','Prev Weekly Pace','Change','Stock','Days Cover at New Pace'],'movers_shakers.csv');}
+function acExpMov(){csvDL((window._acData.moverRows||[]).map(function(r){return[r.name,r.dir,r.v7,r.prevWk,r.chg===null?'NEW':r.chg+'%',r.stk,r.coverNew===null?'':r.coverNew,r.price||'',r.net===null?'':r.net];}),['Product','Direction','Sold 7d','Prev Weekly Pace','Change','Stock','Days Cover at New Pace','Retail Price','Net Per Piece'],'movers_shakers.csv');}
 function acExpDrain(){csvDL((window._acData.drainRows||[]).map(function(r){return[r.name,r.revDel,r.exc,r.refD,r.refLoss,r.canPct+'%',r.bleed,r.total];}),['Product','Delivered Revenue','Excess Commission','Refunded Orders','Refund Loss Est','Cancel%','Loss Bleed Per Month','Total Drain PKR'],'profit_drains.csv');}
 function acExpRecv(){csvDL((window._acData.recvRows||[]).map(function(r){return[r.onum,r.date,r.prd,r.ret,r.days];}),['Order#','Date','Product','Retail','Days Pending'],'receivables_pending.csv');}
 function acExpNew(){csvDL((window._acData.newRows||[]).map(function(r){return[r.name,r.launch.toISOString().split('T')[0],r.daysLive,r.first14,r.sold,Math.round(r.rate*100)/100,Math.round(r.sellThrough*100)+'%',r.stk,r.sa,r.inc,r.price||'',r.rev,r.net===null?'':r.net,r.verdict];}),['Product','Launched','Days Live','First 14d Sold','Total Sold','Daily Rate','Sell-Through','Stock','Sell-Ahead','Incoming PO','Retail Price','Revenue','Net Per Piece','Verdict'],'new_arrivals.csv');}
