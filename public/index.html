@@ -4808,7 +4808,29 @@ function rxAutoAssign(type){
   if(type==='refund')return rxByRole('accountant')||rxByRole('admin')||(CU?CU.name:'');
   return rxByRole('dispatch')||rxByRole('warehouse')||rxByRole('admin')||(CU?CU.name:'');
 }
-function rxSaveAll(){cloudSave('tickets',window.TICKETS||[]);}
+// Saving used to be a blind full-array overwrite (POST replaces the whole
+// cloud blob). Two people creating/updating tickets around the same time
+// from tabs loaded at different moments would silently erase each other's
+// tickets -- whoever saved last won, full stop. Now: pull the current server
+// copy first and bring back any ticket that exists there but not in our
+// local copy (created/changed by someone else since we last loaded), unless
+// we explicitly deleted it ourselves this session. Doesn't require callers
+// to await it -- the local optimistic render still happens instantly.
+window._rxDeletedIds=window._rxDeletedIds||{};
+async function rxSaveAll(){
+  try{
+    var r=await apiGet('/tickets');
+    var serverTickets=await r.json();
+    if(Array.isArray(serverTickets)){
+      var localIds={};
+      (window.TICKETS||[]).forEach(function(t){localIds[t.id]=true;});
+      serverTickets.forEach(function(st){
+        if(!localIds[st.id]&&!window._rxDeletedIds[st.id])(window.TICKETS=window.TICKETS||[]).push(st);
+      });
+    }
+  }catch(e){}
+  cloudSave('tickets',window.TICKETS||[]);
+}
 // Which stage transitions may the current user perform on this ticket?
 function rxCanAdvance(t,next){
   var r=rexRole(CU);if(!r)return false;
@@ -5124,6 +5146,7 @@ function rxDelete(id){
   if(rexRole(CU)!=='admin'){showToast('Only Admin can delete tickets.');return;}
   if(!confirm('Delete ticket '+id+'? This cannot be undone.'))return;
   window.TICKETS=(window.TICKETS||[]).filter(function(x){return x.id!==id;});
+  window._rxDeletedIds[id]=true;
   rxSaveAll();
   var d=document.getElementById('rx-detail');if(d)d.remove();
   rendered.rx=false;doR('rx');
