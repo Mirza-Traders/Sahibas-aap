@@ -3752,7 +3752,39 @@ function loadPO(){
   if(changed)try{localStorage.setItem('sbm_prod_orders',JSON.stringify(window._poData));}catch(e){}
   return window._poData;
 }
-function savePO(arr){
+// Same class of bug as the ticket race fix, but sharper: a blind full-array
+// overwrite meant that whoever saved last (from whatever stale copy their
+// tab had loaded) silently reverted EVERY OTHER field on EVERY OTHER order
+// back to whatever that stale copy remembered -- not just missing orders,
+// but genuine edits on existing ones (this is what was reverting ETA
+// dates: someone else's later, unrelated save was overwriting the just-
+// changed order back to its old contents).
+//
+// touchedIds = the order id(s) THIS call actually intended to change.
+// Before saving: fetch the current server copy. For any order not in
+// touchedIds, defer to the server's version if it has one (it may be
+// fresher than this tab's stale copy) -- only the order(s) we explicitly
+// meant to edit keep our local version. Orders that only exist locally
+// (newly created, not yet on the server) are kept. Orders are never
+// actually deleted (only status-flagged, e.g. "Cancelled"), so this can't
+// resurrect a deleted order.
+async function savePO(arr,touchedIds){
+  var touched={};(touchedIds||[]).forEach(function(id){touched[id]=true;});
+  try{
+    var r=await apiGet('/orders');
+    var serverOrders=await r.json();
+    if(Array.isArray(serverOrders)){
+      var serverById={};
+      serverOrders.forEach(function(so){serverById[so.id]=so;});
+      var localIds={};
+      arr=arr.map(function(o){
+        localIds[o.id]=true;
+        if(touched[o.id])return o;
+        return serverById[o.id]||o;
+      });
+      serverOrders.forEach(function(so){if(!localIds[so.id])arr.push(so);});
+    }
+  }catch(e){}
   window._poData=arr;
   try{localStorage.setItem('sbm_prod_orders',JSON.stringify(arr));}catch(e){showToast('Storage full — please delete old orders or reduce image sizes.');}
   cloudSave('orders',arr);
@@ -4110,7 +4142,7 @@ function saveSetSizes(){
   var nowD=new Date();
   o.editLog=o.editLog||[];
   o.editLog.push({by:CU?CU.name:'',date:nowD.toISOString().split('T')[0],time:nowD.toTimeString().slice(0,5),note:'set sizes '+sp.S+'/'+sp.M+'/'+sp.L+'/'+sp.XL});
-  savePO(orders);var id=_ssId;closeSetSizes();rendered.po=false;doR('po');
+  savePO(orders,[_ssId]);var id=_ssId;closeSetSizes();rendered.po=false;doR('po');
   showToast('✓ Sizes set for '+id);
 }
 function closePoReview(){var m=document.getElementById('po-review-modal');if(m)m.style.display='none';}
@@ -4181,7 +4213,7 @@ function submitPO(){
     var nowD=new Date();
     eo.editLog=eo.editLog||[];
     eo.editLog.push({by:CU?CU.name:'',date:nowD.toISOString().split('T')[0],time:nowD.toTimeString().slice(0,5)});
-    savePO(orders);var editedId=_poEditId;_poEditId=null;closePO();rendered.po=false;doR('po');
+    savePO(orders,[_poEditId]);var editedId=_poEditId;_poEditId=null;closePO();rendered.po=false;doR('po');
     showToast('✓ '+editedId+' updated');
     return;
   }
@@ -4201,7 +4233,7 @@ function submitPO(){
             stitching:{state:'none',done:false,date:null,by:null,startDate:null,startBy:null,log:[]},
             finishing:{state:'none',done:false,date:null,by:null,startDate:null,startBy:null,log:[]}},
     status:'Pending Approval'});
-  savePO(orders);closePO();rendered.po=false;doR('po');
+  savePO(orders,[id]);closePO();rendered.po=false;doR('po');
   showToast('✓ '+id+' submitted — awaiting approval');
 }
 
@@ -4236,12 +4268,22 @@ function advancePoPhase(oid,key){
   var doneCnt=ks.filter(function(k){var st=o.phases[k]&&(o.phases[k].state||(o.phases[k].done?'done':'none'));return st==='done';}).length;
   if(doneCnt===ks.length)o.status='Completed';
   else if(o.status==='Completed')o.status='In Progress';
-  savePO(orders);rendered.po=false;doR('po');
+  savePO(orders,[o.id]);rendered.po=false;doR('po');
   showToast(key+': '+cur+' → '+next);
 }
 
-function changePoEta(oid){
-  var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});if(!o)return;
+async function changePoEta(oid){
+  // Refresh from the cloud first instead of trusting this tab's cached copy
+  // (which could be hours stale) -- otherwise editing here and someone
+  // else's unrelated save (from their own stale tab) landing shortly after
+  // would silently revert this ETA back to the old date.
+  var orders=loadPO();
+  try{
+    var r=await apiGet('/orders');
+    var serverOrders=await r.json();
+    if(Array.isArray(serverOrders)&&serverOrders.length)orders=serverOrders;
+  }catch(e){}
+  var o=orders.find(function(x){return x.id===oid;});if(!o)return;
   var oldEta=o.targetDate||'';
   var inp=prompt('New ETA date (YYYY-MM-DD):',oldEta);
   if(!inp||inp===oldEta)return;
@@ -4253,7 +4295,7 @@ function changePoEta(oid){
   var timeStr=new Date().toTimeString().split(' ')[0].substring(0,5);
   o.etaLog.push({from:oldEta,to:inp,by:CU?CU.name:'',date:today,time:timeStr});
   o.targetDate=inp;
-  savePO(orders);rendered.po=false;doR('po');
+  savePO(orders,[oid]);rendered.po=false;doR('po');
   showToast('ETA updated: '+oldEta+' → '+inp);
 }
 function viewSizeChart(oid){
@@ -4285,7 +4327,7 @@ function addPoRemark(oid){
   var today=new Date().toISOString().split('T')[0];
   var timeStr=new Date().toTimeString().split(' ')[0].substring(0,5);
   o.remarks.push({by:CU?CU.name:'Unknown',date:today,time:timeStr,text:txt});
-  savePO(orders);
+  savePO(orders,[oid]);
   document.getElementById('po-rmk-'+oid).remove();
   rendered.po=false;doR('po');
   showToast('Remark added to '+oid);
@@ -4295,7 +4337,7 @@ function cancelPO(oid){
   var orders=loadPO();
   var o=orders.find(function(x){return x.id===oid;});
   if(o)o.status='Cancelled';
-  savePO(orders);rendered.po=false;doR('po');
+  savePO(orders,[oid]);rendered.po=false;doR('po');
   showToast(oid+' cancelled.');
 }
 function approvePO(oid){
@@ -4306,7 +4348,7 @@ function approvePO(oid){
   o.status='In Progress';
   o.approvedBy=CU.name;
   o.approvedDate=new Date().toISOString().split('T')[0];
-  savePO(orders);rendered.po=false;doR('po');
+  savePO(orders,[oid]);rendered.po=false;doR('po');
   showToast('✓ '+oid+' approved — now In Production');
 }
 function rejectPO(oid){
@@ -4315,7 +4357,7 @@ function rejectPO(oid){
   var o=orders.find(function(x){return x.id===oid;});
   if(!o)return;
   o.status='Rejected';
-  savePO(orders);rendered.po=false;doR('po');
+  savePO(orders,[oid]);rendered.po=false;doR('po');
   showToast(oid+' rejected and returned.');
 }
 function uploadFabricShade(oid,input){
@@ -4328,7 +4370,7 @@ function uploadFabricShade(oid,input){
       var o=orders.find(function(x){return x.id===oid;});
       if(!o)return;
       o.fabricShade=compressed;
-      savePO(orders);rendered.po=false;doR('po');
+      savePO(orders,[oid]);rendered.po=false;doR('po');
       showToast('✓ Fabric shade uploaded for '+oid);
     });
   };
