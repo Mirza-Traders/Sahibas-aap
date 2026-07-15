@@ -3224,7 +3224,7 @@ function rAC(){
 
   // Per-product rollup from full sales history (ignores page filters on purpose —
   // reorder/ageing decisions should always see the whole picture)
-  var pm={},recvRows=[];
+  var pm={};
   DETAIL.forEach(function(r){
     var n=r[1];if(!pm[n])pm[n]={name:n,v30:0,v7:0,vP:0,rev30:0,vPr:0,revPr:0,lastSale:'',sS:0,sM:0,sL:0,sXL:0,tot:0,can:0,del:0,revDel:0,refD:0,refBase:0,exc:0};
     var p=pm[n];
@@ -3233,7 +3233,6 @@ function rAC(){
     if(r[4]==='delivered'){p.del++;p.revDel+=r[9];}
     if(r[4]==='refunded'){p.refD++;p.refBase+=r[9];}
     if(r[16])p.exc+=(r[17]||0);
-    if(r[4]==='delivered'&&r[7]==='PENDING')recvRows.push({onum:r[18],date:r[0],prd:n,ret:r[9],days:r[8]||0});
     if(r[4]!=='cancelled'){
       if(r[0]&&r[0]>p.lastSale)p.lastSale=r[0];
       if(r[0]>=s30){
@@ -3438,15 +3437,6 @@ function rAC(){
   drainRows.sort(function(a,b){return b.total-a.total;});
   var totDrain=drainRows.reduce(function(a,r){return a+r.total;},0);
 
-  // Receivables — delivered but payment still pending
-  recvRows.sort(function(a,b){return b.days-a.days;});
-  var recvTotal=recvRows.reduce(function(a,r){return a+r.ret;},0);
-  var rb={b15:{n:0,v:0},b30:{n:0,v:0},b60:{n:0,v:0},b99:{n:0,v:0}};
-  recvRows.forEach(function(r){
-    var b=r.days<=15?rb.b15:r.days<=30?rb.b30:r.days<=60?rb.b60:rb.b99;
-    b.n++;b.v+=r.ret;
-  });
-
   // Discount & Price Watch — listed vs effective discount, and price drift
   // (avg actually-paid last 30d vs the prior 60d). Original prices stay fixed
   // by policy, so effective discount is a faithful read of total discounting.
@@ -3606,24 +3596,6 @@ function rAC(){
   }).join('');
   var sec9=box(secHead('🩸','Profit Drains — where the rupees leak',drainRows.length,'#8e44ad','Excess commission (exact) + est. refund loss (25% load on refunded value) + monthly loss-pricing bleed \u00b7 drains \u2265 PKR 500 \u00b7 top 150 shown, CSV has all','acExpDrain')
    +(drainRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Delivered Rev</th><th style="'+TH+'">Excess Comm</th><th style="'+TH+'">Refunds</th><th style="'+TH+'">Refund Loss est</th><th style="'+TH+'">Cancel%</th><th style="'+TH+'">Loss Bleed/mo</th><th style="'+TH+'">Total Drain</th></tr></thead><tbody>'+h9rows+'</tbody></table>'):empty('No product is leaking more than PKR 500')),'ac-sec-drain');
-
-  // Section 10 — Receivables ageing
-  var recvShow=recvRows.slice(0,200);
-  var h10rows=recvShow.map(function(r){
-    var dc=r.days>60?'color:#c0392b;font-weight:800':r.days>30?'color:#d4780a;font-weight:700':r.days>15?'color:#d4944a;font-weight:700':'color:#888';
-    return '<tr><td style="'+TDL+'font-family:monospace;font-size:10px;color:#888">'+r.onum+'</td>'
-     +'<td style="'+TD+'">'+fmtDMY(r.date)+'</td>'
-     +'<td style="'+TDL+'font-weight:600">'+r.prd+'</td>'
-     +'<td style="'+TD+'">'+NF(r.ret)+'</td>'
-     +'<td style="'+TD+dc+'">'+r.days+'d</td></tr>';
-  }).join('');
-  var rbCell=function(lbl,b,color){return '<div style="flex:1;min-width:120px;background:#fff;border:1px solid #e8e4dc;border-top:3px solid '+color+';border-radius:6px;padding:8px 12px"><div style="font-size:9px;color:#999;font-weight:700">'+lbl+'</div><div style="font-size:15px;font-weight:800;color:'+color+'">PKR '+N(b.v)+'</div><div style="font-size:9px;color:#aaa">'+b.n+' orders</div></div>';};
-  var sec10=box(secHead('💵','Receivables — delivered but payment pending',recvRows.length,'#2471a3','What Laam still owes on delivered orders \u00b7 <b style="color:#c0392b">PKR '+NF(recvTotal)+' total pending</b>'+(recvRows.length>200?' \u00b7 top 200 oldest shown, CSV has all':''),'acExpRecv')
-   +'<div style="display:flex;gap:10px;flex-wrap:wrap;padding:12px 14px;background:#fdfcf9;border-bottom:1px solid #f0ede8">'
-   +rbCell('0\u201315 DAYS',rb.b15,'#27ae60')+rbCell('16\u201330 DAYS',rb.b30,'#d4944a')+rbCell('31\u201360 DAYS',rb.b60,'#d4780a')+rbCell('60+ DAYS',rb.b99,'#c0392b')
-   +'</div>'
-   +(recvRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THL+'">Order#</th><th style="'+TH+'">Date</th><th style="'+THL+'">Product</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Days Pending</th></tr></thead><tbody>'+h10rows+'</tbody></table>'):empty('Nothing pending — every delivered order is paid')),'ac-sec-recv');
-
   // Section 11 — Discount & Price Watch
   var PWT={RAISE:{bg:'#e8f8ee',fg:'#1e8449',lbl:'🟢 RAISE PRICE'},LEAK:{bg:'#fff3e0',fg:'#b06000',lbl:'🟠 EXTRA DISCOUNT LEAK'},SLIDE:{bg:'#fde8e8',fg:'#c0392b',lbl:'🔴 PRICE SLIDING'}};
   var h11rows=priceWatchRows.map(function(r){
@@ -3707,9 +3679,8 @@ function rAC(){
    +kpiCard(statusRows.length,'Status Mismatches',statusRows.filter(function(r){return r.blocked;}).length+' with blocked revenue','#d4780a','ac-sec-status')
    +kpiCard(priceWatchRows.length,'Price Watch','PKR '+N(totGiven)+'/mo extra discounts','#d4944a','ac-sec-pw')
    +kpiCard(drainRows.length,'Profit Drains','PKR '+N(totDrain)+' leaking','#8e44ad','ac-sec-drain')
-   +kpiCard(recvRows.length,'Receivables','PKR '+N(recvTotal)+' payment pending','#2471a3','ac-sec-recv')
    +'</div>';
-  window._acData={priceRows:priceRows,statusRows:statusRows,reorderRows:reorderRows,ageRows:ageRows,lossRows:lossRows,sizeRows:sizeRows,newRows:newRows,moverRows:moverRows,drainRows:drainRows,recvRows:recvRows,priceWatchRows:priceWatchRows};
+  window._acData={priceRows:priceRows,statusRows:statusRows,reorderRows:reorderRows,ageRows:ageRows,lossRows:lossRows,sizeRows:sizeRows,newRows:newRows,moverRows:moverRows,drainRows:drainRows,priceWatchRows:priceWatchRows};
   document.getElementById('pac').innerHTML=
     '<div style="max-width:1100px">'
     +'<div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px">🚨 Insights — Action Center</div>'
@@ -3726,7 +3697,7 @@ function rAC(){
     +cfgInp('newDays','New arrival window (days)','Articles listed on Laam within this many days count as new arrivals')
     +cfgInp('minNet','Min net/pc for bestseller (PKR)','An article must net at least this much per piece (after the 25%% load) to be called a bestseller')
     +'</div>'
-    +sec7+sec8+sec3+sec6+sec5+sec11+sec9+sec4+sec10+sec1+sec2
+    +sec7+sec8+sec3+sec6+sec5+sec11+sec9+sec4+sec1+sec2
     +'</div>';
 }
 function acExpPrice(){csvDL((window._acData.priceRows||[]).map(function(r){return[r.name,r.laam,r.shop,r.diff];}),['Product','Laam Price','Shopify Price','Diff (Laam-Shopify)'],'price_mismatch.csv');}
@@ -3736,7 +3707,6 @@ function acExpAge(){csvDL((window._acData.ageRows||[]).map(function(r){return[r.
 function acExpPW(){csvDL((window._acData.priceWatchRows||[]).map(function(r){return[r.name,r.gross,r.listed,r.listedDisc+'%',r.effDisc+'%',r.extra+'pp',r.avg30,r.drift===null?'':r.drift+'%',r.v30,r.net===null?'':r.net,r.given,r.tags.join('+')];}),['Product','Original Price','Current Price','Listed Disc%','Effective Disc%','Extra Given pp','Avg Paid 30d','Price Drift%','Sold 30d','Net Per Piece','Given Away Per Month','Verdicts'],'discount_price_watch.csv');}
 function acExpMov(){csvDL((window._acData.moverRows||[]).map(function(r){return[r.name,r.dir,r.v7,r.prevWk,r.chg===null?'NEW':r.chg+'%',r.stk,r.coverNew===null?'':r.coverNew,r.price||'',r.net===null?'':r.net];}),['Product','Direction','Sold 7d','Prev Weekly Pace','Change','Stock','Days Cover at New Pace','Retail Price','Net Per Piece'],'movers_shakers.csv');}
 function acExpDrain(){csvDL((window._acData.drainRows||[]).map(function(r){return[r.name,r.revDel,r.exc,r.refD,r.refLoss,r.canPct+'%',r.bleed,r.total];}),['Product','Delivered Revenue','Excess Commission','Refunded Orders','Refund Loss Est','Cancel%','Loss Bleed Per Month','Total Drain PKR'],'profit_drains.csv');}
-function acExpRecv(){csvDL((window._acData.recvRows||[]).map(function(r){return[r.onum,r.date,r.prd,r.ret,r.days];}),['Order#','Date','Product','Retail','Days Pending'],'receivables_pending.csv');}
 function acExpNew(){csvDL((window._acData.newRows||[]).map(function(r){return[r.name,r.launch.toISOString().split('T')[0],r.daysLive,r.first14,r.sold,Math.round(r.rate*100)/100,Math.round(r.sellThrough*100)+'%',r.stk,r.sa,r.inc,r.price||'',r.rev,r.net===null?'':r.net,r.verdict];}),['Product','Launched','Days Live','First 14d Sold','Total Sold','Daily Rate','Sell-Through','Stock','Sell-Ahead','Incoming PO','Retail Price','Revenue','Net Per Piece','Verdict'],'new_arrivals.csv');}
 function acExpSize(){csvDL((window._acData.sizeRows||[]).map(function(r){var f={};r.cells.forEach(function(c){f[c.sz]=c.share+'% | stk '+c.st+' | SA '+c.sa+' | PO '+(c.po||0)+' | '+c.verdict;});return[r.name,r.retail,r.v30,f.S,f.M,f.L,f.XL,r.broken.join('/'),r.unsized,r.risk];}),['Product','Retail','Sold 30d','S','M','L','XL','Broken Sizes','Unsized Incoming PO','Monthly Revenue at Risk'],'broken_size_runs.csv');}
 function acExpLoss(){csvDL((window._acData.lossRows||[]).map(function(r){return[r.name,r.gross,r.disc?r.disc+'%':'',r.retail,r.cost,r.gp,r.loss,r.breakeven,r.v30,r.bleed,r.stk];}),['Product','Gross Price','Discount%','Retail','Cost','GP/pc','Net Loss/pc','Breakeven Price','Sold 30d','Monthly Bleed PKR','Stock'],'selling_at_loss.csv');}
