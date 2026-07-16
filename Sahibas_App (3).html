@@ -3785,6 +3785,15 @@ function compressImg(dataUrl,maxPx,quality,cb){
 }
 
 var _poSizeChart='';var _poSizeChartName='';
+// These two customers' orders can be created/saved without a size chart
+// attached up front -- but they still can't start Stitching without one
+// (enforced in advancePoPhase). Every other customer keeps the original
+// compulsory-at-save rule below.
+var PO_SIZECHART_EXEMPT_CUSTOMERS=['Factory','Amara (Umzay)'];
+function poSizeChartExempt(customer){
+  var c=(customer||'').toLowerCase().trim();
+  return PO_SIZECHART_EXEMPT_CUSTOMERS.some(function(x){return x.toLowerCase()===c;});
+}
 function poSetRatio(s,m,l,xl){
   document.getElementById('po-rs').value=s;
   document.getElementById('po-rm').value=m;
@@ -4191,7 +4200,7 @@ function submitPO(){
   if(!prod){showToast('Enter a product name.');return;}
   if(!fabric){showToast('Fabric / Material Name is required ✱');return;}
   if(!customer){showToast('Customer / Buyer Name is required ✱');return;}
-  if(!_poSizeChart){showToast('Please attach the Size Chart ✱');return;}
+  if(!_poSizeChart&&!poSizeChartExempt(customer)){showToast('Please attach the Size Chart ✱');return;}
   if(!tot){showToast('Enter total ordered quantity.');return;}
   var orders=loadPO();
   // EDIT MODE — update the existing order in place, keep its id/status/phases/
@@ -4241,6 +4250,16 @@ function advancePoPhase(oid,key){
   var p=o.phases[key];
   if(!p.log)p.log=[];
   var cur=p.state||(p.done?'done':'none');
+  // Stitching cannot start without a size chart attached -- matters mainly
+  // for Factory / Amara (Umzay) orders, since every other customer already
+  // can't have an order without one (checked at order creation/edit time).
+  // Owner is never blocked by this, matching Owner's override everywhere
+  // else on this page.
+  if(key==='stitching'&&!isOwner&&cur==='none'&&!o.sizeChart){
+    showToast('Stitching cannot be started — size chart must be attached first.');
+    openAttachSizeChart(oid);
+    return;
+  }
   var next;
   if(isProd){
     if(cur==='none')next='progress';
@@ -4264,6 +4283,58 @@ function advancePoPhase(oid,key){
   else if(o.status==='Completed')o.status='In Progress';
   savePO(orders,[o.id]);rendered.po=false;doR('po');
   showToast(key+': '+cur+' → '+next);
+}
+
+// Neither "Set Sizes" (numeric ratio only, no chart field) nor "Edit Order"
+// (locked to Owner/the placer, and only pre-approval) can actually attach a
+// size chart at the point Stitching gets blocked -- so this gives Production
+// a small, working, self-service way to do exactly that, right there.
+async function openAttachSizeChart(oid){
+  var orders=loadPO();
+  try{
+    var r=await apiGet('/orders');
+    var serverOrders=await r.json();
+    if(Array.isArray(serverOrders)&&serverOrders.length)orders=serverOrders;
+  }catch(e){}
+  var o=orders.find(function(x){return x.id===oid;});if(!o)return;
+  window._poScCtx={oid:oid,orders:orders,pendingImg:'',pendingName:''};
+  var html='<div id="po-sc-edit" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;background:#fff;border:1px solid #ddd;border-radius:10px;padding:18px;width:320px;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+   +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><b style="font-size:13px">Attach Size Chart — '+o.id+'</b><button onclick="document.getElementById(\'po-sc-edit\').remove();document.getElementById(\'po-sc-ov\').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#999">✕</button></div>'
+   +'<div style="font-size:10px;color:#888;margin-bottom:10px">Stitching for '+o.product.replace(/</g,'&lt;')+' is waiting on this.</div>'
+   +'<div id="po-sc-edit-area" onclick="document.getElementById(\'po-sc-edit-inp\').click()" style="background:#f8f6f2;border:1px dashed #ccc;border-radius:8px;padding:16px;cursor:pointer;text-align:center;margin-bottom:8px">'
+   +'<input id="po-sc-edit-inp" type="file" accept="image/*,.pdf" style="display:none" onchange="poScFileChange(this)">'
+   +'<div id="po-sc-edit-info" style="font-size:11px;color:#888">📎 Click to choose a photo of the size chart</div>'
+   +'</div>'
+   +'<div style="display:flex;gap:6px;margin-top:12px;justify-content:flex-end">'
+   +'<button onclick="document.getElementById(\'po-sc-edit\').remove();document.getElementById(\'po-sc-ov\').remove()" style="background:#fff;border:1px solid #ddd;color:#888;border-radius:6px;padding:6px 14px;font-size:11px;cursor:pointer">Cancel</button>'
+   +'<button onclick="savePoSizeChart()" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:6px 16px;font-size:11px;font-weight:700;cursor:pointer">Save &amp; Start Stitching</button>'
+   +'</div></div>'
+   +'<div id="po-sc-ov" onclick="document.getElementById(\'po-sc-edit\').remove();this.remove()" style="position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.3)"></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+function poScFileChange(input){
+  var file=input.files[0];if(!file)return;
+  var ctx=window._poScCtx;if(!ctx)return;
+  ctx.pendingName=file.name;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    compressImg(e.target.result,900,0.82,function(compressed){
+      ctx.pendingImg=compressed;
+      var info=document.getElementById('po-sc-edit-info');if(info)info.innerHTML='<span style="color:var(--gold2)">✓ '+file.name+'</span>';
+    });
+  };
+  reader.readAsDataURL(file);
+}
+function savePoSizeChart(){
+  var ctx=window._poScCtx;if(!ctx)return;
+  if(!ctx.pendingImg){showToast('Choose a size chart file first.');return;}
+  var o=ctx.orders.find(function(x){return x.id===ctx.oid;});if(!o)return;
+  o.sizeChart=ctx.pendingImg;o.sizeChartName=ctx.pendingName;
+  var m=document.getElementById('po-sc-edit');if(m)m.remove();
+  var ov=document.getElementById('po-sc-ov');if(ov)ov.remove();
+  savePO(ctx.orders,[ctx.oid]);
+  showToast('Size chart attached — starting Stitching.');
+  advancePoPhase(ctx.oid,'stitching');
 }
 
 async function changePoEta(oid){
