@@ -2037,7 +2037,7 @@ function expAL(){if(window._alRows)csvDL(window._alRows.map(r=>[r[18],r[0],r[1],
 var _drRows=[], _drFiltered=[], _drRH=34, _drVis=0;
 var _drSel=new Set(), _drSelProds=new Set();
 var _drSortAsc=true; // date sort direction
-var _drFilters={stat:'',pf:'',dst:'',pay:'',sz:'',cpct:''};
+var _drFilters={stat:'',pf:'',dst:'',pay:'',sz:'',cpct:'',ordSearch:''};
 var DR_W={chk:34,conum:100,onum:88,date:95,prd:160,sz:46,stat:86,pf:96,dst:86,pay:115,days:50,ret:70,cost:78,cpct:60,comm:70,taxpct:48,tax:60,gp:68,pat:68,exc:72};
 var DR_TOT=Object.values(DR_W).reduce(function(a,b){return a+b;},0);
 
@@ -2049,6 +2049,10 @@ function drCell(w,style,content){return '<td style="width:'+w+'px;min-width:'+w+
 
 function applyDrFilters(){
   var f=_drFilters, sp=_drSelProds;
+  // Paste/type multiple order numbers (comma, space, or newline separated) --
+  // matches Order# or Channel Order# (Ch.Order#), whichever the customer
+  // reference happens to use. Substring match so a partial number still finds it.
+  var ordTokens=(f.ordSearch||'').split(/[,\s]+/).map(function(s){return s.trim().toLowerCase();}).filter(Boolean);
   _drFiltered=_drRows.filter(function(r){
     if(sp.size>0&&!sp.has(r[1]))return false;
     if(f.stat&&r[4]!==f.stat)return false;
@@ -2057,6 +2061,11 @@ function applyDrFilters(){
     if(f.pay&&r[7]!==f.pay)return false;
     if(f.sz&&r[3]!==f.sz)return false;
     if(f.cpct&&String(r[11])+'%'!==f.cpct)return false;
+    if(ordTokens.length){
+      var onum=String(r[18]||'').toLowerCase(),conum=String(r[23]||'').toLowerCase();
+      var hit=ordTokens.some(function(t){return onum.indexOf(t)>=0||conum.indexOf(t)>=0;});
+      if(!hit)return false;
+    }
     return true;
   });
   // Apply current sort
@@ -2135,6 +2144,7 @@ function drToggle(i){if(_drSel.has(i))_drSel.delete(i);else _drSel.add(i);render
 function drSelAll(){if(_drSel.size===_drFiltered.length)_drSel.clear();else _drFiltered.forEach(function(r,i){_drSel.add(i);});renderDrVirtual();updDrSelBtn();}
 function updDrSelBtn(){var b=document.getElementById('dr-exp-sel');if(b){b.style.display=_drSel.size>0?'':'none';b.textContent='⬇ Export Selected ('+_drSel.size+')';}}
 function drFlt(k,v){_drFilters[k]=v;applyDrFilters();}
+function drOrdSearch(v){_drFilters.ordSearch=v;clearTimeout(window._drOrdTimer);window._drOrdTimer=setTimeout(applyDrFilters,250);}
 
 // Multi-select product dropdown
 function drProdPanel(){
@@ -2173,7 +2183,7 @@ function rDR(){
   _drFiltered=[..._drRows];
   _drSortAsc=true;
   _drSel.clear();_drSelProds.clear();
-  _drFilters={stat:'',pf:'',dst:'',pay:'',sz:'',cpct:''};
+  _drFilters={stat:'',pf:'',dst:'',pay:'',sz:'',cpct:'',ordSearch:''};
   drSortRows();
 
   var prds=[...new Set(_drRows.map(function(r){return r[1];}))].filter(Boolean).sort();
@@ -2231,8 +2241,9 @@ function rDR(){
     +'</tr>'
     +'<tr style="background:#fafafa">'
     +fempty(W.chk)
-    +fempty(W.conum)
-    +fempty(W.onum)
+    +'<td colspan="2" style="width:'+(W.conum+W.onum)+'px;min-width:'+(W.conum+W.onum)+'px;max-width:'+(W.conum+W.onum)+'px;padding:3px 4px;background:#fafafa;border-bottom:1px solid #e8e4dc">'
+      +'<input type="text" value="'+(_drFilters.ordSearch||'').replace(/"/g,'&quot;')+'" oninput="drOrdSearch(this.value)" placeholder="Order# / Ch.Order#, comma-separated" title="Paste or type multiple order numbers — matches either Order# or Ch.Order#" style="width:100%;border:1px solid #e0dcd4;border-radius:3px;padding:2px 5px;font-size:9px;outline:none;background:#fff;box-sizing:border-box">'
+    +'</td>'
     +fempty(W.date)
     +fcell(W.prd, prdDropdown)
     +fcell(W.sz, fsel('sz',['S','M','L','XL']))
