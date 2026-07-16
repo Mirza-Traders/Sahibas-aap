@@ -4816,7 +4816,7 @@ function rPO(){
        +'<td style="'+TD+stk(0,bg)+'"><input type="checkbox" '+(isSel?'checked':'')+' onchange="togglePoSel(\''+o.id+'\')" style="cursor:pointer;accent-color:var(--gold)"></td>'
        +'<td style="'+TDL+stk(1,bg)+'color:#888;white-space:nowrap">'+fmtDMY(o.date)+'</td>'
        +'<td style="'+TD+stk(2,bg)+'font-weight:700;color:var(--gold2)">'+o.id+'</td>'
-       +'<td style="'+TDL+stk(3,bg)+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+o.product+'</div><div style="white-space:nowrap;overflow:hidden"><span style="'+stBadge+'">'+o.status+'</span> '+ratingChip(o.product)+'</div></td>'
+       +'<td style="'+TDL+stk(3,bg)+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+(o.img&&o.img.startsWith('http')?'<a href="'+o.img+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+o.product+'</a>':o.product)+'</div><div style="white-space:nowrap;overflow:hidden"><span style="'+stBadge+'">'+o.status+'</span> '+ratingChip(o.product)+'</div></td>'
        +'<td style="'+TD+stk(4,bg)+'">'+  (o.customer||'—')+'</td>'
        +'<td style="'+TD+stk(5,bg)+'">'+  (o.fabric||'—')+'</td>'
        +imgCell+scCell
