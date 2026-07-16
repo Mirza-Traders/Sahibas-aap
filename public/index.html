@@ -4554,6 +4554,12 @@ function printSelectedPO(){
   setTimeout(function(){window.print();setTimeout(function(){document.title=ot;},800);},200);
 }
 
+// Production Phases column group starts collapsed (5 columns -> 1 compact
+// summary) to keep the table scannable; personal per-session state, same as
+// the Summary Sheet's own column-group toggles (not saved anywhere, resets
+// on reload -- every user gets their own default, nobody else is affected).
+if(typeof window._poPhasesOpen==='undefined')window._poPhasesOpen=false;
+function togglePoPhases(){window._poPhasesOpen=!window._poPhasesOpen;rendered.po=false;doR('po');}
 function rPO(){
   var el=document.getElementById('ppo');
   if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};
@@ -4639,25 +4645,37 @@ function rPO(){
   // Table — virtualized: header lives in its own div, body renders only the
   // visible slice of rows (like the Detail Report), so the page stays fast
   // no matter how many orders accumulate.
-  var PO_COLS=[36,92,78,225,92,92,62,62,74,44,44,44,44,92,92,92,92,92,106,96,170,130];
+  var phOpen=window._poPhasesOpen;
+  // Product Name shrunk from 225 to 150 (was the widest column by far) with
+  // truncation + tooltip already in place below. Phases group is 5x92=460
+  // expanded, or one 150px summary column collapsed.
+  var PO_COLS=[36,92,78,150,92,92,62,62,74,44,44,44,44].concat(phOpen?[92,92,92,92,92]:[150]).concat([106,96,170,130]);
   var PO_TOT=PO_COLS.reduce(function(a,b){return a+b;},0);
   var PO_RH=76; // tallest row = Pending Approval with 6 action buttons (2 lines of 3)
+  // Frozen columns: checkbox..Ordered Qty (indices 0-8) stay pinned in place
+  // while everything else scrolls underneath -- so which order you're
+  // looking at never scrolls out of view. Offsets are unaffected by the
+  // phases collapse toggle since that only changes columns after index 8.
+  var FROZEN_N=9;
+  var stickyLeft=[];(function(){var acc=0;for(var i=0;i<FROZEN_N;i++){stickyLeft.push(acc);acc+=PO_COLS[i];}})();
+  function stk(idx,bg){return 'position:sticky;left:'+stickyLeft[idx]+'px;z-index:5;background:'+bg+';'+(idx===FROZEN_N-1?'box-shadow:2px 0 4px -2px rgba(0,0,0,.15);':'');}
   var colgroup='<colgroup>'+PO_COLS.map(function(w){return '<col style="width:'+w+'px">';}).join('')+'</colgroup>';
+  var phToggleBtn='<button onclick="event.stopPropagation();togglePoPhases()" title="'+(phOpen?'Collapse':'Expand')+' Production Phases" style="background:rgba(255,255,255,.6);border:1px solid #b8d0ea;border-radius:3px;width:16px;height:16px;line-height:1;cursor:pointer;font-size:10px;font-weight:800;color:#2471a3;padding:0;margin-left:4px">'+(phOpen?'−':'+')+'</button>';
   var hdr='<table style="border-collapse:collapse;table-layout:fixed;width:'+PO_TOT+'px;background:#fff">'+colgroup
    +'<thead>'
    // Grouped header row
    +'<tr style="background:#f0ece4">'
-   +'<th style="'+TH+'" rowspan="3"><input type="checkbox" '+(allSelCheck?'checked':'')+' onchange="togglePoSelAll(['+allIds.map(function(i){return'\''+i+'\'';}).join(',')+'])" style="cursor:pointer;accent-color:var(--gold)"></th>'
-   +'<th style="'+THL+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'date\')">Date'+srtArrow('date')+'</th>'
-   +'<th style="'+TH+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'ono\')">Order No'+srtArrow('ono')+'</th>'
-   +'<th style="'+THL+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'prod\')">Product Name'+srtArrow('prod')+'</th>'
-   +'<th style="'+TH+'" rowspan="3">Customer</th>'
-   +'<th style="'+TH+'" rowspan="3">Fabric</th>'
-   +'<th style="'+TH+'" rowspan="3">Image</th>'
-   +'<th style="'+TH+'" rowspan="3">Size<br>Chart</th>'
-   +'<th style="'+TH+'background:#fdf8f0;cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'qty\')">Ordered<br>Qty<br><span style="font-size:13px;color:var(--gold2)">'+tQ+'</span>'+srtArrow('qty')+'</th>'
+   +'<th style="'+TH+stk(0,'#f0ece4')+'" rowspan="3"><input type="checkbox" '+(allSelCheck?'checked':'')+' onchange="togglePoSelAll(['+allIds.map(function(i){return'\''+i+'\'';}).join(',')+'])" style="cursor:pointer;accent-color:var(--gold)"></th>'
+   +'<th style="'+THL+stk(1,'#f0ece4')+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'date\')">Date'+srtArrow('date')+'</th>'
+   +'<th style="'+TH+stk(2,'#f0ece4')+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'ono\')">Order No'+srtArrow('ono')+'</th>'
+   +'<th style="'+THL+stk(3,'#f0ece4')+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'prod\')">Product Name'+srtArrow('prod')+'</th>'
+   +'<th style="'+TH+stk(4,'#f0ece4')+'" rowspan="3">Customer</th>'
+   +'<th style="'+TH+stk(5,'#f0ece4')+'" rowspan="3">Fabric</th>'
+   +'<th style="'+TH+stk(6,'#f0ece4')+'" rowspan="3">Image</th>'
+   +'<th style="'+TH+stk(7,'#f0ece4')+'" rowspan="3">Size<br>Chart</th>'
+   +'<th style="'+TH+stk(8,'#fdf8f0')+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'qty\')">Ordered<br>Qty<br><span style="font-size:13px;color:var(--gold2)">'+tQ+'</span>'+srtArrow('qty')+'</th>'
    +'<th style="'+TH+'background:#fff8e0;color:#a07030;border-bottom:none" colspan="4">Size Ratio</th>'
-   +'<th style="'+TH+'background:#eef3fb;color:#2471a3;border-bottom:none;cursor:pointer;user-select:none" colspan="5" onclick="setPoSort(\'phases\')" title="Sort by phases completed">Production Phases'+srtArrow('phases')+'</th>'
+   +'<th style="'+TH+'background:#eef3fb;color:#2471a3;border-bottom:none;cursor:pointer;user-select:none" colspan="'+(phOpen?5:1)+'" onclick="setPoSort(\'phases\')" title="Sort by phases completed">Production Phases'+srtArrow('phases')+phToggleBtn+'</th>'
    +'<th style="'+TH+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'eta\')">ETA'+srtArrow('eta')+'</th>'
    +'<th style="'+TH+'" rowspan="3">Urgency</th>'
    +'<th style="'+TH+'" rowspan="3">Remarks</th>'
@@ -4667,19 +4685,21 @@ function rPO(){
    +'<tr style="background:#f8f6f2">'
    +'<th style="'+TH+'background:#fff8e0;color:#a07030">S</th><th style="'+TH+'background:#fff8e0;color:#a07030">M</th>'
    +'<th style="'+TH+'background:#fff8e0;color:#a07030">L</th><th style="'+TH+'background:#fff8e0;color:#a07030">XL</th>'
-   +'<th style="'+TH+'background:#eef3fb;font-size:10px">🖨️ Print</th>'
-   +'<th style="'+TH+'background:#eef3fb;font-size:10px">🌸 Emb</th>'
-   +'<th style="'+TH+'background:#eef3fb;font-size:10px">✂️ Cut</th>'
-   +'<th style="'+TH+'background:#eef3fb;font-size:10px">🧵 Stitch</th>'
-   +'<th style="'+TH+'background:#eef3fb;font-size:10px">✨ Finish</th>'
+   +(phOpen?(
+     '<th style="'+TH+'background:#eef3fb;font-size:10px">🖨️ Print</th>'
+     +'<th style="'+TH+'background:#eef3fb;font-size:10px">🌸 Emb</th>'
+     +'<th style="'+TH+'background:#eef3fb;font-size:10px">✂️ Cut</th>'
+     +'<th style="'+TH+'background:#eef3fb;font-size:10px">🧵 Stitch</th>'
+     +'<th style="'+TH+'background:#eef3fb;font-size:10px">✨ Finish</th>'
+   ):'<th style="'+TH+'background:#eef3fb;font-size:9px;color:#2471a3">Done / 5</th>')
    +'</tr>'
-   // Totals row — only fills the 9 non-rowspan columns: S, M, L, XL, 5 phases
+   // Totals row — fills the non-rowspan columns: S, M, L, XL, phases (5 or 1)
    +'<tr style="background:#fdf8f0;border-top:2px solid #c8a96e">'
    +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tS+'</td>'
    +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tM+'</td>'
    +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tL+'</td>'
    +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tXL+'</td>'
-   +'<td style="'+TD+'background:#eef3fb" colspan="5"></td>'
+   +'<td style="'+TD+'background:#eef3fb" colspan="'+(phOpen?5:1)+'"></td>'
    +'</tr>'
    +'</thead></table>';
   function poRowHtml(o,i){
@@ -4716,8 +4736,18 @@ function rPO(){
         if(state==='progress')return '<td style="'+cs+'"><span style="color:#f59e0b;font-weight:700">🔄</span></td>';
         return '<td style="'+cs+'">–</td>';
       }
-      var imgCell='<td style="'+TD+'">'+(o.img&&o.img.startsWith('http')?'<img src="'+o.img+'?width=60" loading="lazy" decoding="async" style="width:38px;height:38px;object-fit:cover;border-radius:4px;border:1px solid #eee" onerror="this.style.display=\'none\'">':'–')+'</td>';
-      var scCell='<td style="'+TD+'">'+(o.sizeChart?'<img src="'+o.sizeChart+'" loading="lazy" decoding="async" onclick="viewSizeChart(\''+o.id+'\')" style="width:38px;height:38px;object-fit:contain;border:1px solid #d8d8ff;cursor:pointer;border-radius:3px;background:#f8f8ff" title="'+(o.sizeChartName||'Size Chart')+' — click to view full size">':'<span style="color:#ccc;font-size:9px">—</span>')+'</td>';
+      var imgCell='<td style="'+TD+stk(6,bg)+'">'+(o.img&&o.img.startsWith('http')?'<img src="'+o.img+'?width=60" loading="lazy" decoding="async" style="width:38px;height:38px;object-fit:cover;border-radius:4px;border:1px solid #eee" onerror="this.style.display=\'none\'">':'–')+'</td>';
+      var scCell='<td style="'+TD+stk(7,bg)+'">'+(o.sizeChart?'<img src="'+o.sizeChart+'" loading="lazy" decoding="async" onclick="viewSizeChart(\''+o.id+'\')" style="width:38px;height:38px;object-fit:contain;border:1px solid #d8d8ff;cursor:pointer;border-radius:3px;background:#f8f8ff" title="'+(o.sizeChartName||'Size Chart')+' — click to view full size">':'<span style="color:#ccc;font-size:9px">—</span>')+'</td>';
+      // Collapsed Production Phases: one compact cell instead of 5, click to expand.
+      function phSummary(){
+        var ks=['print','embroidery','cutting','stitching','finishing'];
+        if(!phActive)return '<td style="'+TD+'color:#ccc;cursor:pointer" onclick="togglePoPhases()" title="Click to expand phases">—</td>';
+        var done=0,prog=0;
+        ks.forEach(function(k){var ph=o.phases&&o.phases[k]||{};var st=ph.state||(ph.done?'done':'none');if(st==='done')done++;else if(st==='progress')prog++;});
+        var color=done===5?'#1e8449':prog>0?'#a07030':'#888';
+        var bar=ks.map(function(k){var ph=o.phases&&o.phases[k]||{};var st=ph.state||(ph.done?'done':'none');var c=st==='done'?'#27ae60':st==='progress'?'#f59e0b':'#e0e0e0';return '<span style="display:inline-block;width:14px;height:6px;border-radius:2px;background:'+c+';margin:0 1px"></span>';}).join('');
+        return '<td style="'+TD+'cursor:pointer" onclick="togglePoPhases()" title="Click to expand phases — '+done+' done, '+prog+' in progress, '+(5-done-prog)+' not started"><div style="font-weight:800;font-size:11px;color:'+color+'">'+done+'/5</div><div style="margin-top:2px">'+bar+'</div></td>';
+      }
       // Urgency from ETA
       var urgCell;
       if(o.targetDate){var _etaD=new Date(o.targetDate),_now=new Date();_now.setHours(0,0,0,0);_etaD.setHours(0,0,0,0);var _diff=Math.round((_etaD-_now)/(864e5));urgCell=_diff<0?'<td style="'+TD+'"><span style="background:#fde8e8;color:#c0392b;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700;white-space:nowrap">🔴 Overdue</span></td>':_diff<=7?'<td style="'+TD+'"><span style="background:#fff8e0;color:#a07030;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700;white-space:nowrap">🟡 '+_diff+'d left</span></td>':'<td style="'+TD+'"><span style="background:#e8f8ee;color:#1e8449;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700;white-space:nowrap">🟢 '+_diff+'d</span></td>';}else{urgCell='<td style="'+TD+'"><span style="color:#ccc;font-size:9px">⚪ No ETA</span></td>';}
@@ -4744,19 +4774,19 @@ function rPO(){
       if((isOwner||isInit)&&o.status!=='Completed'&&o.status!=='Cancelled'&&o.status!=='Rejected')actCell+='<button onclick="cancelPO(\''+o.id+'\')" style="flex:1 1 30%;background:none;border:1px solid #eee;color:#c0392b;border-radius:4px;padding:3px 4px;font-size:9px;cursor:pointer;white-space:nowrap">Cancel</button>';
       actCell+='</div></td>';
       return '<tr style="height:'+PO_RH+'px;background:'+bg+'">'
-       +'<td style="'+TD+'"><input type="checkbox" '+(isSel?'checked':'')+' onchange="togglePoSel(\''+o.id+'\')" style="cursor:pointer;accent-color:var(--gold)"></td>'
-       +'<td style="'+TDL+'color:#888;white-space:nowrap">'+fmtDMY(o.date)+'</td>'
-       +'<td style="'+TD+'font-weight:700;color:var(--gold2)">'+o.id+'</td>'
-       +'<td style="'+TDL+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+o.product+'</div><div style="white-space:nowrap;overflow:hidden"><span style="'+stBadge+'">'+o.status+'</span> '+ratingChip(o.product)+'</div></td>'
-       +'<td style="'+TD+'">'+  (o.customer||'—')+'</td>'
-       +'<td style="'+TD+'">'+  (o.fabric||'—')+'</td>'
+       +'<td style="'+TD+stk(0,bg)+'"><input type="checkbox" '+(isSel?'checked':'')+' onchange="togglePoSel(\''+o.id+'\')" style="cursor:pointer;accent-color:var(--gold)"></td>'
+       +'<td style="'+TDL+stk(1,bg)+'color:#888;white-space:nowrap">'+fmtDMY(o.date)+'</td>'
+       +'<td style="'+TD+stk(2,bg)+'font-weight:700;color:var(--gold2)">'+o.id+'</td>'
+       +'<td style="'+TDL+stk(3,bg)+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+o.product+'</div><div style="white-space:nowrap;overflow:hidden"><span style="'+stBadge+'">'+o.status+'</span> '+ratingChip(o.product)+'</div></td>'
+       +'<td style="'+TD+stk(4,bg)+'">'+  (o.customer||'—')+'</td>'
+       +'<td style="'+TD+stk(5,bg)+'">'+  (o.fabric||'—')+'</td>'
        +imgCell+scCell
-       +'<td style="'+TD+'font-weight:700;background:#fdf8f0;color:var(--gold2)">'+rt+(sizesMissing(o)?'<br><span style="font-size:8px;color:#a06010;font-weight:700">⚠ sizes not set</span>':'')+'</td>'
+       +'<td style="'+TD+stk(8,'#fdf8f0')+'font-weight:700;color:var(--gold2)">'+rt+(sizesMissing(o)?'<br><span style="font-size:8px;color:#a06010;font-weight:700">⚠ sizes not set</span>':'')+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.S||0)+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.M||0)+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.L||0)+'</td>'
        +'<td style="'+TD+'background:#fffbea">'+(o.XL||0)+'</td>'
-       +phCell('print')+phCell('embroidery')+phCell('cutting')+phCell('stitching')+phCell('finishing')
+       +(phOpen?(phCell('print')+phCell('embroidery')+phCell('cutting')+phCell('stitching')+phCell('finishing')):phSummary())
        +(function(){var etaChanged=o.etaLog&&o.etaLog.length>0;var etaTip=etaChanged?o.etaLog.map(function(l){return l.from+' → '+l.to+' by '+l.by+' '+l.date;}).join(' | '):'';var etaColor=etaChanged?'color:#c0392b;font-weight:700':'color:#2980b9';var etaText=o.targetDate?fmtD(o.targetDate):'—';var editBtn=(isProdUser||isOwner)&&o.status!=='Completed'&&o.status!=='Cancelled'?' <button onclick="changePoEta(\''+o.id+'\')" style="background:none;border:none;cursor:pointer;font-size:10px;color:#888;padding:0" title="Change ETA">✏️</button>':'';return '<td style="'+TD+etaColor+';font-size:10px;white-space:nowrap" title="'+etaTip+'">'+etaText+editBtn+'</td>';})()
 
        +urgCell+rmkCell+actCell
