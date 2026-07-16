@@ -3844,6 +3844,7 @@ function poPopulateCustomerSelect(selected){
   sel.value=selected||'';
 }
 function addFabricPrompt(){
+  if(!CU||CU.role!=='Owner'){showToast('Only the Owner can add new fabric types — ask them to add it via Manage Lists.');return;}
   var name=prompt('New fabric / material type:');
   if(name==null)return;
   name=name.trim();
@@ -3856,6 +3857,7 @@ function addFabricPrompt(){
   showToast('Added "'+name+'" to Fabric types.');
 }
 function addCustomerPrompt(){
+  if(!CU||CU.role!=='Owner'){showToast('Only the Owner can add new customers — ask them to add it via Manage Lists.');return;}
   var name=prompt('New customer / buyer name:');
   if(name==null)return;
   name=name.trim();
@@ -3869,8 +3871,18 @@ function addCustomerPrompt(){
 }
 
 var _poEditId=null;
+// Adding a brand-new customer/fabric changes a shared list for the whole
+// team, so it's Owner-only -- same restriction as the Manage Lists page
+// itself. Hides the buttons entirely rather than showing ones that just
+// error, since addFabricPrompt/addCustomerPrompt already enforce this too.
+function poSyncAddBtns(){
+  var isOwner=CU&&CU.role==='Owner';
+  var fb=document.getElementById('po-add-fabric-btn');if(fb)fb.style.display=isOwner?'':'none';
+  var cb=document.getElementById('po-add-customer-btn');if(cb)cb.style.display=isOwner?'':'none';
+}
 function openNewPO(name){
   _poEditId=null;
+  poSyncAddBtns();
   var t=document.getElementById('po-modal-title');if(t)t.textContent='📋 New Production Order';
   var sb=document.getElementById('po-submit-btn');if(sb)sb.textContent='Place Order →';
   var dl=document.getElementById('po-prodlist');
@@ -4041,6 +4053,7 @@ function poCanEdit(o){
   return isInit&&o.status==='Pending Approval';
 }
 function openEditPO(oid){
+  poSyncAddBtns();
   var orders=loadPO();
   var o=orders.find(function(x){return x.id===oid;});
   if(!o){showToast('Order not found.');return;}
@@ -5925,14 +5938,14 @@ function toggleSB(){
     <label style="display:block;font-size:10px;color:#888;margin-bottom:5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Fabric / Material Name <span style="color:#e74c3c">*</span></label>
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <select id="po-fabric" style="flex:1;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box"><option value="">Select fabric...</option></select>
-      <button type="button" onclick="addFabricPrompt()" title="Add new fabric type" style="background:#252525;border:1px solid #3a3a3a;color:var(--gold);border-radius:8px;padding:0 16px;font-size:16px;font-weight:700;cursor:pointer">+</button>
+      <button type="button" id="po-add-fabric-btn" onclick="addFabricPrompt()" title="Add new fabric type" style="background:#252525;border:1px solid #3a3a3a;color:var(--gold);border-radius:8px;padding:0 16px;font-size:16px;font-weight:700;cursor:pointer">+</button>
     </div>
 
     <!-- Customer -->
     <label style="display:block;font-size:10px;color:#888;margin-bottom:5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Customer / Buyer Name <span style="color:#e74c3c">✱</span></label>
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <select id="po-customer" style="flex:1;background:#252525;border:1px solid #3a3a3a;color:#fff;border-radius:8px;padding:10px 13px;font-size:13px;outline:none;box-sizing:border-box"><option value="">Select customer...</option></select>
-      <button type="button" onclick="addCustomerPrompt()" title="Add new customer" style="background:#252525;border:1px solid #3a3a3a;color:var(--gold);border-radius:8px;padding:0 16px;font-size:16px;font-weight:700;cursor:pointer">+</button>
+      <button type="button" id="po-add-customer-btn" onclick="addCustomerPrompt()" title="Add new customer" style="background:#252525;border:1px solid #3a3a3a;color:var(--gold);border-radius:8px;padding:0 16px;font-size:16px;font-weight:700;cursor:pointer">+</button>
     </div>
 
     <!-- Ordered Qty + Size Breakdown -->
