@@ -4670,6 +4670,8 @@ function printSelectedPO(){
 // on reload -- every user gets their own default, nobody else is affected).
 if(typeof window._poPhasesOpen==='undefined')window._poPhasesOpen=false;
 function togglePoPhases(){window._poPhasesOpen=!window._poPhasesOpen;rendered.po=false;doR('po');}
+if(typeof window._poSizeRatioOpen==='undefined')window._poSizeRatioOpen=false;
+function togglePoSizeRatio(){window._poSizeRatioOpen=!window._poSizeRatioOpen;rendered.po=false;doR('po');}
 function rPO(){
   var el=document.getElementById('ppo');
   if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};
@@ -4756,10 +4758,12 @@ function rPO(){
   // visible slice of rows (like the Detail Report), so the page stays fast
   // no matter how many orders accumulate.
   var phOpen=window._poPhasesOpen;
+  var srOpen=window._poSizeRatioOpen;
   // Product Name shrunk from 225 to 150 (was the widest column by far) with
-  // truncation + tooltip already in place below. Phases group is 5x92=460
+  // truncation + tooltip already in place below. Size Ratio group is 4x44=176
+  // expanded, or one 130px summary column collapsed. Phases group is 5x92=460
   // expanded, or one 150px summary column collapsed.
-  var PO_COLS=[36,92,78,150,92,92,62,62,74,44,44,44,44].concat(phOpen?[92,92,92,92,92]:[150]).concat([106,96,170,130]);
+  var PO_COLS=[36,92,78,150,92,92,62,62,74].concat(srOpen?[44,44,44,44]:[130]).concat(phOpen?[92,92,92,92,92]:[150]).concat([106,96,170,130]);
   var PO_TOT=PO_COLS.reduce(function(a,b){return a+b;},0);
   var PO_RH=76; // tallest row = Pending Approval with 6 action buttons (2 lines of 3)
   // Frozen columns: checkbox..Ordered Qty (indices 0-8) stay pinned in place
@@ -4771,6 +4775,7 @@ function rPO(){
   function stk(idx,bg){return 'position:sticky;left:'+stickyLeft[idx]+'px;z-index:5;background:'+bg+';'+(idx===FROZEN_N-1?'box-shadow:2px 0 4px -2px rgba(0,0,0,.15);':'');}
   var colgroup='<colgroup>'+PO_COLS.map(function(w){return '<col style="width:'+w+'px">';}).join('')+'</colgroup>';
   var phToggleBtn='<button onclick="event.stopPropagation();togglePoPhases()" title="'+(phOpen?'Collapse':'Expand')+' Production Phases" style="background:rgba(255,255,255,.6);border:1px solid #b8d0ea;border-radius:3px;width:16px;height:16px;line-height:1;cursor:pointer;font-size:10px;font-weight:800;color:#2471a3;padding:0;margin-left:4px">'+(phOpen?'−':'+')+'</button>';
+  var srToggleBtn='<button onclick="event.stopPropagation();togglePoSizeRatio()" title="'+(srOpen?'Collapse':'Expand')+' Size Ratio" style="background:rgba(255,255,255,.6);border:1px solid #e0c080;border-radius:3px;width:16px;height:16px;line-height:1;cursor:pointer;font-size:10px;font-weight:800;color:#a07030;padding:0;margin-left:4px">'+(srOpen?'−':'+')+'</button>';
   var hdr='<table style="border-collapse:collapse;table-layout:fixed;width:'+PO_TOT+'px;background:#fff">'+colgroup
    +'<thead>'
    // Grouped header row
@@ -4784,7 +4789,7 @@ function rPO(){
    +'<th style="'+TH+stk(6,'#f0ece4')+'" rowspan="3">Image</th>'
    +'<th style="'+TH+stk(7,'#f0ece4')+'" rowspan="3">Size<br>Chart</th>'
    +'<th style="'+TH+stk(8,'#fdf8f0')+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'qty\')">Ordered<br>Qty<br><span style="font-size:13px;color:var(--gold2)">'+tQ+'</span>'+srtArrow('qty')+'</th>'
-   +'<th style="'+TH+'background:#fff8e0;color:#a07030;border-bottom:none" colspan="4">Size Ratio</th>'
+   +'<th style="'+TH+'background:#fff8e0;color:#a07030;border-bottom:none;cursor:pointer;user-select:none" colspan="'+(srOpen?4:1)+'">Size Ratio'+srToggleBtn+'</th>'
    +'<th style="'+TH+'background:#eef3fb;color:#2471a3;border-bottom:none;cursor:pointer;user-select:none" colspan="'+(phOpen?5:1)+'" onclick="setPoSort(\'phases\')" title="Sort by phases completed">Production Phases'+srtArrow('phases')+phToggleBtn+'</th>'
    +'<th style="'+TH+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'eta\')">ETA'+srtArrow('eta')+'</th>'
    +'<th style="'+TH+'" rowspan="3">Urgency</th>'
@@ -4793,8 +4798,10 @@ function rPO(){
    +'</tr>'
    // Column names
    +'<tr style="background:#f8f6f2">'
-   +'<th style="'+TH+'background:#fff8e0;color:#a07030">S</th><th style="'+TH+'background:#fff8e0;color:#a07030">M</th>'
-   +'<th style="'+TH+'background:#fff8e0;color:#a07030">L</th><th style="'+TH+'background:#fff8e0;color:#a07030">XL</th>'
+   +(srOpen?(
+     '<th style="'+TH+'background:#fff8e0;color:#a07030">S</th><th style="'+TH+'background:#fff8e0;color:#a07030">M</th>'
+     +'<th style="'+TH+'background:#fff8e0;color:#a07030">L</th><th style="'+TH+'background:#fff8e0;color:#a07030">XL</th>'
+   ):'<th style="'+TH+'background:#fff8e0;font-size:9px;color:#a07030">S / M / L / XL</th>')
    +(phOpen?(
      '<th style="'+TH+'background:#eef3fb;font-size:10px">🖨️ Print</th>'
      +'<th style="'+TH+'background:#eef3fb;font-size:10px">🌸 Emb</th>'
@@ -4803,12 +4810,14 @@ function rPO(){
      +'<th style="'+TH+'background:#eef3fb;font-size:10px">✨ Finish</th>'
    ):'<th style="'+TH+'background:#eef3fb;font-size:9px;color:#2471a3">Done / 5</th>')
    +'</tr>'
-   // Totals row — fills the non-rowspan columns: S, M, L, XL, phases (5 or 1)
+   // Totals row — fills the non-rowspan columns: Size Ratio (4 or 1), phases (5 or 1)
    +'<tr style="background:#fdf8f0;border-top:2px solid #c8a96e">'
-   +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tS+'</td>'
-   +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tM+'</td>'
-   +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tL+'</td>'
-   +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tXL+'</td>'
+   +(srOpen?(
+     '<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tS+'</td>'
+     +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tM+'</td>'
+     +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tL+'</td>'
+     +'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030">'+tXL+'</td>'
+   ):'<td style="'+TD+'background:#fff8e0;font-weight:800;color:#a07030;font-size:10px">'+tS+'/'+tM+'/'+tL+'/'+tXL+'</td>')
    +'<td style="'+TD+'background:#eef3fb" colspan="'+(phOpen?5:1)+'"></td>'
    +'</tr>'
    +'</thead></table>';
@@ -4846,7 +4855,7 @@ function rPO(){
         if(state==='progress')return '<td style="'+cs+'"><span style="color:#f59e0b;font-weight:700">🔄</span></td>';
         return '<td style="'+cs+'">–</td>';
       }
-      var imgCell='<td style="'+TD+stk(6,bg)+'">'+(o.img&&o.img.startsWith('http')?'<img src="'+o.img+'?width=60" loading="lazy" decoding="async" onclick="rxViewPhoto(\''+o.img.replace(/'/g,"\\'")+'\')" title="Click to enlarge" style="width:38px;height:38px;object-fit:cover;border-radius:4px;border:1px solid #eee;cursor:zoom-in" onerror="this.style.display=\'none\'">':'–')+'</td>';
+      var imgCell='<td style="'+TD+stk(6,bg)+'">'+(o.img&&o.img.startsWith('http')?'<img src="'+o.img+'?width=100" loading="lazy" decoding="async" onclick="rxViewPhoto(\''+o.img.replace(/'/g,"\\'")+'\')" title="Click to enlarge" style="width:42px;height:53px;object-fit:cover;object-position:top center;border-radius:4px;border:1px solid #eee;cursor:zoom-in" onerror="this.style.display=\'none\'">':'–')+'</td>';
       var scCell='<td style="'+TD+stk(7,bg)+'">'+(o.sizeChart?'<img src="'+o.sizeChart+'" loading="lazy" decoding="async" onclick="viewSizeChart(\''+o.id+'\')" style="width:38px;height:38px;object-fit:contain;border:1px solid #d8d8ff;cursor:pointer;border-radius:3px;background:#f8f8ff" title="'+(o.sizeChartName||'Size Chart')+' — click to view full size">':'<span style="color:#ccc;font-size:9px">—</span>')+'</td>';
       // Collapsed Production Phases: one compact cell instead of 5, click to expand.
       function phSummary(){
@@ -4892,10 +4901,12 @@ function rPO(){
        +'<td style="'+TD+stk(5,bg)+'">'+  (o.fabric||'—')+'</td>'
        +imgCell+scCell
        +'<td style="'+TD+stk(8,'#fdf8f0')+'font-weight:700;color:var(--gold2)">'+rt+(sizesMissing(o)?'<br><span style="font-size:8px;color:#a06010;font-weight:700">⚠ sizes not set</span>':'')+'</td>'
-       +'<td style="'+TD+'background:#fffbea">'+(o.S||0)+'</td>'
-       +'<td style="'+TD+'background:#fffbea">'+(o.M||0)+'</td>'
-       +'<td style="'+TD+'background:#fffbea">'+(o.L||0)+'</td>'
-       +'<td style="'+TD+'background:#fffbea">'+(o.XL||0)+'</td>'
+       +(srOpen?(
+         '<td style="'+TD+'background:#fffbea">'+(o.S||0)+'</td>'
+         +'<td style="'+TD+'background:#fffbea">'+(o.M||0)+'</td>'
+         +'<td style="'+TD+'background:#fffbea">'+(o.L||0)+'</td>'
+         +'<td style="'+TD+'background:#fffbea">'+(o.XL||0)+'</td>'
+       ):'<td style="'+TD+'background:#fffbea;cursor:pointer;font-size:10px" onclick="togglePoSizeRatio()" title="Click to expand Size Ratio">'+(o.S||0)+'/'+(o.M||0)+'/'+(o.L||0)+'/'+(o.XL||0)+'</td>')
        +(phOpen?(phCell('print')+phCell('embroidery')+phCell('cutting')+phCell('stitching')+phCell('finishing')):phSummary())
        +(function(){var etaChanged=o.etaLog&&o.etaLog.length>0;var etaTip=etaChanged?o.etaLog.map(function(l){return l.from+' → '+l.to+' by '+l.by+' '+l.date;}).join(' | '):'';var etaColor=etaChanged?'color:#c0392b;font-weight:700':'color:#2980b9';var etaText=o.targetDate?fmtD(o.targetDate):'—';var editBtn=(isProdUser||isOwner)&&o.status!=='Completed'&&o.status!=='Cancelled'?' <button onclick="changePoEta(\''+o.id+'\')" style="background:none;border:none;cursor:pointer;font-size:10px;color:#888;padding:0" title="Change ETA">✏️</button>':'';return '<td style="'+TD+etaColor+';font-size:10px;white-space:nowrap" title="'+etaTip+'">'+etaText+editBtn+'</td>';})()
 
