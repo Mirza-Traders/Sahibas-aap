@@ -4874,6 +4874,18 @@ function rPO(){
    +'<td style="'+TD+'background:#eef3fb" colspan="'+(phOpen?5:1)+'"></td>'
    +'</tr>'
    +'</thead></table>';
+  // How many still-active plans (Pending Approval + In Progress -- not
+  // Completed/Rejected) exist for each product, across ALL orders regardless
+  // of the current filter -- so the count reflects true company-wide load,
+  // not just what's currently on screen. Multiple concurrent lots of the
+  // same product are legitimate (different colorways/customers), so this is
+  // informational, not a duplicate warning.
+  var productRunningCount={};
+  allActive.forEach(function(o){
+    if(o.status!=='Pending Approval'&&o.status!=='In Progress')return;
+    var k=(o.product||'').toLowerCase().trim();if(!k)return;
+    productRunningCount[k]=(productRunningCount[k]||0)+1;
+  });
   function poRowHtml(o,i){
       var rt=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
       var isSel=!!sel[o.id];
@@ -4949,7 +4961,12 @@ function rPO(){
        +'<td style="'+TD+stk(0,bg)+'"><input type="checkbox" '+(isSel?'checked':'')+' onchange="togglePoSel(\''+o.id+'\')" style="cursor:pointer;accent-color:var(--gold)"></td>'
        +'<td style="'+TDL+stk(1,bg)+'color:#888;white-space:nowrap">'+fmtDMY(o.date)+'</td>'
        +'<td style="'+TD+stk(2,bg)+'font-weight:700;color:var(--gold2)">'+o.id+'</td>'
-       +'<td style="'+TDL+stk(3,bg)+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+(o.img&&o.img.startsWith('http')?'<a href="'+o.img+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+o.product+'</a>':o.product)+'</div><div style="white-space:nowrap;overflow:hidden"><span style="'+stBadge+'">'+o.status+'</span> '+ratingChip(o.product)+'</div></td>'
+       +(function(){
+         var isRunning=o.status==='Pending Approval'||o.status==='In Progress';
+         var runCnt=productRunningCount[(o.product||'').toLowerCase().trim()]||0;
+         var runBadge=(isRunning&&runCnt>=2)?' <span title="'+runCnt+' active production plans for this product right now (across all customers/lots) -- multiple concurrent lots are normal, e.g. different colorways or customers" style="background:#eef0fb;color:#4a4ab0;font-size:8px;font-weight:800;padding:2px 6px;border-radius:8px;display:inline-block;white-space:nowrap">⟲ '+runCnt+' plans running</span>':'';
+         return '<td style="'+TDL+stk(3,bg)+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+(o.img&&o.img.startsWith('http')?'<a href="'+o.img+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+o.product+'</a>':o.product)+runBadge+'</div><div style="white-space:nowrap;overflow:hidden"><span style="'+stBadge+'">'+o.status+'</span> '+ratingChip(o.product)+'</div></td>';
+       })()
        +'<td style="'+TD+stk(4,bg)+'">'+  (o.customer||'—')+'</td>'
        +'<td style="'+TD+stk(5,bg)+'">'+  (o.fabric||'—')+'</td>'
        +imgCell+scCell
