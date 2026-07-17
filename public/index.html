@@ -101,6 +101,8 @@ td{padding:6px 9px;border-bottom:1px solid #f2efe9;white-space:nowrap;color:#1a1
 tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:hover td{background:#fde9b0!important;border-bottom-color:#e8c878}
 #pcs-tbody tr.cs-kr td{background:#ffe082!important;border-top:1px solid var(--gold)!important;border-bottom:1px solid var(--gold)!important;}
 #pcs-tbody tr.cs-kr td:first-child{border-left:3px solid var(--gold)!important;}
+#po-rv tr.po-kr td{background:#ffe082!important;border-top:1px solid var(--gold)!important;border-bottom:1px solid var(--gold)!important;}
+#po-rv tr.po-kr td:first-child{background:#ffe082!important;border-left:3px solid var(--gold)!important;}
 .nr{text-align:right}.nc{text-align:center}
 .tr td{background:#faf6ed!important;font-weight:700;color:var(--gold2);border-top:2px solid #e8dfc8;position:sticky;bottom:0}
 .xrow td{background:#fff5f5!important;border-left:3px solid var(--red)}
@@ -2779,20 +2781,24 @@ document.addEventListener('keydown',function(e){
   var inInput=ae&&(ae.tagName==='INPUT'||ae.tagName==='SELECT'||ae.tagName==='TEXTAREA');
   if((e.key==='ArrowLeft'||e.key==='ArrowRight')&&!inInput){
     var sc=document.getElementById('cs-scroll');
-    if(!sc)return;
-    e.preventDefault();
-    sc.scrollLeft+=e.key==='ArrowRight'?120:-120;
+    var pv=document.getElementById('po-vs');
+    if(sc){e.preventDefault();sc.scrollLeft+=e.key==='ArrowRight'?120:-120;}
+    else if(pv){e.preventDefault();pv.scrollLeft+=e.key==='ArrowRight'?120:-120;}
   }
   if((e.key==='ArrowUp'||e.key==='ArrowDown')&&!inInput){
     var tbody=document.getElementById('pcs-tbody');
-    if(!tbody)return;
-    e.preventDefault();
-    var rows=Array.from(tbody.querySelectorAll('tr'));
-    if(!rows.length)return;
-    if(e.key==='ArrowDown')_csActiveRow=Math.min(_csActiveRow+1,rows.length-1);
-    else _csActiveRow=Math.max(_csActiveRow-1,0);
-    rows.forEach(function(r,i){r.classList.toggle('cs-kr',i===_csActiveRow);});
-    rows[_csActiveRow].scrollIntoView({block:'nearest',behavior:'smooth'});
+    if(tbody){
+      e.preventDefault();
+      var rows=Array.from(tbody.querySelectorAll('tr'));
+      if(!rows.length)return;
+      if(e.key==='ArrowDown')_csActiveRow=Math.min(_csActiveRow+1,rows.length-1);
+      else _csActiveRow=Math.max(_csActiveRow-1,0);
+      rows.forEach(function(r,i){r.classList.toggle('cs-kr',i===_csActiveRow);});
+      rows[_csActiveRow].scrollIntoView({block:'nearest',behavior:'smooth'});
+    }else if(window._poKeyMove&&document.getElementById('po-vs')){
+      e.preventDefault();
+      window._poKeyMove(e.key==='ArrowDown'?1:-1);
+    }
   }
 });
 
@@ -4167,7 +4173,7 @@ function openPoReview(oid){
    +'<div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:4px">'+o.product+' '+ratingChip(o.product)+'</div>'
    +'<div style="font-size:11px;color:#888;line-height:1.7">Fabric: <span style="color:#ccc">'+(o.fabric||'—')+'</span><br>'
    +'Customer: <span style="color:#ccc">'+(o.customer||'—')+'</span><br>'
-   +'Requirement: <span style="color:#ccc">'+(o.urgency||'ROUTINE')+'</span> · Target: <span style="color:#ccc">'+(o.targetDate?fmtD(o.targetDate):'—')+'</span><br>'
+   +'Requirement: <span style="color:#ccc">'+(o.urgency||'ROUTINE')+'</span> · Target: <span style="color:#ccc">'+(o.targetDate?fmtDMY(o.targetDate):'—')+'</span><br>'
    +'Placed by: <span style="color:#ccc">'+(o.placedBy||'—')+'</span> on '+fmtD(o.date)+'</div>'
    +'</div></div>'
    +stockHtml
@@ -4442,6 +4448,20 @@ function approvePO(oid){
   savePO(orders,[oid]);rendered.po=false;doR('po');
   showToast('✓ '+oid+' approved — now In Production');
 }
+function bulkApprovePO(){
+  if(!CU||CU.role!=='Owner'){showToast('Only Owner can approve orders.');return;}
+  var orders=loadPO();
+  var sel=window._poSel||{};
+  var targets=orders.filter(function(o){return sel[o.id]&&o.status==='Pending Approval';});
+  if(!targets.length){showToast('No selected orders are Pending Approval.');return;}
+  if(!confirm('Approve '+targets.length+' selected order'+(targets.length!==1?'s':'')+'?'))return;
+  var today=new Date().toISOString().split('T')[0];
+  targets.forEach(function(o){o.status='In Progress';o.approvedBy=CU.name;o.approvedDate=today;});
+  savePO(orders,targets.map(function(o){return o.id;}));
+  window._poSel={};
+  rendered.po=false;doR('po');
+  showToast('✓ '+targets.length+' order'+(targets.length!==1?'s':'')+' approved — now In Production');
+}
 function rejectPO(oid){
   if(!confirm('Reject order '+oid+'? The order placer will need to resubmit.'))return;
   var orders=loadPO();
@@ -4596,14 +4616,14 @@ function doPrintPO(o,imgSrc){
 
 // ── PO TABLE helpers ──────────────────────────────────────────────
 function togglePoFlt(field,val){
-  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:''};
   var arr=window._poFlt[field];
   if(!Array.isArray(arr)){window._poFlt[field]=[val];rendered.po=false;doR('po');return;}
   var idx=arr.indexOf(val);if(idx>=0)arr.splice(idx,1);else arr.push(val);
   rendered.po=false;doR('po');
 }
 function setPoFlt(field,val){
-  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:''};
   window._poFlt[field]=val;
   if(field==='ono'){
     clearTimeout(window._poSearchTimer);
@@ -4612,7 +4632,7 @@ function setPoFlt(field,val){
   }
   rendered.po=false;doR('po');
 }
-function clearPoFlt(){window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};rendered.po=false;doR('po');}
+function clearPoFlt(){window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:''};rendered.po=false;doR('po');}
 function clearPoFltField(field){if(window._poFlt)window._poFlt[field]=[];rendered.po=false;doR('po');}
 function togglePoDrop(id){window._poDrop=(window._poDrop===id?'':id);rendered.po=false;doR('po');}
 function setPoSort(col){var cur=window._poSort||{col:'date',asc:false};if(cur.col===col){window._poSort={col:col,asc:!cur.asc};}else{window._poSort={col:col,asc:false};}rendered.po=false;doR('po');}
@@ -4624,7 +4644,7 @@ function togglePoSelAll(ids){
   window._poSel=sel;rendered.po=false;doR('po');
 }
 function exportPOCSV(){
-  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:''};
   var orders=loadPO();var f=window._poFlt;
   var rows=orders.filter(function(o){
     if(o.status==='Cancelled')return false;
@@ -4641,7 +4661,7 @@ function exportPOCSV(){
   var hdr=['Date','Order No','Product','Fabric','Customer','Ordered Qty','S','M','L','XL','Status','Printing','Embroidery','Cutting','Stitching','Finishing','ETA','Placed By','Approved By'];
   var csv=hdr.join(',')+'\n'+rows.map(function(o){
     var rt=o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0);
-    return [fmtDMY(o.date),o.id,o.product,o.fabric||'',o.customer||'',rt,o.S||0,o.M||0,o.L||0,o.XL||0,o.status,ph(o,'print'),ph(o,'embroidery'),ph(o,'cutting'),ph(o,'stitching'),ph(o,'finishing'),fmtD(o.targetDate),o.placedBy||'',o.approvedBy||'']
+    return [fmtDMY(o.date),o.id,o.product,o.fabric||'',o.customer||'',rt,o.S||0,o.M||0,o.L||0,o.XL||0,o.status,ph(o,'print'),ph(o,'embroidery'),ph(o,'cutting'),ph(o,'stitching'),ph(o,'finishing'),fmtDMY(o.targetDate),o.placedBy||'',o.approvedBy||'']
     .map(function(v){return '"'+String(v||'').replace(/"/g,'""')+'"';}).join(',');
   }).join('\n');
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
@@ -4668,13 +4688,29 @@ function printSelectedPO(){
 // summary) to keep the table scannable; personal per-session state, same as
 // the Summary Sheet's own column-group toggles (not saved anywhere, resets
 // on reload -- every user gets their own default, nobody else is affected).
+if(typeof window._poActiveRow==='undefined')window._poActiveRow=-1;
 if(typeof window._poPhasesOpen==='undefined')window._poPhasesOpen=false;
 function togglePoPhases(){window._poPhasesOpen=!window._poPhasesOpen;rendered.po=false;doR('po');}
 if(typeof window._poSizeRatioOpen==='undefined')window._poSizeRatioOpen=false;
 function togglePoSizeRatio(){window._poSizeRatioOpen=!window._poSizeRatioOpen;rendered.po=false;doR('po');}
+// Size the table to fill whatever space is actually left below it on screen
+// (KPI cards + toolbar + banner vary in height), instead of a fixed vh
+// percentage that leaves the horizontal scrollbar stranded mid-page on tall
+// screens or short content. A single resize listener (registered once,
+// guarded below) keeps it correct if the window is resized.
+function poFitHeight(){
+  var vs=document.getElementById('po-vs');if(!vs)return;
+  var top=vs.getBoundingClientRect().top;
+  var h=Math.max(200,window.innerHeight-top-16);
+  vs.style.maxHeight=h+'px';
+}
+if(!window._poResizeBound){
+  window._poResizeBound=true;
+  window.addEventListener('resize',function(){poFitHeight();});
+}
 function rPO(){
   var el=document.getElementById('ppo');
-  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[]};
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:''};
   if(!window._poSel)window._poSel={};
   if(!window._poDrop)window._poDrop='';
   var orders=loadPO();
@@ -4685,6 +4721,7 @@ function rPO(){
     if(f.ono){var s=f.ono.toLowerCase();if(o.id.toLowerCase().indexOf(s)<0&&o.product.toLowerCase().indexOf(s)<0)return false;}
     if(f.prods&&f.prods.length&&f.prods.indexOf(o.product)<0)return false;
     if(f.fabs&&f.fabs.length&&f.fabs.indexOf(o.fabric||'')<0)return false;
+    if(f.status&&o.status!==f.status)return false;
     return true;
   });
   if(!window._poSort)window._poSort={col:'date',asc:false};
@@ -4706,7 +4743,7 @@ function rPO(){
   // Filter options from all active orders
   var allProds=allActive.map(function(o){return o.product;}).filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
   var allFabs=allActive.map(function(o){return o.fabric||'';}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).sort();
-  var hasFilter=f.from||f.to||f.ono||(f.prods&&f.prods.length)||(f.fabs&&f.fabs.length);
+  var hasFilter=f.from||f.to||f.ono||(f.prods&&f.prods.length)||(f.fabs&&f.fabs.length)||f.status;
   // Multi-select dropdown builder
   function mkDrop(id,label,opts,selArr){
     var open=window._poDrop===id;var cnt=selArr?selArr.length:0;
@@ -4723,8 +4760,10 @@ function rPO(){
     return '<div style="position:relative;display:inline-block">'+btn+dd+'</div>';
   }
   var selCount=Object.keys(sel).filter(function(k){return sel[k];}).length;
+  var selPendingCount=active.filter(function(o){return sel[o.id]&&o.status==='Pending Approval';}).length;
   var allIds=active.map(function(o){return o.id;});
   var allSelCheck=allIds.length>0&&allIds.every(function(id){return sel[id];});
+  var STATUS_OPTS=['Pending Approval','In Progress','Completed','Rejected'];
   // Filter + toolbar
   var toolbar='<div style="background:#fafafa;border:1px solid #eee;border-radius:8px;padding:10px 14px;margin:12px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
    +'<span style="font-size:10px;color:#aaa;font-weight:700;letter-spacing:.06em">FILTERS</span>'
@@ -4734,8 +4773,13 @@ function rPO(){
    +'<input type="text" value="'+(f.ono||'')+'" placeholder="Order No / Product search…" oninput="setPoFlt(\'ono\',this.value)" style="border:1px solid #ddd;border-radius:6px;padding:5px 10px;font-size:11px;min-width:170px;background:#fff;color:#333">'
    +mkDrop('prods','Product',allProds,f.prods)
    +mkDrop('fabs','Fabric',allFabs,f.fabs)
+   +'<select onchange="setPoFlt(\'status\',this.value)" style="border:1px solid #ddd;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;font-weight:600;background:'+(f.status?'var(--gold)':'#f5f5f5')+';color:'+(f.status?'#111':'#555')+'">'
+     +'<option value=""'+(!f.status?' selected':'')+'>Status: All</option>'
+     +STATUS_OPTS.map(function(s){return '<option value="'+s+'"'+(f.status===s?' selected':'')+'>'+s+'</option>';}).join('')
+   +'</select>'
    +(hasFilter?'<button onclick="clearPoFlt()" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">✕ Clear</button>':'')
    +'<div style="margin-left:auto;display:flex;gap:6px;align-items:center">'
+   +(isOwner&&selPendingCount>0?'<button onclick="bulkApprovePO()" style="background:#27ae60;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer" title="Approve all selected Pending Approval orders">✓ Approve Selected ('+selPendingCount+')</button>':'')
    +'<button onclick="exportPOCSV()" style="background:#fff;border:1px solid #27ae60;color:#27ae60;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer" title="Export filtered/selected rows as CSV">⬇ CSV</button>'
    +'<button onclick="printSelectedPO()" style="background:#fff;border:1px solid #2980b9;color:#2980b9;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer" title="Print selected orders as PDF">🖨️ Print PDF</button>'
    +(canPlace?'<button onclick="openNewPO()" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer">+ New Order</button>':'')
@@ -4908,7 +4952,7 @@ function rPO(){
          +'<td style="'+TD+'background:#fffbea">'+(o.XL||0)+'</td>'
        ):'<td style="'+TD+'background:#fffbea;cursor:pointer;font-size:10px" onclick="togglePoSizeRatio()" title="Click to expand Size Ratio">'+(o.S||0)+'/'+(o.M||0)+'/'+(o.L||0)+'/'+(o.XL||0)+'</td>')
        +(phOpen?(phCell('print')+phCell('embroidery')+phCell('cutting')+phCell('stitching')+phCell('finishing')):phSummary())
-       +(function(){var etaChanged=o.etaLog&&o.etaLog.length>0;var etaTip=etaChanged?o.etaLog.map(function(l){return l.from+' → '+l.to+' by '+l.by+' '+l.date;}).join(' | '):'';var etaColor=etaChanged?'color:#c0392b;font-weight:700':'color:#2980b9';var etaText=o.targetDate?fmtD(o.targetDate):'—';var editBtn=(isProdUser||isOwner)&&o.status!=='Completed'&&o.status!=='Cancelled'?' <button onclick="changePoEta(\''+o.id+'\')" style="background:none;border:none;cursor:pointer;font-size:10px;color:#888;padding:0" title="Change ETA">✏️</button>':'';return '<td style="'+TD+etaColor+';font-size:10px;white-space:nowrap" title="'+etaTip+'">'+etaText+editBtn+'</td>';})()
+       +(function(){var etaChanged=o.etaLog&&o.etaLog.length>0;var etaTip=etaChanged?o.etaLog.map(function(l){return l.from+' → '+l.to+' by '+l.by+' '+l.date;}).join(' | '):'';var etaColor=etaChanged?'color:#c0392b;font-weight:700':'color:#2980b9';var etaText=o.targetDate?fmtDMY(o.targetDate):'—';var editBtn=(isProdUser||isOwner)&&o.status!=='Completed'&&o.status!=='Cancelled'?' <button onclick="changePoEta(\''+o.id+'\')" style="background:none;border:none;cursor:pointer;font-size:10px;color:#888;padding:0" title="Change ETA">✏️</button>':'';return '<td style="'+TD+etaColor+';font-size:10px;white-space:nowrap" title="'+etaTip+'">'+etaText+editBtn+'</td>';})()
 
        +urgCell+rmkCell+actCell
        +'</tr>';
@@ -4920,11 +4964,16 @@ function rPO(){
    +'<div id="po-hdr" style="overflow:hidden">'+hdr+'</div>'
    +(active.length===0
      ?'<div style="padding:40px;text-align:center;color:#bbb;font-size:13px;width:100%">No orders match the current filter. <a href="#" onclick="clearPoFlt();return false" style="color:var(--gold)">Clear filters</a></div>'
-     :'<div id="po-vs" style="overflow-y:auto;max-height:64vh;position:relative">'
+     :'<div id="po-vs" style="overflow-y:auto;overflow-x:auto;position:relative">'
       +'<div id="po-sp" style="position:relative;width:'+PO_TOT+'px;height:'+(active.length*PO_RH)+'px">'
       +'<div id="po-rv" style="position:absolute;left:0;right:0;top:0"></div>'
       +'</div></div>')
    +'</div>';
+  // Fill the ACTUAL remaining screen height (not a fixed 64vh) so the
+  // table's own horizontal scrollbar sits right at the bottom of the
+  // visible window instead of wherever a fixed percentage happens to land —
+  // reachable without scrolling the page down first. Recomputed on resize.
+  poFitHeight();
   // Virtual slice renderer — only the rows in (or near) the viewport exist in the DOM.
   var vs=document.getElementById('po-vs');
   if(vs){
@@ -4959,6 +5008,28 @@ function rPO(){
     }
     vs.addEventListener('scroll',renderPoSlice,{passive:true});
     renderPoSlice();
+    // Keyboard row navigation (Up/Down), same idea as the Summary Sheet's
+    // _csActiveRow but scroll-aware since rows here are virtualized -- the
+    // target row may not exist in the DOM yet, so this scrolls it into view
+    // first, then (re)applies the highlight regardless of whether that
+    // scroll actually triggered a slice rebuild.
+    function poApplyActiveHighlight(){
+      var rv2=document.getElementById('po-rv');if(!rv2)return;
+      var tb2=rv2.querySelector('tbody');if(!tb2)return;
+      Array.from(tb2.rows).forEach(function(r,j){r.classList.toggle('po-kr',(lastStart+j)===window._poActiveRow);});
+    }
+    window._poKeyMove=function(delta){
+      if(document.getElementById('po-vs')!==vs)return; // stale closure from a previous render
+      if(!active.length)return;
+      var cur=window._poActiveRow<0?-1:window._poActiveRow;
+      window._poActiveRow=Math.max(0,Math.min(cur+delta,active.length-1));
+      var targetTop=window._poActiveRow*PO_RH;
+      if(targetTop<vs.scrollTop)vs.scrollTop=targetTop;
+      else if(targetTop+PO_RH>vs.scrollTop+vs.clientHeight)vs.scrollTop=targetTop+PO_RH-vs.clientHeight;
+      renderPoSlice();
+      poApplyActiveHighlight();
+    };
+    poApplyActiveHighlight();
   }
 }
 
