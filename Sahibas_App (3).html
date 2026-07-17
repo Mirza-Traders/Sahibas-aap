@@ -4615,6 +4615,17 @@ function doPrintPO(o,imgSrc){
 }
 
 // ── PO TABLE helpers ──────────────────────────────────────────────
+// In-place filter for the Product/Fabric/Status dropdowns -- toggles label
+// visibility client-side only, no page re-render, so typing never loses
+// focus (unlike a rendered.po=false;doR('po') per-keystroke approach).
+function poDropFilter(input){
+  var q=(input.value||'').toLowerCase().trim();
+  var panel=input.closest('.po-dd-panel');if(!panel)return;
+  panel.querySelectorAll('label[data-nm]').forEach(function(lbl){
+    var nm=lbl.getAttribute('data-nm')||'';
+    lbl.style.display=(!q||nm.indexOf(q)>=0)?'flex':'none';
+  });
+}
 function togglePoFlt(field,val){
   if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:[]};
   var arr=window._poFlt[field];
@@ -4750,11 +4761,12 @@ function rPO(){
     var btnStyle='border:1px solid #ddd;border-radius:6px;padding:5px 11px;font-size:11px;cursor:pointer;font-weight:600;white-space:nowrap;background:'+(cnt>0?'var(--gold)':'#f5f5f5')+';color:'+(cnt>0?'#111':'#555');
     var btn='<button onclick="event.stopPropagation();togglePoDrop(\''+id+'\')" style="'+btnStyle+'">'+label+(cnt>0?' ('+cnt+')':'')+' ▾</button>';
     if(!open)return btn;
-    var dd='<div style="position:absolute;top:calc(100% + 4px);left:0;z-index:500;background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px;min-width:190px;max-height:220px;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,.15)">';
+    var dd='<div class="po-dd-panel" style="position:absolute;top:calc(100% + 4px);left:0;z-index:500;background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px;min-width:190px;max-height:260px;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,.15)">';
+    if(opts.length>4)dd+='<input type="text" placeholder="Search '+label.toLowerCase()+'..." oninput="poDropFilter(this)" onclick="event.stopPropagation()" style="width:100%;border:1px solid #e0dcd4;border-radius:5px;padding:5px 8px;font-size:11px;outline:none;box-sizing:border-box;margin-bottom:5px">';
     if(cnt>0)dd+='<div onclick="clearPoFltField(\''+id+'\')" style="font-size:10px;color:#c0392b;cursor:pointer;padding:2px 4px;margin-bottom:4px;border-radius:4px;background:#fff5f5">✕ Clear all</div>';
     opts.forEach(function(opt){
       var chk=(selArr||[]).indexOf(opt)>=0;
-      dd+='<label style="display:flex;align-items:center;gap:7px;padding:5px 6px;cursor:pointer;border-radius:4px;font-size:12px;white-space:nowrap;hover:background:#f5f5f5"><input type="checkbox" '+(chk?'checked':'')+' onchange="togglePoFlt(\''+id+'\',\''+opt.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\')" style="cursor:pointer;accent-color:var(--gold)">'+opt+'</label>';
+      dd+='<label data-nm="'+opt.toLowerCase().replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:7px;padding:5px 6px;cursor:pointer;border-radius:4px;font-size:12px;white-space:nowrap;hover:background:#f5f5f5"><input type="checkbox" '+(chk?'checked':'')+' onchange="togglePoFlt(\''+id+'\',\''+opt.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\')" style="cursor:pointer;accent-color:var(--gold)">'+opt+'</label>';
     });
     dd+='</div>';
     return '<div style="position:relative;display:inline-block">'+btn+dd+'</div>';
