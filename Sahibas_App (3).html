@@ -4616,14 +4616,14 @@ function doPrintPO(o,imgSrc){
 
 // ── PO TABLE helpers ──────────────────────────────────────────────
 function togglePoFlt(field,val){
-  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:''};
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:[]};
   var arr=window._poFlt[field];
   if(!Array.isArray(arr)){window._poFlt[field]=[val];rendered.po=false;doR('po');return;}
   var idx=arr.indexOf(val);if(idx>=0)arr.splice(idx,1);else arr.push(val);
   rendered.po=false;doR('po');
 }
 function setPoFlt(field,val){
-  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:''};
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:[]};
   window._poFlt[field]=val;
   if(field==='ono'){
     clearTimeout(window._poSearchTimer);
@@ -4632,7 +4632,7 @@ function setPoFlt(field,val){
   }
   rendered.po=false;doR('po');
 }
-function clearPoFlt(){window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:''};rendered.po=false;doR('po');}
+function clearPoFlt(){window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:[]};rendered.po=false;doR('po');}
 function clearPoFltField(field){if(window._poFlt)window._poFlt[field]=[];rendered.po=false;doR('po');}
 function togglePoDrop(id){window._poDrop=(window._poDrop===id?'':id);rendered.po=false;doR('po');}
 function setPoSort(col){var cur=window._poSort||{col:'date',asc:false};if(cur.col===col){window._poSort={col:col,asc:!cur.asc};}else{window._poSort={col:col,asc:false};}rendered.po=false;doR('po');}
@@ -4644,7 +4644,7 @@ function togglePoSelAll(ids){
   window._poSel=sel;rendered.po=false;doR('po');
 }
 function exportPOCSV(){
-  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:''};
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:[]};
   var orders=loadPO();var f=window._poFlt;
   var rows=orders.filter(function(o){
     if(o.status==='Cancelled')return false;
@@ -4710,7 +4710,7 @@ if(!window._poResizeBound){
 }
 function rPO(){
   var el=document.getElementById('ppo');
-  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:''};
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:[]};
   if(!window._poSel)window._poSel={};
   if(!window._poDrop)window._poDrop='';
   var orders=loadPO();
@@ -4721,7 +4721,7 @@ function rPO(){
     if(f.ono){var s=f.ono.toLowerCase();if(o.id.toLowerCase().indexOf(s)<0&&o.product.toLowerCase().indexOf(s)<0)return false;}
     if(f.prods&&f.prods.length&&f.prods.indexOf(o.product)<0)return false;
     if(f.fabs&&f.fabs.length&&f.fabs.indexOf(o.fabric||'')<0)return false;
-    if(f.status&&o.status!==f.status)return false;
+    if(f.status&&f.status.length&&f.status.indexOf(o.status)<0)return false;
     return true;
   });
   if(!window._poSort)window._poSort={col:'date',asc:false};
@@ -4743,7 +4743,7 @@ function rPO(){
   // Filter options from all active orders
   var allProds=allActive.map(function(o){return o.product;}).filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
   var allFabs=allActive.map(function(o){return o.fabric||'';}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).sort();
-  var hasFilter=f.from||f.to||f.ono||(f.prods&&f.prods.length)||(f.fabs&&f.fabs.length)||f.status;
+  var hasFilter=f.from||f.to||f.ono||(f.prods&&f.prods.length)||(f.fabs&&f.fabs.length)||(f.status&&f.status.length);
   // Multi-select dropdown builder
   function mkDrop(id,label,opts,selArr){
     var open=window._poDrop===id;var cnt=selArr?selArr.length:0;
@@ -4773,10 +4773,7 @@ function rPO(){
    +'<input type="text" value="'+(f.ono||'')+'" placeholder="Order No / Product search…" oninput="setPoFlt(\'ono\',this.value)" style="border:1px solid #ddd;border-radius:6px;padding:5px 10px;font-size:11px;min-width:170px;background:#fff;color:#333">'
    +mkDrop('prods','Product',allProds,f.prods)
    +mkDrop('fabs','Fabric',allFabs,f.fabs)
-   +'<select onchange="setPoFlt(\'status\',this.value)" style="border:1px solid #ddd;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;font-weight:600;background:'+(f.status?'var(--gold)':'#f5f5f5')+';color:'+(f.status?'#111':'#555')+'">'
-     +'<option value=""'+(!f.status?' selected':'')+'>Status: All</option>'
-     +STATUS_OPTS.map(function(s){return '<option value="'+s+'"'+(f.status===s?' selected':'')+'>'+s+'</option>';}).join('')
-   +'</select>'
+   +mkDrop('status','Status',STATUS_OPTS,f.status)
    +(hasFilter?'<button onclick="clearPoFlt()" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">✕ Clear</button>':'')
    +'<div style="margin-left:auto;display:flex;gap:6px;align-items:center">'
    +(isOwner&&selPendingCount>0?'<button onclick="bulkApprovePO()" style="background:#27ae60;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer" title="Approve all selected Pending Approval orders">✓ Approve Selected ('+selPendingCount+')</button>':'')
