@@ -5201,8 +5201,25 @@ function rxnThumb(inputId,thumbId){
   var el=document.getElementById(thumbId);if(!el)return;
   el.innerHTML=img?'<img src="'+img+(img.indexOf('?')>=0?'&':'?')+'width=80" style="width:34px;height:44px;object-fit:cover;border-radius:5px;border:1px solid #e5e2db" onerror="this.parentNode.innerHTML=\'\'">':'';
 }
+function rxnChatThumb(){
+  var el=document.getElementById('rxn-chat-thumb');if(!el)return;
+  var d=window._rxnChatImg;
+  el.innerHTML=d?'<img src="'+d+'" onclick="rxViewPhoto(this.src)" style="width:52px;height:65px;object-fit:cover;border-radius:6px;border:1px solid #e5e2db;cursor:zoom-in">':'';
+}
+function rxnChatPhoto(input){
+  var file=input&&input.files&&input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    compressImg(e.target.result,1000,0.8,function(compressed){
+      window._rxnChatImg=compressed;
+      rxnChatThumb();
+    });
+  };
+  reader.readAsDataURL(file);
+}
 function openRxNew(type){
   var isRef=type==='refund';
+  window._rxnChatImg='';
   var assignees=rxUsers().map(function(u){return '<option'+(u.name===rxAutoAssign(type)?' selected':'')+'>'+u.name+'</option>';}).join('');
   var fld=function(lbl,inner){return '<label style="display:block;font-size:10px;color:#888;margin:10px 0 4px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">'+lbl+'</label>'+inner;};
   var inp=function(id,ph,type2){return '<input id="'+id+'" type="'+(type2||'text')+'" placeholder="'+(ph||'')+'" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box">';};
@@ -5217,6 +5234,16 @@ function openRxNew(type){
    +'<div>'+fld('Mobile',inp('rxn-mobile','03xx-xxxxxxx'))+'</div>'
    +'</div>'
    +fld('Address',inp('rxn-address','Delivery address'))
+   +'<div style="background:#faf8f3;border:1px solid #eee;border-radius:8px;padding:4px 12px 12px;margin-top:10px">'
+   +'<div style="font-size:9px;color:#a07030;font-weight:700;margin-top:8px">CUSTOMER VERIFICATION</div>'
+   +fld('Customer Chat Screenshot','<div style="display:flex;gap:8px;align-items:center"><span id="rxn-chat-thumb"></span><input type="file" accept="image/*" onchange="rxnChatPhoto(this)" style="font-size:11px"></div>')
+   +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 12px">'
+   +'<div>'+fld('Instagram Profile *',inp('rxn-ig','Profile link / @handle'))+'</div>'
+   +'<div>'+fld('Facebook Profile *',inp('rxn-fb','Profile link'))+'</div>'
+   +'<div>'+fld('WhatsApp Profile *',inp('rxn-wa','Number / profile link'))+'</div>'
+   +'</div>'
+   +'<div style="font-size:9px;color:#999;margin-top:4px">At least one of the three is required — this is how the Owner/Admin confirms the case is genuine.</div>'
+   +'</div>'
    +'<div style="display:grid;grid-template-columns:2fr 1fr;gap:0 12px">'
    +'<div>'+fld('Product Returned *','<div style="display:flex;gap:8px;align-items:center"><span id="rxn-product-thumb"></span><input id="rxn-product" list="rxn-prodlist" oninput="rxnThumb(\'rxn-product\',\'rxn-product-thumb\')" placeholder="Type to search…" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box"></div><datalist id="rxn-prodlist">'+rxProductOptions()+'</datalist>')+'</div>'
    +'<div>'+fld('Size',szSel('rxn-size'))+'</div>'
@@ -5251,12 +5278,15 @@ function submitRx(type){
   if(!product){showToast('Select the returned product.');return;}
   if(type==='refund'&&!amount){showToast('Enter the refund amount.');return;}
   if(type==='exchange'&&!v('rxn-psend')){showToast('Select the product to send.');return;}
+  var ig=v('rxn-ig'),fb=v('rxn-fb'),wa=v('rxn-wa');
+  if(!ig&&!fb&&!wa){showToast('Paste at least one of Instagram, Facebook or WhatsApp profile — required to verify the customer.');return;}
   var T=window.TICKETS||[];
   var mx=0;T.forEach(function(t){var n=parseInt(String(t.id||'').replace('RX-',''))||0;if(n>mx)mx=n;});
   var t={id:'RX-'+String(mx+1).padStart(3,'0'),type:type,status:'initiated',
     order:order,customer:customer,customerMobile:v('rxn-mobile'),customerAddress:v('rxn-address'),
     product:product,size:v('rxn-size'),productToSend:v('rxn-psend'),sizeToSend:v('rxn-szsend'),
     amount:amount,platform:v('rxn-platform'),reason:v('rxn-reason'),notes:v('rxn-notes'),
+    chatScreenshot:window._rxnChatImg||'',instagramProfile:ig,facebookProfile:fb,whatsappProfile:wa,
     assignedTo:v('rxn-assign')||rxAutoAssign(type),
     bankName:v('rxn-bank'),accountTitle:v('rxn-acctitle'),accountNumber:v('rxn-accnum'),
     createdBy:CU?CU.name:'',createdAt:rxNow(),
@@ -5322,8 +5352,10 @@ function openRxDetail(id){
    +'<div>'+g('Returned',(t.product||'')+(t.size?' ('+t.size+')':''))+(t.productToSend?g('To Send',t.productToSend+(t.sizeToSend?' ('+t.sizeToSend+')':'')):'')+g('Amount',t.amount?'PKR '+NF(t.amount):'')+g('Assigned To',t.assignedTo)+g('Created',(t.createdAt||'')+' by '+(t.createdBy||''))+'</div>'
    +'</div>'
    +g('Address',t.customerAddress)
+   +(t.instagramProfile||t.facebookProfile||t.whatsappProfile?'<div style="background:#faf8f3;border:1px solid #eee;border-radius:8px;padding:8px 12px;margin-top:10px"><div style="font-size:9px;color:#a07030;font-weight:700;text-transform:uppercase;margin-bottom:2px">Customer Verification</div>'+g('Instagram',t.instagramProfile)+g('Facebook',t.facebookProfile)+g('WhatsApp',t.whatsappProfile)+'</div>':'')
    +(function(){
        var photos=[
+         {key:'chatScreenshot',lbl:'Customer Chat (at creation)'},
          {key:'receivedPhoto',lbl:'Received Article'},
          {key:'paidPhoto',lbl:(t.type==='refund'?'Payment Voucher':'Dispatch Proof')},
          {key:'informedPhoto',lbl:'Customer Informed (chat)'}
