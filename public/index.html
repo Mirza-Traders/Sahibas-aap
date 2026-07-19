@@ -2017,6 +2017,16 @@ function rDP(){
 // ── PRE-BOOKED ORDERS ── pre-booked/pending sales lines (not yet allocated)
 // grouped by product, next to the matching Production Order's qty/ETA so
 // staff can see at a glance whether production covers what's been sold.
+if(typeof window._pbFlt==='undefined')window._pbFlt={prods:[]};
+if(typeof window._pbDrop==='undefined')window._pbDrop='';
+function togglePbFlt(field,val){
+  if(!window._pbFlt)window._pbFlt={prods:[]};
+  var arr=window._pbFlt[field];
+  var idx=arr.indexOf(val);if(idx>=0)arr.splice(idx,1);else arr.push(val);
+  rendered.pb=false;doR('pb');
+}
+function togglePbDrop(id){window._pbDrop=(window._pbDrop===id?'':id);rendered.pb=false;doR('pb');}
+function clearPbFltField(field){if(window._pbFlt)window._pbFlt[field]=[];rendered.pb=false;doR('pb');}
 function rPB(){
   var rows=fRows(DETAIL).filter(function(r){return r[4]==='pending';});
   var byProd={};
@@ -2050,19 +2060,35 @@ function rPB(){
   });
   arr.sort(function(a,b){return (b.delayed-a.delayed)||(b.total-a.total);});
 
-  var pbAllProducts=arr.map(function(g){return g.product;});
-  var q=(window._pbSearch||'').toLowerCase().trim();
-  if(q)arr=arr.filter(function(g){return g.product.toLowerCase().indexOf(q)>=0;});
+  var pbAllProducts=arr.map(function(g){return g.product;}).sort();
+  if(!window._pbFlt)window._pbFlt={prods:[]};
+  if(!window._pbDrop)window._pbDrop='';
+  var pbSel=window._pbFlt.prods||[];
+  if(pbSel.length)arr=arr.filter(function(g){return pbSel.indexOf(g.product)>=0;});
 
   var totalPending=arr.reduce(function(a,g){return a+g.total;},0);
   var totalDelayed=arr.reduce(function(a,g){return a+g.delayed;},0);
   var noProdCount=arr.filter(function(g){return g.noProd;}).length;
 
-  var srchOpts=pbAllProducts.slice().sort().map(function(p){return '<option>'+p+'</option>';}).join('');
-  var h='<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">'
-   +'<input id="pb-search" list="pb-prodlist" value="'+(window._pbSearch||'').replace(/"/g,'&quot;')+'" placeholder="🔍 Search / select a product…" oninput="window._pbSearch=this.value;clearTimeout(window._pbT);window._pbT=setTimeout(function(){rendered.pb=false;doR(\'pb\');var s=document.getElementById(\'pb-search\');if(s){s.focus();s.selectionStart=s.selectionEnd=s.value.length;}},300)" style="border:1px solid #ddd;border-radius:6px;padding:7px 10px;font-size:12px;min-width:260px;background:#fff">'
-   +'<datalist id="pb-prodlist">'+srchOpts+'</datalist>'
-   +(window._pbSearch?'<button onclick="window._pbSearch=\'\';rendered.pb=false;doR(\'pb\')" style="background:none;border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;color:#888">✕ Clear</button>':'')
+  var pbOpen=window._pbDrop==='prods';
+  var pbBtnStyle='border:1px solid #ddd;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap;background:'+(pbSel.length?'var(--gold)':'#f5f5f5')+';color:'+(pbSel.length?'#111':'#555');
+  var pbDD='';
+  if(pbOpen){
+    pbDD='<div class="po-dd-panel" style="position:absolute;top:calc(100% + 4px);left:0;z-index:500;background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px;min-width:220px;max-height:280px;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,.15)">'
+     +'<input type="text" placeholder="Search products…" oninput="poDropFilter(this)" onclick="event.stopPropagation()" style="width:100%;border:1px solid #e0dcd4;border-radius:5px;padding:5px 8px;font-size:11px;outline:none;box-sizing:border-box;margin-bottom:5px">'
+     +(pbSel.length?'<div onclick="clearPbFltField(\'prods\')" style="font-size:10px;color:#c0392b;cursor:pointer;padding:2px 4px;margin-bottom:4px;border-radius:4px;background:#fff5f5">✕ Clear all</div>':'')
+     +pbAllProducts.map(function(p){
+        var chk=pbSel.indexOf(p)>=0;
+        return '<label data-nm="'+p.toLowerCase().replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:7px;padding:5px 6px;cursor:pointer;border-radius:4px;font-size:12px;white-space:nowrap"><input type="checkbox" '+(chk?'checked':'')+' onchange="togglePbFlt(\'prods\',\''+p.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\')" style="cursor:pointer;accent-color:var(--gold)">'+p+'</label>';
+      }).join('')
+     +'</div>';
+  }
+  var h='<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;position:relative">'
+   +'<div style="position:relative;display:inline-block" onclick="event.stopPropagation()">'
+   +'<button onclick="togglePbDrop(\'prods\')" style="'+pbBtnStyle+'">🔍 Product'+(pbSel.length?' ('+pbSel.length+')':'')+' ▾</button>'
+   +pbDD
+   +'</div>'
+   +(pbSel.length?'<button onclick="clearPbFltField(\'prods\')" style="background:none;border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;color:#888">✕ Clear</button>':'')
    +'</div>';
   h+='<div class="krow">'
    +'<div class="kpi w"><div class="kl">Products Pending</div><div class="kv">'+arr.length+'</div><div class="ks">pre-booked, not yet allocated</div></div>'
@@ -2072,7 +2098,7 @@ function rPB(){
    +'</div>';
 
   if(!arr.length){
-    h+='<div style="text-align:center;padding:60px 20px;color:#aaa"><div style="font-size:40px;margin-bottom:12px">'+(q?'🔍':'✅')+'</div><div style="font-size:13px;font-weight:700;color:#888">'+(q?'No pending orders match "'+window._pbSearch+'"':'No pending pre-booked orders')+'</div><div style="font-size:10px;margin-top:6px">Pre-booked items are detected from <b>Item Status = pending</b> in your sales CSV.</div></div>';
+    h+='<div style="text-align:center;padding:60px 20px;color:#aaa"><div style="font-size:40px;margin-bottom:12px">'+(pbSel.length?'🔍':'✅')+'</div><div style="font-size:13px;font-weight:700;color:#888">'+(pbSel.length?'No pending orders for the selected product(s)':'No pending pre-booked orders')+'</div><div style="font-size:10px;margin-top:6px">Pre-booked items are detected from <b>Item Status = pending</b> in your sales CSV.</div></div>';
     document.getElementById('ppb').innerHTML=h;
     return;
   }
@@ -2106,7 +2132,8 @@ function rPB(){
      +'</tr>';
   });
   h+='</tbody></table></div>';
-  document.getElementById('ppb').innerHTML=h;
+  var pbOverlay=window._pbDrop?'<div onclick="togglePbDrop(\'\')" style="position:fixed;inset:0;z-index:499"></div>':'';
+  document.getElementById('ppb').innerHTML=pbOverlay+h;
 }
 
 // ── EXCESS COMM ──
