@@ -2050,11 +2050,21 @@ function rPB(){
   });
   arr.sort(function(a,b){return (b.delayed-a.delayed)||(b.total-a.total);});
 
+  var pbAllProducts=arr.map(function(g){return g.product;});
+  var q=(window._pbSearch||'').toLowerCase().trim();
+  if(q)arr=arr.filter(function(g){return g.product.toLowerCase().indexOf(q)>=0;});
+
   var totalPending=arr.reduce(function(a,g){return a+g.total;},0);
   var totalDelayed=arr.reduce(function(a,g){return a+g.delayed;},0);
   var noProdCount=arr.filter(function(g){return g.noProd;}).length;
 
-  var h='<div class="krow">'
+  var srchOpts=pbAllProducts.slice().sort().map(function(p){return '<option>'+p+'</option>';}).join('');
+  var h='<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">'
+   +'<input id="pb-search" list="pb-prodlist" value="'+(window._pbSearch||'').replace(/"/g,'&quot;')+'" placeholder="🔍 Search / select a product…" oninput="window._pbSearch=this.value;clearTimeout(window._pbT);window._pbT=setTimeout(function(){rendered.pb=false;doR(\'pb\');var s=document.getElementById(\'pb-search\');if(s){s.focus();s.selectionStart=s.selectionEnd=s.value.length;}},300)" style="border:1px solid #ddd;border-radius:6px;padding:7px 10px;font-size:12px;min-width:260px;background:#fff">'
+   +'<datalist id="pb-prodlist">'+srchOpts+'</datalist>'
+   +(window._pbSearch?'<button onclick="window._pbSearch=\'\';rendered.pb=false;doR(\'pb\')" style="background:none;border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;color:#888">✕ Clear</button>':'')
+   +'</div>';
+  h+='<div class="krow">'
    +'<div class="kpi w"><div class="kl">Products Pending</div><div class="kv">'+arr.length+'</div><div class="ks">pre-booked, not yet allocated</div></div>'
    +'<div class="kpi b"><div class="kl">Total Pending Qty</div><div class="kv">'+NF(totalPending)+'</div><div class="ks">units across all sizes</div></div>'
    +'<div class="kpi r"><div class="kl">Delayed</div><div class="kv">'+NF(totalDelayed)+'</div><div class="ks">already past committed delivery date</div></div>'
@@ -2062,7 +2072,7 @@ function rPB(){
    +'</div>';
 
   if(!arr.length){
-    h+='<div style="text-align:center;padding:60px 20px;color:#aaa"><div style="font-size:40px;margin-bottom:12px">✅</div><div style="font-size:13px;font-weight:700;color:#888">No pending pre-booked orders</div><div style="font-size:10px;margin-top:6px">Pre-booked items are detected from <b>Item Status = pending</b> in your sales CSV.</div></div>';
+    h+='<div style="text-align:center;padding:60px 20px;color:#aaa"><div style="font-size:40px;margin-bottom:12px">'+(q?'🔍':'✅')+'</div><div style="font-size:13px;font-weight:700;color:#888">'+(q?'No pending orders match "'+window._pbSearch+'"':'No pending pre-booked orders')+'</div><div style="font-size:10px;margin-top:6px">Pre-booked items are detected from <b>Item Status = pending</b> in your sales CSV.</div></div>';
     document.getElementById('ppb').innerHTML=h;
     return;
   }
@@ -2078,9 +2088,9 @@ function rPB(){
    +'<th style="padding:8px 10px;text-align:left;background:#faf3df">ETA</th>'
    +'</tr></thead><tbody>';
   arr.forEach(function(g){
-    var thumb=g.img?'<img src="'+g.img+(g.img.indexOf('?')>=0?'&':'?')+'width=60" style="width:32px;height:40px;object-fit:cover;object-position:top center;border-radius:4px;vertical-align:middle;margin-right:8px">':'';
+    var thumb=g.img?'<img src="'+g.img+(g.img.indexOf('?')>=0?'&':'?')+'width=60" style="width:32px;height:40px;object-fit:cover;object-position:top center;border-radius:4px;vertical-align:middle;margin-left:8px">':'';
     h+='<tr>'
-     +'<td style="padding:8px 10px">'+thumb+'<strong>'+g.product+'</strong></td>'
+     +'<td style="padding:8px 10px"><strong>'+g.product+'</strong>'+thumb+'</td>'
      +'<td style="padding:8px 10px;text-align:right">'+(g.S||'-')+'</td>'
      +'<td style="padding:8px 10px;text-align:right">'+(g.M||'-')+'</td>'
      +'<td style="padding:8px 10px;text-align:right">'+(g.L||'-')+'</td>'
