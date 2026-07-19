@@ -351,6 +351,7 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
     <div class="sb-section">
       <div class="sb-head">Production</div>
       <div class="sb-item" data-id="po" onclick="doST('po')"><span class="sb-ico">📦</span>Orders</div>
+      <div class="sb-item" data-id="pb" onclick="doST('pb')"><span class="sb-ico">⏳</span>Pre-Booked</div>
     </div>
     <div class="sb-divider"></div>
     <div class="sb-section">
@@ -401,6 +402,7 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
     <div id="pst" class="pnl"></div>
     <div id="psk" class="pnl"></div>
     <div id="pdp" class="pnl"></div>
+    <div id="ppb" class="pnl"></div>
     <div id="pcs" class="pnl"></div>
     <div id="pec" class="pnl"></div>
     <div id="pal" class="pnl"></div>
@@ -818,15 +820,16 @@ function parseSales(txt,cm){
     var rfd=(row['Refund Date']||row['Refund date']||row['Refunded Date']||'').trim();
     var imgUrl=(row['Image Url']||row['Image URL']||row['image_url']||row['Item Image']||row['Image']||'').trim();
     if(imgUrl&&imgUrl.indexOf('http')===0){var ik=prd.toLowerCase().trim();if(!SALES_IMG[ik])SALES_IMG[ik]=imgUrl;}
+    var dly=String(row['Item Delayed']||'').toLowerCase().trim()==='true'?1:0;
     // [0]date [1]prd [2]sku [3]sz [4]stat [5]pf [6]dst [7]pay [8]dp
     // [9]ret [10]cost [11]cpct [12]comm [13]tax [14]gp [15]pat
     // [16]isX [17]xa [18]onum [19]mk [20]gross(orig) [21]actualPrice [22]isRefunded
-    // [23]conum(channel order#) [24]taxpct
+    // [23]conum(channel order#) [24]taxpct [25]isDelayed(Item Delayed col)
     rows.push([dt||'',prd,sku,sz,stat,pf,dst,pay,dp,
       Math.round(ret),Math.round(cost),Math.round(cpct*10)/10,
       Math.round(comm),Math.round(tax),Math.round(gp),Math.round(pat),
       isX,Math.round(xa),onum,mk,Math.round(ov),Math.round(av),rfd?1:0,
-      conum,taxpct]);
+      conum,taxpct,dly]);
   });
   return rows;
 }
@@ -1014,6 +1017,11 @@ function applyRoleNav(){
       if(el.getAttribute('data-id')==='ac')el.style.display='none';
     });
   }
+  if(role!=='Owner'&&role!=='Accountant'&&role!=='Editor'){
+    nav.querySelectorAll('.sb-item').forEach(function(el){
+      if(el.getAttribute('data-id')==='pb')el.style.display='none';
+    });
+  }
   if(!rexRole(CU)){
     nav.querySelectorAll('.sb-item').forEach(function(el){
       if(el.getAttribute('data-id')==='rx')el.style.display='none';
@@ -1115,7 +1123,7 @@ function doST(id){
   document.getElementById('p'+id).classList.add('on');
   if(!rendered[id]){rendered[id]=true;document.getElementById('p'+id).innerHTML='<div class="spin">Rendering...</div>';setTimeout(()=>{try{doR(id);}catch(e){document.getElementById('p'+id).innerHTML='<div class="spin" style="color:var(--red)">Error: '+e.message+'</div>';}},15);}
 }
-function doR(id){var M={ov:rOV,pl:rPL,sz:rSZ,vl:rVL,st:rST,sk:rSK,dp:rDP,cs:rCS,ec:rEC,al:rAL,dr:rDR,us:rUS,in:rIN,pr:rPR,pp:rPP,rf:rRF,po:rPO,rc:rRC,co:rCO,dc:rDC,ml:rML,ac:rAC,rx:rRX};M[id]&&M[id]();}
+function doR(id){var M={ov:rOV,pl:rPL,sz:rSZ,vl:rVL,st:rST,sk:rSK,dp:rDP,cs:rCS,ec:rEC,al:rAL,dr:rDR,us:rUS,in:rIN,pr:rPR,pp:rPP,rf:rRF,po:rPO,rc:rRC,co:rCO,dc:rDC,ml:rML,ac:rAC,rx:rRX,pb:rPB};M[id]&&M[id]();}
 
 // ═══════════════════════════════════════════════════════════════════
 // TAB RENDERERS
@@ -2004,6 +2012,91 @@ function rDP(){
     h+='</tbody></table></div></div>';
   }
   document.getElementById('pdp').innerHTML=h;
+}
+
+// ── PRE-BOOKED ORDERS ── pre-booked/pending sales lines (not yet allocated)
+// grouped by product, next to the matching Production Order's qty/ETA so
+// staff can see at a glance whether production covers what's been sold.
+function rPB(){
+  var rows=fRows(DETAIL).filter(function(r){return r[4]==='pending';});
+  var byProd={};
+  rows.forEach(function(r){
+    var p=r[1];
+    if(!byProd[p])byProd[p]={product:p,S:0,M:0,L:0,XL:0,total:0,delayed:0};
+    var sz=String(r[3]||'').toUpperCase().trim();
+    if(byProd[p][sz]!==undefined)byProd[p][sz]++;
+    byProd[p].total++;
+    if(r[25])byProd[p].delayed++;
+  });
+  var active=loadPO().filter(function(o){return o.status==='Pending Approval'||o.status==='In Progress';});
+  var arr=Object.keys(byProd).map(function(p){
+    var g=byProd[p];
+    var matches=active.filter(function(o){return (o.product||'').toLowerCase().trim()===p.toLowerCase().trim();});
+    if(matches.length){
+      g.poIds=matches.map(function(o){return o.id;});
+      g.poQty=matches.reduce(function(a,o){return a+(o.total||0);},0);
+      g.poS=matches.reduce(function(a,o){return a+(o.S||0);},0);
+      g.poM=matches.reduce(function(a,o){return a+(o.M||0);},0);
+      g.poL=matches.reduce(function(a,o){return a+(o.L||0);},0);
+      g.poXL=matches.reduce(function(a,o){return a+(o.XL||0);},0);
+      var etas=matches.map(function(o){return o.targetDate;}).filter(Boolean).sort();
+      g.poEta=etas[0]||'';
+      g.noProd=false;
+    }else{
+      g.poIds=[];g.poQty=0;g.poEta='';g.noProd=true;
+    }
+    g.img=findImg(p.toLowerCase().trim());
+    return g;
+  });
+  arr.sort(function(a,b){return (b.delayed-a.delayed)||(b.total-a.total);});
+
+  var totalPending=arr.reduce(function(a,g){return a+g.total;},0);
+  var totalDelayed=arr.reduce(function(a,g){return a+g.delayed;},0);
+  var noProdCount=arr.filter(function(g){return g.noProd;}).length;
+
+  var h='<div class="krow">'
+   +'<div class="kpi w"><div class="kl">Products Pending</div><div class="kv">'+arr.length+'</div><div class="ks">pre-booked, not yet allocated</div></div>'
+   +'<div class="kpi b"><div class="kl">Total Pending Qty</div><div class="kv">'+NF(totalPending)+'</div><div class="ks">units across all sizes</div></div>'
+   +'<div class="kpi r"><div class="kl">Delayed</div><div class="kv">'+NF(totalDelayed)+'</div><div class="ks">already past committed delivery date</div></div>'
+   +'<div class="kpi r"><div class="kl">No Production Plan</div><div class="kv">'+noProdCount+'</div><div class="ks">products need a PO raised</div></div>'
+   +'</div>';
+
+  if(!arr.length){
+    h+='<div style="text-align:center;padding:60px 20px;color:#aaa"><div style="font-size:40px;margin-bottom:12px">✅</div><div style="font-size:13px;font-weight:700;color:#888">No pending pre-booked orders</div><div style="font-size:10px;margin-top:6px">Pre-booked items are detected from <b>Item Status = pending</b> in your sales CSV.</div></div>';
+    document.getElementById('ppb').innerHTML=h;
+    return;
+  }
+
+  h+='<div class="tw"><table><thead><tr>'
+   +'<th style="padding:8px 10px;text-align:left">Product</th>'
+   +'<th style="padding:8px 10px;text-align:right">S</th><th style="padding:8px 10px;text-align:right">M</th><th style="padding:8px 10px;text-align:right">L</th><th style="padding:8px 10px;text-align:right">XL</th>'
+   +'<th style="padding:8px 10px;text-align:right">Grand Total</th>'
+   +'<th style="padding:8px 10px;text-align:right;color:var(--red)">Delayed Qty</th>'
+   +'<th style="padding:8px 10px;text-align:left;background:#faf3df">Upcoming Production</th>'
+   +'<th style="padding:8px 10px;text-align:right;background:#faf3df">Qty</th>'
+   +'<th style="padding:8px 10px;text-align:left;background:#faf3df">Size Ratio</th>'
+   +'<th style="padding:8px 10px;text-align:left;background:#faf3df">ETA</th>'
+   +'</tr></thead><tbody>';
+  arr.forEach(function(g){
+    var thumb=g.img?'<img src="'+g.img+(g.img.indexOf('?')>=0?'&':'?')+'width=60" style="width:32px;height:40px;object-fit:cover;object-position:top center;border-radius:4px;vertical-align:middle;margin-right:8px">':'';
+    h+='<tr>'
+     +'<td style="padding:8px 10px">'+thumb+'<strong>'+g.product+'</strong></td>'
+     +'<td style="padding:8px 10px;text-align:right">'+(g.S||'-')+'</td>'
+     +'<td style="padding:8px 10px;text-align:right">'+(g.M||'-')+'</td>'
+     +'<td style="padding:8px 10px;text-align:right">'+(g.L||'-')+'</td>'
+     +'<td style="padding:8px 10px;text-align:right">'+(g.XL||'-')+'</td>'
+     +'<td style="padding:8px 10px;text-align:right;font-weight:700">'+g.total+'</td>'
+     +'<td style="padding:8px 10px;text-align:right;'+(g.delayed?'color:var(--red);font-weight:800':'color:#bbb')+'">'+(g.delayed||'-')+'</td>'
+     +(g.noProd?
+        '<td colspan="4" style="padding:8px 10px;background:#fdeeee;color:var(--red);font-weight:700">⚠ No production plan found — raise a Production Order</td>'
+       :'<td style="padding:8px 10px;background:#faf8f3">'+g.poIds.join(', ')+'</td>'
+        +'<td style="padding:8px 10px;text-align:right;background:#faf8f3;font-weight:700">'+g.poQty+'</td>'
+        +'<td style="padding:8px 10px;background:#faf8f3">'+g.poS+'/'+g.poM+'/'+g.poL+'/'+g.poXL+'</td>'
+        +'<td style="padding:8px 10px;background:#faf8f3">'+(g.poEta?fmtDMY(g.poEta):'—')+'</td>')
+     +'</tr>';
+  });
+  h+='</tbody></table></div>';
+  document.getElementById('ppb').innerHTML=h;
 }
 
 // ── EXCESS COMM ──
