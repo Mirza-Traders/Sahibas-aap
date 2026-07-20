@@ -4851,6 +4851,13 @@ if(!window._poResizeBound){
 }
 function rPO(){
   var el=document.getElementById('ppo');
+  // Every mutation (Mark/Done, ETA edit, filter change...) rebuilds this whole
+  // panel's innerHTML, which destroys and recreates #po-vs as a fresh DOM
+  // node -- fresh nodes start at scrollTop 0, so without this the page visibly
+  // jumps to the top on every click. Capture both scroll positions before the
+  // rebuild and restore them once the new table is in place.
+  var _poPrevScrollTop=(document.getElementById('po-vs')||{}).scrollTop||0;
+  var _poPrevWinScroll=window.scrollY||document.documentElement.scrollTop||0;
   if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:[]};
   if(!window._poSel)window._poSel={};
   if(!window._poDrop)window._poDrop='';
@@ -5133,6 +5140,8 @@ function rPO(){
   // Virtual slice renderer — only the rows in (or near) the viewport exist in the DOM.
   var vs=document.getElementById('po-vs');
   if(vs){
+    if(_poPrevScrollTop)vs.scrollTop=_poPrevScrollTop;
+    if(_poPrevWinScroll)window.scrollTo(0,_poPrevWinScroll);
     var visCount=Math.ceil((vs.clientHeight||window.innerHeight*0.64)/PO_RH)+8;
     var lastStart=-1,lastEnd=-1;
     function poSliceHtml(a,b){var h='';for(var i=a;i<b;i++)h+=poRowHtml(active[i],i);return h;}
