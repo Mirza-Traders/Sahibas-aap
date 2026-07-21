@@ -5384,7 +5384,7 @@ function rRX(){
     if(f.q){var q=f.q.toLowerCase();
       if(String(t.order||'').toLowerCase().indexOf(q)<0
        &&String(t.customer||'').toLowerCase().indexOf(q)<0
-       &&String(t.product||'').toLowerCase().indexOf(q)<0
+       &&!rxItems(t).some(function(it){return String(it.product||'').toLowerCase().indexOf(q)>=0;})
        &&String(t.id||'').toLowerCase().indexOf(q)<0)return false;}
     return true;
   });
@@ -5414,15 +5414,18 @@ function rRX(){
   var TD2='padding:7px 9px;font-size:11px;border-bottom:1px solid #f0ede8;vertical-align:middle;';
   var STC={initiated:'background:#fff8e0;color:#a07030',received:'background:#eef3fb;color:#2471a3',approved:'background:#f5e8f8;color:#8e44ad',paid:'background:#e8f8ee;color:#1e8449',informed:'background:#e8f8f5;color:#16a085',closed:'background:#f0f0f0;color:#888'};
   var body=rows.map(function(t){
-    var img=findImg(String(t.product||'').toLowerCase().trim());
+    var its=rxItems(t);
+    var first=its[0];
+    var img=findImg(String(first.product||'').toLowerCase().trim());
     var thumb=img?'<img src="'+img+(img.indexOf('?')>=0?'&':'?')+'width=60" loading="lazy" style="width:28px;height:36px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px" onerror="this.style.display=\'none\'">':'';
+    var moreBadge=its.length>1?' <span title="'+its.slice(1).map(function(it){return (it.product||'')+(it.size?' ('+it.size+')':'');}).join(', ').replace(/"/g,'&quot;')+'" style="background:#eef0fb;color:#4a4ab0;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px;cursor:help;white-space:nowrap">+'+(its.length-1)+' more</span>':'';
     return '<tr onclick="openRxDetail(\''+t.id+'\')" style="cursor:pointer" onmouseover="this.style.background=\'#faf8f3\'" onmouseout="this.style.background=\'\'">'
      +'<td style="'+TD2+'color:#888;white-space:nowrap">'+(t.createdAt||'').split(' ')[0]+'</td>'
      +'<td style="'+TD2+'font-weight:700;color:var(--gold2)">'+t.id+'</td>'
      +'<td style="'+TD2+'"><span style="'+(t.type==='refund'?'background:#fde8e8;color:#c0392b':'background:#e8f8ee;color:#0F6E56')+';padding:2px 8px;border-radius:3px;font-size:8px;font-weight:800">'+(t.type==='refund'?'REFUND':'EXCHANGE')+'</span></td>'
      +'<td style="'+TD2+'font-family:monospace;font-size:10px">#'+(t.order||'')+'</td>'
      +'<td style="'+TD2+'font-weight:600">'+(t.customer||'')+'</td>'
-     +'<td style="'+TD2+'">'+thumb+(t.product||'')+' '+ratingChip(t.product)+(t.productToSend?'<br><span style="color:#0F6E56;font-size:10px">→ '+t.productToSend+(t.sizeToSend?' ('+t.sizeToSend+')':'')+'</span>':'')+'</td>'
+     +'<td style="'+TD2+'">'+thumb+(first.product||'')+' '+ratingChip(first.product)+moreBadge+(first.productToSend?'<br><span style="color:#0F6E56;font-size:10px">→ '+first.productToSend+(first.sizeToSend?' ('+first.sizeToSend+')':'')+'</span>':'')+'</td>'
      +'<td style="'+TD2+'text-align:right;font-weight:700">'+(t.amount?NF(t.amount):'—')+'</td>'
      +'<td style="'+TD2+'font-size:10px;color:#666">'+(t.platform||'')+'</td>'
      +'<td style="'+TD2+'font-size:10px">'+(t.assignedTo||'')+'</td>'
@@ -5437,14 +5440,71 @@ function rRX(){
    +'</div></div></div>';
 }
 function rxExport(){
-  csvDL((window.TICKETS||[]).map(function(t){return[t.id,t.type,(t.createdAt||''),t.order||'',t.customer||'',t.customerMobile||'',t.product||'',t.size||'',t.productToSend||'',t.sizeToSend||'',t.amount||0,t.platform||'',t.reason||'',t.assignedTo||'',rxStageLabel(t.status,t.type),t.createdBy||'',t.bankName||'',t.accountTitle||'',t.accountNumber||'',(t.history||[]).map(function(h){return h.stage+' by '+h.by+' at '+h.at;}).join(' | ')];}),
-  ['Ticket','Type','Created','Order#','Customer','Mobile','Product','Size','Product To Send','Size To Send','Amount','Platform','Reason','Assigned To','Stage','Created By','Bank','Account Title','IBAN','History'],'refund_exchange_tickets.csv');
+  csvDL((window.TICKETS||[]).map(function(t){
+    var its=rxItems(t);
+    return[t.id,t.type,(t.createdAt||''),t.order||'',t.customer||'',t.customerMobile||'',
+      its.map(function(it){return it.product||'';}).join('; '),
+      its.map(function(it){return it.size||'';}).join('; '),
+      its.map(function(it){return it.productToSend||'';}).join('; '),
+      its.map(function(it){return it.sizeToSend||'';}).join('; '),
+      t.amount||0,t.platform||'',t.reason||'',t.assignedTo||'',rxStageLabel(t.status,t.type),t.createdBy||'',t.bankName||'',t.accountTitle||'',t.accountNumber||'',(t.history||[]).map(function(h){return h.stage+' by '+h.by+' at '+h.at;}).join(' | ')];
+  }),
+  ['Ticket','Type','Created','Order#','Customer','Mobile','Product(s)','Size(s)','Product(s) To Send','Size(s) To Send','Amount','Platform','Reason','Assigned To','Stage','Created By','Bank','Account Title','IBAN','History'],'refund_exchange_tickets.csv');
 }
 function rxProductOptions(){
   var names={};
   Object.keys(STOCK_PRODS||{}).forEach(function(k){names[STOCK_PRODS[k].title]=1;});
   if(DETAIL&&DETAIL.length)DETAIL.forEach(function(r){if(r[1])names[r[1]]=1;});
   return Object.keys(names).sort().map(function(n){return '<option value="'+n.replace(/"/g,'&quot;')+'">';}).join('');
+}
+// A ticket may carry an items[] array (2+ products in one refund/exchange) or,
+// for tickets created before that existed, a single product/size/productToSend/
+// sizeToSend/amount directly on the ticket. Normalize to always return an
+// array so every display site can treat all tickets the same way.
+function rxItems(t){
+  if(t&&t.items&&t.items.length)return t.items;
+  return [{product:(t&&t.product)||'',size:(t&&t.size)||'',productToSend:(t&&t.productToSend)||'',sizeToSend:(t&&t.sizeToSend)||'',amount:(t&&t.amount)||0}];
+}
+var rxFld=function(lbl,inner){return '<label style="display:block;font-size:10px;color:#888;margin:10px 0 4px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">'+lbl+'</label>'+inner;};
+var rxInp=function(id,ph,type2){return '<input id="'+id+'" type="'+(type2||'text')+'" placeholder="'+(ph||'')+'" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box">';};
+var rxSzSel=function(id){return '<select id="'+id+'" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box"><option value="">—</option><option>S</option><option>M</option><option>L</option><option>XL</option></select>';};
+// One returned-item row in the New Refund/Exchange form -- product to return
+// (+ size), product to send back for exchanges, and a per-item refund amount.
+// Multiple rows let one ticket cover 2+ items from the same order/customer.
+function rxnItemRowHtml(idx,isRef){
+  return '<div id="rxn-item-row-'+idx+'" style="border:1px solid #eee;border-radius:8px;padding:10px 10px 2px;margin-bottom:8px;position:relative;background:#fafafa">'
+   +'<button type="button" onclick="rxnRemoveItem('+idx+')" title="Remove this item" style="position:absolute;top:6px;right:6px;background:none;border:none;color:#c0392b;font-size:15px;cursor:pointer;line-height:1;padding:2px">✕</button>'
+   +'<div style="display:grid;grid-template-columns:2fr 1fr;gap:0 12px">'
+   +'<div>'+rxFld('Product Returned *','<div style="display:flex;gap:8px;align-items:center"><span id="rxn-item-'+idx+'-thumb"></span><input id="rxn-item-'+idx+'-product" list="rxn-prodlist" oninput="rxnThumb(\'rxn-item-'+idx+'-product\',\'rxn-item-'+idx+'-thumb\')" placeholder="Type to search…" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box"></div>')+'</div>'
+   +'<div>'+rxFld('Size',rxSzSel('rxn-item-'+idx+'-size'))+'</div>'
+   +'</div>'
+   +(isRef?'':'<div style="display:grid;grid-template-columns:2fr 1fr;gap:0 12px">'
+   +'<div>'+rxFld('Product To Send *','<div style="display:flex;gap:8px;align-items:center"><span id="rxn-item-'+idx+'-psend-thumb"></span><input id="rxn-item-'+idx+'-psend" list="rxn-prodlist" oninput="rxnThumb(\'rxn-item-'+idx+'-psend\',\'rxn-item-'+idx+'-psend-thumb\')" placeholder="Type to search…" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box"></div>')+'</div>'
+   +'<div>'+rxFld('Size',rxSzSel('rxn-item-'+idx+'-szsend'))+'</div>'
+   +'</div>')
+   +(isRef?rxFld('Amount (PKR) *',rxInp('rxn-item-'+idx+'-amount','e.g. 5500','number')):'')
+   +'</div>';
+}
+// Initial render only (one row). Add/remove touch just the one row's DOM node
+// directly rather than rebuilding the whole container -- rebuilding would
+// wipe out whatever was already typed into the OTHER rows.
+function rxnRenderItems(){
+  var c=document.getElementById('rxn-items');if(!c)return;
+  var isRef=window._rxnType==='refund';
+  c.innerHTML=window._rxnItemIds.map(function(idx){return rxnItemRowHtml(idx,isRef);}).join('');
+}
+function rxnAddItem(){
+  var isRef=window._rxnType==='refund';
+  var newIdx=window._rxnItemSeq++;
+  window._rxnItemIds.push(newIdx);
+  var c=document.getElementById('rxn-items');if(!c)return;
+  c.insertAdjacentHTML('beforeend',rxnItemRowHtml(newIdx,isRef));
+}
+function rxnRemoveItem(idx){
+  if(window._rxnItemIds.length<=1)return;
+  window._rxnItemIds=window._rxnItemIds.filter(function(i){return i!==idx;});
+  var row=document.getElementById('rxn-item-row-'+idx);
+  if(row)row.remove();
 }
 // Live product thumbnail preview beside the New Refund/Exchange product fields.
 function rxnThumb(inputId,thumbId){
@@ -5472,10 +5532,11 @@ function rxnChatPhoto(input){
 function openRxNew(type){
   var isRef=type==='refund';
   window._rxnChatImg='';
+  window._rxnType=type;
+  window._rxnItemIds=[0];
+  window._rxnItemSeq=1;
+  var fld=rxFld,inp=rxInp,szSel=rxSzSel;
   var assignees=rxUsers().map(function(u){return '<option'+(u.name===rxAutoAssign(type)?' selected':'')+'>'+u.name+'</option>';}).join('');
-  var fld=function(lbl,inner){return '<label style="display:block;font-size:10px;color:#888;margin:10px 0 4px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">'+lbl+'</label>'+inner;};
-  var inp=function(id,ph,type2){return '<input id="'+id+'" type="'+(type2||'text')+'" placeholder="'+(ph||'')+'" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box">';};
-  var szSel=function(id){return '<select id="'+id+'" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box"><option value="">—</option><option>S</option><option>M</option><option>L</option><option>XL</option></select>';};
   var html='<div id="rx-new" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">'
    +'<div style="background:#fff;border-radius:14px;padding:22px;width:min(520px,95vw);max-height:92vh;overflow-y:auto">'
    +'<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:15px">'+(isRef?'+ New Refund':'⇄ New Exchange')+'</b><button onclick="document.getElementById(\'rx-new\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#999">✕</button></div>'
@@ -5496,18 +5557,11 @@ function openRxNew(type){
    +'</div>'
    +'<div style="font-size:9px;color:#999;margin-top:4px">At least one of the three is required — this is how the Owner/Admin confirms the case is genuine.</div>'
    +'</div>'
-   +'<div style="display:grid;grid-template-columns:2fr 1fr;gap:0 12px">'
-   +'<div>'+fld('Product Returned *','<div style="display:flex;gap:8px;align-items:center"><span id="rxn-product-thumb"></span><input id="rxn-product" list="rxn-prodlist" oninput="rxnThumb(\'rxn-product\',\'rxn-product-thumb\')" placeholder="Type to search…" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box"></div><datalist id="rxn-prodlist">'+rxProductOptions()+'</datalist>')+'</div>'
-   +'<div>'+fld('Size',szSel('rxn-size'))+'</div>'
-   +'</div>'
-   +(isRef?'':'<div style="display:grid;grid-template-columns:2fr 1fr;gap:0 12px">'
-   +'<div>'+fld('Product To Send *','<div style="display:flex;gap:8px;align-items:center"><span id="rxn-psend-thumb"></span><input id="rxn-psend" list="rxn-prodlist" oninput="rxnThumb(\'rxn-psend\',\'rxn-psend-thumb\')" placeholder="Type to search…" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box"></div>')+'</div>'
-   +'<div>'+fld('Size',szSel('rxn-szsend'))+'</div>'
-   +'</div>')
-   +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">'
-   +'<div>'+fld('Amount (PKR)'+(isRef?' *':''),inp('rxn-amount','e.g. 5500','number'))+'</div>'
+   +'<datalist id="rxn-prodlist">'+rxProductOptions()+'</datalist>'
+   +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><label style="font-size:10px;color:#888;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Items — one order/customer can return more than one</label></div>'
+   +'<div id="rxn-items">'+rxnItemRowHtml(0,isRef)+'</div>'
+   +'<button type="button" onclick="rxnAddItem()" style="background:#fff;border:1px dashed #c8a96e;color:#a07030;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;margin-bottom:6px">+ Add another item</button>'
    +'<div>'+fld('Reason *','<select id="rxn-reason" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;box-sizing:border-box"><option>Size Issue</option><option>Color Mismatch</option><option>Fabric Different from Description</option><option>Product Defect / Damage</option><option>Wrong Item Dispatched</option><option>Customer Changed Mind</option><option>Other</option></select>')+'</div>'
-   +'</div>'
    +(isRef?'<div style="background:#faf8f3;border:1px solid #eee;border-radius:8px;padding:4px 12px 12px;margin-top:10px"><div style="font-size:9px;color:#a07030;font-weight:700;margin-top:8px">BANK DETAILS (for payout)</div>'
      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">'
      +'<div>'+fld('Bank Name',inp('rxn-bank','e.g. Meezan'))+'</div>'
@@ -5524,20 +5578,34 @@ function openRxNew(type){
 }
 function submitRx(type){
   var v=function(id){var e=document.getElementById(id);return e?String(e.value||'').trim():'';};
-  var order=v('rxn-order'),customer=v('rxn-customer'),product=v('rxn-product'),amount=parseInt(v('rxn-amount'))||0;
+  var order=v('rxn-order'),customer=v('rxn-customer');
   if(!order){showToast('Enter the order number.');return;}
   if(!customer){showToast('Enter the customer name.');return;}
-  if(!product){showToast('Select the returned product.');return;}
-  if(type==='refund'&&!amount){showToast('Enter the refund amount.');return;}
-  if(type==='exchange'&&!v('rxn-psend')){showToast('Select the product to send.');return;}
+  var ids=window._rxnItemIds||[0];
+  var items=[];
+  for(var i=0;i<ids.length;i++){
+    var idx=ids[i];
+    var product=v('rxn-item-'+idx+'-product'),size=v('rxn-item-'+idx+'-size'),
+        psend=v('rxn-item-'+idx+'-psend'),szsend=v('rxn-item-'+idx+'-szsend'),
+        amt=parseInt(v('rxn-item-'+idx+'-amount'))||0;
+    if(!product){showToast('Select the returned product for item '+(i+1)+'.');return;}
+    if(type==='refund'&&!amt){showToast('Enter the refund amount for item '+(i+1)+' ('+product+').');return;}
+    if(type==='exchange'&&!psend){showToast('Select the product to send for item '+(i+1)+' ('+product+').');return;}
+    items.push({product:product,size:size,productToSend:psend,sizeToSend:szsend,amount:amt});
+  }
+  var totalAmount=items.reduce(function(a,it){return a+(it.amount||0);},0);
   var ig=v('rxn-ig'),fb=v('rxn-fb'),wa=v('rxn-wa');
   if(!ig&&!fb&&!wa){showToast('Paste at least one of Instagram, Facebook or WhatsApp profile — required to verify the customer.');return;}
   var T=window.TICKETS||[];
   var mx=0;T.forEach(function(t){var n=parseInt(String(t.id||'').replace('RX-',''))||0;if(n>mx)mx=n;});
   var t={id:'RX-'+String(mx+1).padStart(3,'0'),type:type,status:'initiated',
     order:order,customer:customer,customerMobile:v('rxn-mobile'),customerAddress:v('rxn-address'),
-    product:product,size:v('rxn-size'),productToSend:v('rxn-psend'),sizeToSend:v('rxn-szsend'),
-    amount:amount,platform:v('rxn-platform'),reason:v('rxn-reason'),notes:v('rxn-notes'),
+    items:items,
+    // Mirror the first item onto the flat fields too, so anything that still
+    // reads t.product/t.size directly (old code paths, exports) shows the
+    // right thing for single-item tickets and something reasonable otherwise.
+    product:items[0].product,size:items[0].size,productToSend:items[0].productToSend,sizeToSend:items[0].sizeToSend,
+    amount:totalAmount,platform:v('rxn-platform'),reason:v('rxn-reason'),notes:v('rxn-notes'),
     chatScreenshot:window._rxnChatImg||'',instagramProfile:ig,facebookProfile:fb,whatsappProfile:wa,
     assignedTo:v('rxn-assign')||rxAutoAssign(type),
     bankName:v('rxn-bank'),accountTitle:v('rxn-acctitle'),accountNumber:v('rxn-accnum'),
@@ -5601,8 +5669,18 @@ function openRxDetail(id){
    +'<div style="display:flex;gap:4px;margin-bottom:4px">'+bars+'</div><div style="display:flex;gap:4px;margin-bottom:14px">'+lbls+'</div>'
    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">'
    +'<div>'+g('Order #','#'+(t.order||''))+g('Customer',t.customer)+g('Mobile',t.customerMobile)+g('Platform',t.platform)+g('Reason',t.reason)+'</div>'
-   +'<div>'+g('Returned',(t.product||'')+(t.size?' ('+t.size+')':''))+(t.productToSend?g('To Send',t.productToSend+(t.sizeToSend?' ('+t.sizeToSend+')':'')):'')+g('Amount',t.amount?'PKR '+NF(t.amount):'')+g('Assigned To',t.assignedTo)+g('Created',(t.createdAt||'')+' by '+(t.createdBy||''))+'</div>'
+   +'<div>'+g('Amount',t.amount?'PKR '+NF(t.amount):'')+g('Assigned To',t.assignedTo)+g('Created',(t.createdAt||'')+' by '+(t.createdBy||''))+'</div>'
    +'</div>'
+   +(function(){
+       var its=rxItems(t);
+       return '<div style="font-size:9px;color:#999;font-weight:700;text-transform:uppercase;padding:5px 0 4px">Item'+(its.length>1?'s ('+its.length+')':'')+'</div>'
+        +its.map(function(it,i){
+          return '<div style="background:#f8f6f2;border-radius:6px;padding:6px 10px;margin-bottom:4px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:8px">'
+           +'<span>'+(its.length>1?(i+1)+'. ':'')+'<b>'+(it.product||'')+'</b>'+(it.size?' ('+it.size+')':'')+(it.productToSend?' → <b>'+it.productToSend+'</b>'+(it.sizeToSend?' ('+it.sizeToSend+')':''):'')+'</span>'
+           +(it.amount?'<span style="color:#a07030;font-weight:700;white-space:nowrap">PKR '+NF(it.amount)+'</span>':'')
+           +'</div>';
+        }).join('');
+     })()
    +g('Address',t.customerAddress)
    +(t.instagramProfile||t.facebookProfile||t.whatsappProfile?'<div style="background:#faf8f3;border:1px solid #eee;border-radius:8px;padding:8px 12px;margin-top:10px"><div style="font-size:9px;color:#a07030;font-weight:700;text-transform:uppercase;margin-bottom:2px">Customer Verification</div>'+g('Instagram',t.instagramProfile)+g('Facebook',t.facebookProfile)+g('WhatsApp',t.whatsappProfile)+'</div>':'')
    +(function(){
