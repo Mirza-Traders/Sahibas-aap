@@ -711,8 +711,13 @@ async function generate(){
       else setProg(14,'Ratings file had no usable rows — kept previous ratings');
     }
 
-    // Stock
-    STOCK=[];
+    // Stock — the file is optional and STOCK is published bundled inside the
+    // sales-data blob (see publishSnapshot), so unconditionally clearing it
+    // here used to mean: upload today's sales without reselecting the stock
+    // file (easy to do, it's marked optional) -> STOCK silently drops to []
+    // in memory -> Publish pushes that empty array over the cloud's real
+    // stock data for the whole team. Only touch STOCK when a fresh file was
+    // actually given; otherwise leave whatever's already loaded alone.
     if(stockFile){
       setProg(12,'Loading stock file...');
       var st=await readFile(stockFile);
