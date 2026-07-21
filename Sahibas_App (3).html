@@ -2104,6 +2104,20 @@ function rPB(){
 
   if(!arr.length){
     h+='<div style="text-align:center;padding:60px 20px;color:#aaa"><div style="font-size:40px;margin-bottom:12px">'+(pbSel.length?'🔍':'✅')+'</div><div style="font-size:13px;font-weight:700;color:#888">'+(pbSel.length?'No pending orders for the selected product(s)':'No pending pre-booked orders')+'</div><div style="font-size:10px;margin-top:6px">Pre-booked items are detected from <b>Item Status = pending</b> in your sales CSV.</div></div>';
+    // Self-service diagnostic: if the account has sales data loaded but
+    // zero rows literally match "pending", show what statuses ARE actually
+    // in the data -- catches export wording that doesn't match "pending"
+    // exactly, without anyone needing to open devtools to find out.
+    if(!pbSel.length&&DETAIL.length){
+      var statusCounts={};
+      fRows(DETAIL).forEach(function(r){var s=r[4]||'(blank)';statusCounts[s]=(statusCounts[s]||0)+1;});
+      var statusList=Object.keys(statusCounts).sort(function(a,b){return statusCounts[b]-statusCounts[a];});
+      h+='<div style="max-width:420px;margin:0 auto 40px;background:#fafafa;border:1px solid #eee;border-radius:8px;padding:14px 18px">'
+       +'<div style="font-size:10px;color:#a07030;font-weight:700;text-transform:uppercase;margin-bottom:8px">Diagnostic — Item Status values actually in your data</div>'
+       +statusList.map(function(s){return '<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;'+(s==='pending'?'color:#1e8449;font-weight:700':'color:#555')+'"><span>'+s+(s==='pending'?' ✓':'')+'</span><span>'+NF(statusCounts[s])+'</span></div>';}).join('')
+       +'<div style="font-size:9px;color:#999;margin-top:8px">If none of these say exactly "pending", that\'s why this report is empty — tell me the real wording and I\'ll match it.</div>'
+       +'</div>';
+    }
     document.getElementById('ppb').innerHTML=h;
     return;
   }
