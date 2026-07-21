@@ -1236,7 +1236,7 @@ function rOV(){
     stuckArr.forEach(function(r){
       var pfs=Object.keys(r.platforms).join(', ');
       var dc=r.maxDays>60?'color:var(--red);font-weight:700':r.maxDays>45?'color:var(--orange);font-weight:700':'color:var(--orange)';
-      h+='<tr><td><strong>'+r.name+'</strong></td><td>'+pfs+'</td><td class="nr">'+r.count+'</td>'
+      h+='<tr><td><strong'+phov(r.name)+'>'+r.name+'</strong></td><td>'+pfs+'</td><td class="nr">'+r.count+'</td>'
        +'<td class="nr" style="'+dc+'">'+r.maxDays+'d</td></tr>';
     });
     h+='</tbody></table></div></div>';
@@ -1311,7 +1311,7 @@ function rSZ(){
    +'<div class="exp-bar"><button class="exp-btn" onclick="expSZ()">Export CSV</button></div>'
    +'<div class="tw"><table>'+TH(['Product','S','M','L','XL','Total'],['n','S','M','L','XL','t'])+'<tbody>';
   pd.forEach(p=>{var b=Math.max(p.S,p.M,p.L,p.XL);function sc(v){return'<td class="nr" data-v="'+v+'" style="'+(v===b&&v>0?'font-weight:700;color:var(--gold2)':'')+'">'+(v||'-')+'</td>';}
-    h+='<tr><td><strong>'+p.n+'</strong></td>'+sc(p.S)+sc(p.M)+sc(p.L)+sc(p.XL)+'<td class="nr" data-v="'+p.t+'"><strong style="color:var(--gold2)">'+NF(p.t)+'</strong></td></tr>';});
+    h+='<tr><td><strong'+phov(p.n)+'>'+p.n+'</strong></td>'+sc(p.S)+sc(p.M)+sc(p.L)+sc(p.XL)+'<td class="nr" data-v="'+p.t+'"><strong style="color:var(--gold2)">'+NF(p.t)+'</strong></td></tr>';});
   h+='<tr class="tr"><td>TOTAL</td><td class="nr">'+NF(tS)+'</td><td class="nr">'+NF(tM)+'</td><td class="nr">'+NF(tL)+'</td><td class="nr">'+NF(tXL)+'</td><td class="nr">'+NF(tAll)+'</td></tr></tbody></table></div>'
    +'<div class="pg"><button class="pb" onclick="pages.sz--;rendered.sz=false;doR(\'sz\')" '+(pg<=1?'disabled':'')+'>Prev</button><span>Page '+pg+'/'+tp+'</span><button class="pb" onclick="pages.sz++;rendered.sz=false;doR(\'sz\')" '+(pg>=tp?'disabled':'')+'>Next</button></div>';
   document.getElementById('psz').innerHTML=h;window._szArr=arr;
@@ -1332,7 +1332,7 @@ function rVL(){
    +'<div class="exp-bar"><button class="exp-btn" onclick="expVL()">Export CSV</button></div>'
    +'<div class="tw"><table>'+TH(['Product','Last 10d','Last 20d','Last 30d','Daily Rate','Momentum'],['name','u10','u20','u30','rate','mom'],'lrrrrc')+'<tbody>';
   arr.forEach(v=>{var mc=v.mom==='SURGING'?'var(--green)':v.mom==='SLOWING'?'var(--red)':'#888';var ar=v.mom==='SURGING'?'↑':v.mom==='SLOWING'?'↓':'→';
-    h+='<tr><td><strong>'+v.name+'</strong></td><td class="nr" data-v="'+v.u10+'">'+NF(v.u10)+'</td><td class="nr" data-v="'+v.u20+'">'+NF(v.u20)+'</td><td class="nr" data-v="'+v.u30+'">'+NF(v.u30)+'</td><td class="nr" data-v="'+v.rate+'">'+v.rate+'/day</td><td style="color:'+mc+';font-weight:700;text-align:center">'+ar+' '+v.mom+'</td></tr>';});
+    h+='<tr><td><strong'+phov(v.name)+'>'+v.name+'</strong></td><td class="nr" data-v="'+v.u10+'">'+NF(v.u10)+'</td><td class="nr" data-v="'+v.u20+'">'+NF(v.u20)+'</td><td class="nr" data-v="'+v.u30+'">'+NF(v.u30)+'</td><td class="nr" data-v="'+v.rate+'">'+v.rate+'/day</td><td style="color:'+mc+';font-weight:700;text-align:center">'+ar+' '+v.mom+'</td></tr>';});
   h+='</tbody></table></div>';document.getElementById('pvl').innerHTML=h;window._vlArr=arr;
 }
 function expVL(){if(window._vlArr)csvDL(window._vlArr.map(v=>[v.name,v.u10,v.u20,v.u30,v.rate,v.mom]),['Product','Last10d','Last20d','Last30d','DailyRate','Momentum'],'velocity.csv');}
@@ -1474,6 +1474,43 @@ function findImg(k){
 }
 var _IMG_BORROWED={};
 function imgBorrowedParent(name){return _IMG_BORROWED[String(name).toLowerCase().trim()]||'';}
+function phov(n){return ' data-prod-hover="'+String(n||'').toLowerCase().trim().replace(/"/g,'&quot;')+'"';}
+// Generic hover-preview: hover any element carrying data-prod-hover="<product
+// name>" to see an enlarged photo float near the cursor (like Google Sheets'
+// smart-chip preview). One delegated listener registered once -- works for
+// anything with the attribute anywhere in the DOM, including virtualized rows
+// rebuilt after the fact, no per-render wiring needed.
+(function(){
+  var pv=null,hideT=null;
+  function ensurePv(){
+    if(pv)return pv;
+    pv=document.createElement('div');
+    pv.id='prod-hover-pv';
+    pv.style.cssText='position:fixed;z-index:99999;display:none;pointer-events:none;background:#fff;border:1px solid #ddd;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:6px';
+    document.body.appendChild(pv);
+    return pv;
+  }
+  function place(p,e){
+    var x=e.clientX+16,y=e.clientY+16,pw=172,ph=212;
+    if(x+pw>window.innerWidth)x=e.clientX-pw-16;
+    if(y+ph>window.innerHeight)y=e.clientY-ph-16;
+    p.style.left=x+'px';p.style.top=y+'px';
+  }
+  document.addEventListener('mouseover',function(e){
+    var el=e.target.closest('[data-prod-hover]');if(!el)return;
+    var img=findImg((el.getAttribute('data-prod-hover')||'').toLowerCase().trim());if(!img)return;
+    clearTimeout(hideT);
+    var p=ensurePv();
+    p.innerHTML='<img src="'+img+(img.indexOf('?')>=0?'&':'?')+'width=300" style="width:160px;height:200px;object-fit:cover;object-position:top center;border-radius:6px;display:block">';
+    p.style.display='block';
+    place(p,e);
+  });
+  document.addEventListener('mousemove',function(e){if(pv&&pv.style.display==='block')place(pv,e);});
+  document.addEventListener('mouseout',function(e){
+    if(!e.target.closest('[data-prod-hover]'))return;
+    hideT=setTimeout(function(){if(pv)pv.style.display='none';},50);
+  });
+})();
 function csToggle(el){var n=el.getAttribute('data-n');if(el.checked)_csSelProds.add(n);else _csSelProds.delete(n);var b=document.getElementById('cs-exp-sel');if(b)b.style.display=_csSelProds.size>0?'':'none';}
 function csSelAll(){var allC=document.querySelectorAll('#pcs-tbody input[type=checkbox]');var doAdd=_csSelProds.size<(window._csArr||[]).length;_csSelProds.clear();allC.forEach(function(cb){cb.checked=doAdd;if(doAdd)_csSelProds.add(cb.getAttribute('data-n'));});var b=document.getElementById('cs-exp-sel');if(b)b.style.display=_csSelProds.size>0?'':'none';}
 function csSort(el){var c=el.getAttribute('data-c');if(_csSortCol===c)_csSortAsc=!_csSortAsc;else{_csSortCol=c;_csSortAsc=false;}rendered.cs=false;doR('cs');}
@@ -1819,7 +1856,8 @@ function rCS(){
     // similar-named product's photo is shown in its place.
     var _bp=simg?imgBorrowedParent(p.name):'';
     if(_bp)imgHtml='<div style="position:relative;width:52px">'+imgHtml+'<span title="Not this product\'s own photo — showing &quot;'+_bp.replace(/"/g,'')+'&quot; (no photo exists for '+p.name.replace(/"/g,'')+')" style="position:absolute;top:2px;right:2px;background:rgba(30,30,30,.78);color:#ffd76e;font-size:11px;font-weight:700;border-radius:4px;padding:0 4px;line-height:15px;cursor:help">≈</span></div>';
-    var nameCell=simg?'<a href="'+p.img+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+p.name+'</a>':p.name;
+    var _pnh=phov(p.name);
+    var nameCell=simg?'<a href="'+p.img+'" target="_blank" rel="noopener"'+_pnh+' style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+p.name+'</a>':'<span'+_pnh+'>'+p.name+'</span>';
     tbody+='<tr style="background:'+bg+';border-bottom:1px solid #f2efe9'+(isSel?';outline:2px solid var(--gold)':'')+'">'
      +'<td data-fl="1" style="padding:6px 8px;background:'+bg+'"><input type="checkbox" data-n="'+p.name.replace(/"/g,'')+'" '+(isSel?'checked':'')+' onchange="csToggle(this)" style="cursor:pointer;accent-color:var(--gold)"></td>'
      +'<td data-fl="1" style="padding:4px 6px;background:'+bg+';width:75px;min-width:75px;text-align:center;font-size:10px;color:#888;white-space:nowrap">'+fmtCDate(p.createdAt)+'</td>'
@@ -1940,7 +1978,7 @@ function rSK(){
    +'<tr style="background:#f8f6f2;font-weight:700;border-bottom:2px solid #e8e4dc"><td>TOTAL — '+arr.length+' products</td><td class="nr">-</td><td class="nr">'+NF(ts)+'</td><td class="nr">'+NF(tS)+'</td><td class="nr">'+NF(tM)+'</td><td class="nr">'+NF(tL)+'</td><td class="nr">'+NF(tXL)+'</td><td class="nr">'+NF(tV)+'</td><td class="nr">-</td><td class="nr">-</td><td class="nc">-</td></tr>';
   pd.forEach(r=>{var af=r.alert==='CRITICAL'?'stk-cr':r.alert==='LOW'?'stk-lo':r.alert==='OK'?'stk-ok':'stk-ns';var dc=r.days!=null&&r.days<7?'color:var(--red);font-weight:700':r.days!=null&&r.days<21?'color:var(--orange);font-weight:700':'';
     var dys=r.days==null?'∞':(r.total===0?'OUT':r.days+'d');
-    h+='<tr><td><strong>'+r.name+'</strong></td><td class="nr" style="color:var(--gold2);font-weight:600">'+(r.price?NF(r.price):'-')+'</td><td class="nr" data-v="'+r.total+'">'+NF(r.total)+'</td><td class="nr">'+(r.S||'-')+'</td><td class="nr">'+(r.M||'-')+'</td><td class="nr">'+(r.L||'-')+'</td><td class="nr">'+(r.XL||'-')+'</td><td class="nr" data-v="'+r.vel+'">'+NF(r.vel)+'</td><td class="nr" data-v="'+r.rate+'">'+(r.rate>0?r.rate+'/d':'-')+'</td><td class="nr" style="'+dc+'" data-v="'+(r.days==null?9999:r.days)+'">'+dys+'</td><td class="nc"><span class="'+af+'">'+r.alert+'</span></td></tr>';});
+    h+='<tr><td><strong'+phov(r.name)+'>'+r.name+'</strong></td><td class="nr" style="color:var(--gold2);font-weight:600">'+(r.price?NF(r.price):'-')+'</td><td class="nr" data-v="'+r.total+'">'+NF(r.total)+'</td><td class="nr">'+(r.S||'-')+'</td><td class="nr">'+(r.M||'-')+'</td><td class="nr">'+(r.L||'-')+'</td><td class="nr">'+(r.XL||'-')+'</td><td class="nr" data-v="'+r.vel+'">'+NF(r.vel)+'</td><td class="nr" data-v="'+r.rate+'">'+(r.rate>0?r.rate+'/d':'-')+'</td><td class="nr" style="'+dc+'" data-v="'+(r.days==null?9999:r.days)+'">'+dys+'</td><td class="nc"><span class="'+af+'">'+r.alert+'</span></td></tr>';});
   h+='</tbody></table></div><div class="pg"><button class="pb" onclick="pages.sk--;rendered.sk=false;doR(\'sk\')" '+(pg<=1?'disabled':'')+'>Prev</button><span>Page '+pg+'/'+tp+'</span><button class="pb" onclick="pages.sk++;rendered.sk=false;doR(\'sk\')" '+(pg>=tp?'disabled':'')+'>Next</button></div>';
   document.getElementById('psk').innerHTML=h;
 }
@@ -1962,7 +2000,7 @@ function rDP(){
       h+='<div class="sec"><div class="stl">All Pending Orders — Oldest First</div><div class="tw"><table>'+TH(['Product','Size','Status','Days Pending','Platform','Dest'],null,'lccrcl')+'<tbody>';
       active.slice(0,200).forEach(function(r){
         var dc=r[8]>60?'color:var(--red);font-weight:700':r[8]>30?'color:var(--orange);font-weight:700':'';
-        h+='<tr><td><strong>'+r[1]+'</strong></td><td class="nc">'+r[3]+'</td>'
+        h+='<tr><td><strong'+phov(r[1])+'>'+r[1]+'</strong></td><td class="nc">'+r[3]+'</td>'
          +'<td class="nc" style="color:var(--orange)">'+r[4]+'</td>'
          +'<td class="nr" style="'+dc+'">'+r[8]+'d</td>'
          +'<td>'+pBadge(r[5])+'</td><td>'+dBadge(r[6])+'</td></tr>';
@@ -1996,7 +2034,7 @@ function rDP(){
      +TH(['Product','Size','Status','Days Pending','Platform','Dest','Stock Available'],null,'lccrcrc')+'<tbody>';
     can.forEach(function(r){
       var dc=r[8]>60?'color:var(--red);font-weight:700':r[8]>30?'color:var(--orange);font-weight:700':'';
-      h+='<tr><td><strong>'+r[1]+'</strong></td><td class="nc">'+r[3]+'</td>'
+      h+='<tr><td><strong'+phov(r[1])+'>'+r[1]+'</strong></td><td class="nc">'+r[3]+'</td>'
        +'<td class="nc" style="color:var(--orange);font-weight:600">'+r[4]+'</td>'
        +'<td class="nr" style="'+dc+'">'+r[8]+'d</td>'
        +'<td>'+pBadge(r[5])+'</td><td>'+dBadge(r[6])+'</td>'
@@ -2009,7 +2047,7 @@ function rDP(){
      +TH(['Product','Size','Status','Days Pending','Platform','Dest'],null,'lccrcl')+'<tbody>';
     cant.slice(0,150).forEach(function(r){
       var dc=r[8]>60?'color:var(--red);font-weight:700':r[8]>30?'color:var(--orange);font-weight:700':'';
-      h+='<tr><td><strong>'+r[1]+'</strong></td><td class="nc">'+r[3]+'</td>'
+      h+='<tr><td><strong'+phov(r[1])+'>'+r[1]+'</strong></td><td class="nc">'+r[3]+'</td>'
        +'<td class="nc">'+r[4]+'</td>'
        +'<td class="nr" style="'+dc+'">'+r[8]+'d</td>'
        +'<td>'+pBadge(r[5])+'</td><td>'+dBadge(r[6])+'</td></tr>';
@@ -2148,8 +2186,9 @@ function rPB(){
   function pbSrtArrow(col){var cur=window._pbSort;if(cur.col===col)return' '+(cur.asc?'▲':'▼');return' <span style="opacity:.25;font-size:9px">↕</span>';}
   var pbSrToggleBtn='<button onclick="event.stopPropagation();togglePbSizeRatio()" title="'+(pbSrOpen?'Collapse':'Expand')+' Size Ratio" style="background:rgba(255,255,255,.6);border:1px solid #e0c080;border-radius:3px;width:16px;height:16px;line-height:1;cursor:pointer;font-size:10px;font-weight:800;color:#a07030;padding:0;margin-left:4px">'+(pbSrOpen?'−':'+')+'</button>';
   var pbTh=function(lbl,col,align,extraStyle){return '<th style="padding:8px 10px;text-align:'+(align||'left')+';cursor:pointer;user-select:none'+(extraStyle?';'+extraStyle:'')+'" onclick="setPbSort(\''+col+'\')">'+lbl+pbSrtArrow(col)+'</th>';};
-  h+='<div class="tw"><table><thead><tr>'
+  h+='<div class="tw" style="max-height:none"><table><thead><tr>'
    +pbTh('Product','product','left')
+   +'<th style="padding:8px 10px;text-align:left">Image</th>'
    +(pbSrOpen?(pbTh('S','s','right')+pbTh('M','m','right')+pbTh('L','l','right')+pbTh('XL','xl','right'))
              :'<th style="padding:8px 10px;text-align:right;cursor:pointer;user-select:none" onclick="togglePbSizeRatio()" title="Click to expand Size Ratio">S / M / L / XL'+pbSrToggleBtn+'</th>')
    +pbTh('Grand Total','total','right')
@@ -2160,9 +2199,10 @@ function rPB(){
    +pbTh('ETA','eta','left','background:#faf3df')
    +'</tr></thead><tbody>';
   arr.forEach(function(g){
-    var thumb=g.img?'<img src="'+g.img+(g.img.indexOf('?')>=0?'&':'?')+'width=60" style="width:32px;height:40px;object-fit:cover;object-position:top center;border-radius:4px;vertical-align:middle;margin-left:8px">':'';
+    var thumb=g.img?'<img src="'+g.img+(g.img.indexOf('?')>=0?'&':'?')+'width=100" style="width:42px;height:53px;object-fit:cover;object-position:top center;border-radius:4px;border:1px solid #eee">':'<span style="color:#ccc;font-size:9px">—</span>';
     h+='<tr>'
-     +'<td style="padding:8px 10px"><strong>'+g.product+'</strong>'+thumb+'</td>'
+     +'<td style="padding:8px 10px"><strong'+phov(g.product)+'>'+g.product+'</strong></td>'
+     +'<td style="padding:8px 10px">'+thumb+'</td>'
      +(pbSrOpen?(
         '<td style="padding:8px 10px;text-align:right">'+(g.S||'-')+'</td>'
         +'<td style="padding:8px 10px;text-align:right">'+(g.M||'-')+'</td>'
@@ -2192,7 +2232,7 @@ function rEC(){
   var h='<div class="krow"><div class="kpi r"><div class="kl">Overcharged Orders</div><div class="kv">'+NF(rows.length)+'</div><div class="ks">In filtered range</div></div><div class="kpi r"><div class="kl">Total Overcharge</div><div class="kv">PKR '+N(total)+'</div><div class="ks">Claim from Laam</div></div><div class="kpi g"><div class="kl">Rates</div><div class="kv" style="font-size:13px">MP 15% / OCT 7-12%</div><div class="ks">Per contract</div></div></div>'
    +'<div class="exp-bar"><button class="exp-btn" onclick="expEC()">Export CSV ('+rows.length+' rows)</button></div>'
    +'<div class="tw"><table>'+TH(['Order#','Date','Product','Platform','Dest','Retail','Correct%','Charged%','Correct Comm','Charged Comm','Excess PKR'],null,'lllccrrrrrr')+'<tbody>';
-  pd.forEach(r=>h+='<tr><td style="font-family:monospace;font-size:10px;color:#aaa">'+r.oid+'</td><td>'+fmtD(r.date)+'</td><td><strong>'+r.prd+'</strong></td><td>'+pBadge(r.pf)+'</td><td>'+dBadge(r.dst)+'</td><td class="nr">'+NF(r.ret)+'</td><td class="nr" style="color:var(--green)">'+r.cr+'%</td><td class="nr" style="color:var(--red);font-weight:700">'+r.chg+'%</td><td class="nr">'+NF(r.cc)+'</td><td class="nr" style="color:var(--red)">'+NF(r.ch)+'</td><td class="nr" style="color:var(--red);font-weight:700">'+NF(r.xa)+'</td></tr>');
+  pd.forEach(r=>h+='<tr><td style="font-family:monospace;font-size:10px;color:#aaa">'+r.oid+'</td><td>'+fmtD(r.date)+'</td><td><strong'+phov(r.prd)+'>'+r.prd+'</strong></td><td>'+pBadge(r.pf)+'</td><td>'+dBadge(r.dst)+'</td><td class="nr">'+NF(r.ret)+'</td><td class="nr" style="color:var(--green)">'+r.cr+'%</td><td class="nr" style="color:var(--red);font-weight:700">'+r.chg+'%</td><td class="nr">'+NF(r.cc)+'</td><td class="nr" style="color:var(--red)">'+NF(r.ch)+'</td><td class="nr" style="color:var(--red);font-weight:700">'+NF(r.xa)+'</td></tr>');
   h+='<tr class="tr"><td colspan="5">TOTAL</td><td></td><td></td><td></td><td></td><td></td><td class="nr" style="color:var(--red)">'+NF(total)+'</td></tr></tbody></table></div>'
    +'<div class="pg"><button class="pb" onclick="pages.excess--;rendered.ec=false;doR(\'ec\')" '+(pg<=1?'disabled':'')+'>Prev</button><span>'+pg+'/'+tp+'</span><button class="pb" onclick="pages.excess++;rendered.ec=false;doR(\'ec\')" '+(pg>=tp?'disabled':'')+'>Next</button></div>';
   document.getElementById('pec').innerHTML=h;window._ecRows=rows;
@@ -2207,7 +2247,7 @@ function rAL(){
    +'<div class="exp-bar"><button class="exp-btn" onclick="expAL()">Export CSV ('+rows.length+' rows)</button></div>'
    +'<div class="tw"><table>'+TH(['Order#','Date','Product','SKU','Size','Platform','Dest','Payment','Days','Retail'],null,'llllccccrr')+'<tbody>';
   pd.forEach(r=>{var dc=r[8]>90?'color:var(--red)':r[8]>60?'color:var(--orange)':'';var pc=r[7]==='PAID'?'color:var(--green)':r[7]==='PENDING'?'color:var(--orange)':'';
-    h+='<tr><td style="font-family:monospace;font-size:10px;color:#aaa">'+r[18]+'</td><td>'+fmtD(r[0])+'</td><td><strong>'+r[1]+'</strong></td><td style="font-family:monospace;font-size:10px;color:#aaa">'+r[2]+'</td><td class="nc">'+r[3]+'</td><td>'+pBadge(r[5])+'</td><td>'+dBadge(r[6])+'</td><td style="'+pc+';font-weight:700" class="nc">'+r[7]+'</td><td class="nr" style="'+dc+';font-weight:700" data-v="'+r[8]+'">'+r[8]+'d</td><td class="nr" data-v="'+r[9]+'">'+NF(r[9])+'</td></tr>';});
+    h+='<tr><td style="font-family:monospace;font-size:10px;color:#aaa">'+r[18]+'</td><td>'+fmtD(r[0])+'</td><td><strong'+phov(r[1])+'>'+r[1]+'</strong></td><td style="font-family:monospace;font-size:10px;color:#aaa">'+r[2]+'</td><td class="nc">'+r[3]+'</td><td>'+pBadge(r[5])+'</td><td>'+dBadge(r[6])+'</td><td style="'+pc+';font-weight:700" class="nc">'+r[7]+'</td><td class="nr" style="'+dc+';font-weight:700" data-v="'+r[8]+'">'+r[8]+'d</td><td class="nr" data-v="'+r[9]+'">'+NF(r[9])+'</td></tr>';});
   h+='</tbody></table></div><div class="pg"><button class="pb" onclick="pages.alloc--;rendered.al=false;doR(\'al\')" '+(pg<=1?'disabled':'')+'>Prev</button><span>'+pg+'/'+tp+'</span><button class="pb" onclick="pages.alloc++;rendered.al=false;doR(\'al\')" '+(pg>=tp?'disabled':'')+'>Next</button></div>';
   document.getElementById('pal').innerHTML=h;window._alRows=rows;
 }
@@ -5159,7 +5199,8 @@ function rPO(){
          var isRunning=o.status==='Pending Approval'||o.status==='In Progress';
          var runCnt=productRunningCount[(o.product||'').toLowerCase().trim()]||0;
          var runBadge=(isRunning&&runCnt>=2)?' <span title="'+runCnt+' active production plans for this product right now (across all customers/lots) -- multiple concurrent lots are normal, e.g. different colorways or customers" style="background:#eef0fb;color:#4a4ab0;font-size:8px;font-weight:800;padding:2px 6px;border-radius:8px;display:inline-block;white-space:nowrap">⟲ '+runCnt+' plans running</span>':'';
-         return '<td style="'+TDL+stk(3,bg)+'"><div style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+(o.img&&o.img.startsWith('http')?'<a href="'+o.img+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+o.product+'</a>':o.product)+runBadge+'</div><div style="white-space:nowrap;overflow:hidden"><span style="'+stBadge+'">'+o.status+'</span> '+ratingChip(o.product)+'</div></td>';
+         var _pnh=phov(o.product);
+         return '<td style="'+TDL+stk(3,bg)+'"><div'+_pnh+' style="font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+o.product.replace(/"/g,'&quot;')+'">'+(_oImg&&_oImg.startsWith('http')?'<a href="'+_oImg+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+o.product+'</a>':o.product)+runBadge+'</div><div style="white-space:nowrap;overflow:hidden"><span style="'+stBadge+'">'+o.status+'</span> '+ratingChip(o.product)+'</div></td>';
        })()
        +'<td style="'+TD+stk(4,bg)+'">'+  (o.customer||'—')+'</td>'
        +'<td style="'+TD+stk(5,bg)+'">'+  (o.fabric||'—')+'</td>'
