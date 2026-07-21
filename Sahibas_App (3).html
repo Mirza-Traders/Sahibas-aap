@@ -3713,7 +3713,7 @@ function rAC(){
     // Name link (photo opens in new tab) + the Laam rating chip, so every
     // Insights section shows the rating wherever a product is mentioned.
     var chip=ratingChip(r.name);
-    var base=(r.img&&String(r.img).indexOf('http')===0)?'<a href="'+r.img+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+r.name+'</a>':r.name;
+    var base=(r.img&&String(r.img).indexOf('http')===0)?'<a href="'+r.img+'" target="_blank" rel="noopener"'+phov(r.name)+' style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--gold);cursor:pointer">'+r.name+'</a>':'<span'+phov(r.name)+'>'+r.name+'</span>';
     return chip?base+' '+chip:base;
   }
   function secHead(ico,title,count,color,sub,expId){
