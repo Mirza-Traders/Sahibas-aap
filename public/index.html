@@ -4328,6 +4328,9 @@ function poCanSetSizes(o){
   // demand it must fulfil. Owner can also set it as an override. Production-
   // floor users who didn't place the order cannot (they lack that context).
   if(CU.role==='Owner')return true;
+  // Zeeshan gets the same override as Owner -- he needs to correct the size
+  // split on orders he didn't place himself, including ones already approved.
+  if(CU.email==='zeeshanshafaytex@gmail.com')return true;
   return (o.placedBy===CU.name||o.placedByEmail===CU.email);
 }
 function sizesMissing(o){return o&&(o.total>0)&&((o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0)===0);}
