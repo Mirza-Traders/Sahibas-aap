@@ -4930,6 +4930,8 @@ if(typeof window._poPhasesOpen==='undefined')window._poPhasesOpen=false;
 function togglePoPhases(){window._poPhasesOpen=!window._poPhasesOpen;rendered.po=false;doR('po');}
 if(typeof window._poSizeRatioOpen==='undefined')window._poSizeRatioOpen=false;
 function togglePoSizeRatio(){window._poSizeRatioOpen=!window._poSizeRatioOpen;rendered.po=false;doR('po');}
+if(typeof window._poHideCompleted==='undefined')window._poHideCompleted=true;
+function togglePoHideCompleted(){window._poHideCompleted=!window._poHideCompleted;rendered.po=false;doR('po');}
 // Size the table to fill whatever space is actually left below it on screen
 // (KPI cards + toolbar + banner vary in height), instead of a fixed vh
 // percentage that leaves the horizontal scrollbar stranded mid-page on tall
@@ -4968,6 +4970,15 @@ function rPO(){
     if(f.status&&f.status.length&&f.status.indexOf(o.status)<0)return false;
     return true;
   });
+  // Completed plans pile up over time and crowd out what actually needs
+  // attention -- hide them by default (same "Hide discontinued" pattern as
+  // Summary Sheet), but never hide them if the Status filter was explicitly
+  // set to Completed -- that's a deliberate "show me completed" action.
+  var completedCount=active.filter(function(o){return o.status==='Completed';}).length;
+  var statusExplicitlyIncludesCompleted=f.status&&f.status.length&&f.status.indexOf('Completed')>=0;
+  if(window._poHideCompleted&&!statusExplicitlyIncludesCompleted){
+    active=active.filter(function(o){return o.status!=='Completed';});
+  }
   if(!window._poSort)window._poSort={col:'date',asc:false};
   (function(){var _srt=window._poSort;active.sort(function(a,b){var av,bv;if(_srt.col==='date'){av=a.date||'';bv=b.date||'';}else if(_srt.col==='ono'){av=(a.id||'').toLowerCase();bv=(b.id||'').toLowerCase();}else if(_srt.col==='prod'){av=(a.product||'').toLowerCase();bv=(b.product||'').toLowerCase();}else if(_srt.col==='eta'){av=a.targetDate||'';bv=b.targetDate||'';}else if(_srt.col==='qty'){av=a.total!=null?a.total:(a.S||0)+(a.M||0)+(a.L||0)+(a.XL||0);bv=b.total!=null?b.total:(b.S||0)+(b.M||0)+(b.L||0)+(b.XL||0);}else if(_srt.col==='phases'){var pc=function(o){return['cutting','print','embroidery','stitching','finishing'].filter(function(k){var p=o.phases&&o.phases[k];return p&&(p.state==='done'||(!p.state&&p.done));}).length;};av=pc(a);bv=pc(b);}else{av=a.date||'';bv=b.date||'';}var r=av<bv?-1:av>bv?1:0;return _srt.asc?r:-r;});})();
   var canPlace=CU&&(CU.role==='Owner'||CU.role==='Editor'||CU.role==='Production');
@@ -5020,6 +5031,7 @@ function rPO(){
    +mkDrop('fabs','Fabric',allFabs,f.fabs)
    +mkDrop('status','Status',STATUS_OPTS,f.status)
    +(hasFilter?'<button onclick="clearPoFlt()" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">✕ Clear</button>':'')
+   +(completedCount>0&&!statusExplicitlyIncludesCompleted?'<button onclick="togglePoHideCompleted()" title="Completed plans stay in the data — this just keeps them out of the way" style="border:1px solid '+(window._poHideCompleted?'#ccc':'#27ae60')+';background:'+(window._poHideCompleted?'#fff':'#f0f8f0')+';color:'+(window._poHideCompleted?'#888':'#1e8449')+';border-radius:4px;padding:5px 10px;font-size:10px;cursor:pointer;font-weight:600">'+(window._poHideCompleted?'Show completed ('+completedCount+' hidden)':'Hide completed ('+completedCount+')')+'</button>':'')
    +'<div style="margin-left:auto;display:flex;gap:6px;align-items:center">'
    +(isOwner&&selPendingCount>0?'<button onclick="bulkApprovePO()" style="background:#27ae60;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer" title="Approve all selected Pending Approval orders">✓ Approve Selected ('+selPendingCount+')</button>':'')
    +'<button onclick="exportPOCSV()" style="background:#fff;border:1px solid #27ae60;color:#27ae60;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer" title="Export filtered/selected rows as CSV">⬇ CSV</button>'
