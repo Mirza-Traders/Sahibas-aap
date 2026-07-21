@@ -4297,7 +4297,8 @@ function openPoReview(oid){
   var k=(o.product||'').toLowerCase().trim();
   var cur={S:o.S||0,M:o.M||0,L:o.L||0,XL:o.XL||0};
   var stockHtml=poStockPositionHtml(k,cur,'+ This Order ('+o.id+')');
-  var thumb=(o.img&&o.img.startsWith('http'))?'<img src="'+o.img+'" style="width:56px;height:70px;object-fit:cover;border-radius:6px;border:1px solid #3a3a3a">':'<div style="width:56px;height:70px;border-radius:6px;background:#252525;border:1px solid #3a3a3a"></div>';
+  var _reviewImg=poImg(o);
+  var thumb=(_reviewImg&&_reviewImg.startsWith('http'))?'<img src="'+_reviewImg+'" style="width:56px;height:70px;object-fit:cover;border-radius:6px;border:1px solid #3a3a3a">':'<div style="width:56px;height:70px;border-radius:6px;background:#252525;border:1px solid #3a3a3a"></div>';
   var body='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">'
    +'<div style="color:#fff;font-size:16px;font-weight:700;letter-spacing:.02em">👁 Review '+o.id+' — before you approve</div>'
    +'<button onclick="closePoReview()" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer;line-height:1;padding:2px 6px">✕</button>'
@@ -4630,7 +4631,8 @@ function printPO(oid){
   // cannot print an order that's still Pending Approval or Rejected.
   if(o.status==='Pending Approval'||o.status==='Rejected'){showToast('This order can be printed only after it is approved.');return;}
   showToast('Preparing print…');
-  var imgUrl=o.img&&o.img.startsWith('http')?o.img:'';
+  var _printImg=poImg(o);
+  var imgUrl=_printImg&&_printImg.startsWith('http')?_printImg:'';
   if(imgUrl){
     // Preload image into browser cache via Image element (no CORS issues), then print
     var preload=new Image();
@@ -4749,6 +4751,11 @@ function doPrintPO(o,imgSrc){
   setTimeout(function(){window.print();setTimeout(function(){document.title=ot;},800);},100);
 }
 
+// PO thumbnails used to be frozen at creation/edit time (o.img), so a photo
+// updated later in Shopify never reached orders already placed. Resolve live
+// against the current product-image index every time it's displayed, falling
+// back to the stored value only for products no longer in that index.
+function poImg(o){return findImg((o.product||'').toLowerCase().trim())||o.img||'';}
 // ── PO TABLE helpers ──────────────────────────────────────────────
 // In-place filter for the Product/Fabric/Status dropdowns -- toggles label
 // visibility client-side only, no page re-render, so typing never loses
@@ -4821,7 +4828,8 @@ function printSelectedPO(){
   var orders=loadPO();
   var rows=orders.filter(function(o){return sel[o.id];});
   var html=rows.map(function(o,i){
-    var imgSrc=o.img&&o.img.startsWith('http')?o.img:'';
+    var _selImg=poImg(o);
+    var imgSrc=_selImg&&_selImg.startsWith('http')?_selImg:'';
     return (i>0?'<div style="page-break-before:always"></div>':'')+buildPOPrintHtml(o,imgSrc);
   }).join('');
   var pf=document.getElementById('po-print-frame');pf.innerHTML=html;
@@ -5062,7 +5070,8 @@ function rPO(){
         if(state==='progress')return '<td style="'+cs+'"><span style="color:#f59e0b;font-weight:700">🔄</span></td>';
         return '<td style="'+cs+'">–</td>';
       }
-      var imgCell='<td style="'+TD+stk(6,bg)+'">'+(o.img&&o.img.startsWith('http')?'<img src="'+o.img+'?width=100" loading="lazy" decoding="async" onclick="rxViewPhoto(\''+o.img.replace(/'/g,"\\'")+'\')" title="Click to enlarge" style="width:42px;height:53px;object-fit:cover;object-position:top center;border-radius:4px;border:1px solid #eee;cursor:zoom-in" onerror="this.style.display=\'none\'">':'–')+'</td>';
+      var _oImg=poImg(o);
+      var imgCell='<td style="'+TD+stk(6,bg)+'">'+(_oImg&&_oImg.startsWith('http')?'<img src="'+_oImg+'?width=100" loading="lazy" decoding="async" onclick="rxViewPhoto(\''+_oImg.replace(/'/g,"\\'")+'\')" title="Click to enlarge" style="width:42px;height:53px;object-fit:cover;object-position:top center;border-radius:4px;border:1px solid #eee;cursor:zoom-in" onerror="this.style.display=\'none\'">':'–')+'</td>';
       var scCell='<td style="'+TD+stk(7,bg)+'">'+(o.sizeChart?'<img src="'+o.sizeChart+'" loading="lazy" decoding="async" onclick="viewSizeChart(\''+o.id+'\')" style="width:38px;height:38px;object-fit:contain;border:1px solid #d8d8ff;cursor:pointer;border-radius:3px;background:#f8f8ff" title="'+(o.sizeChartName||'Size Chart')+' — click to view full size">':'<span style="color:#ccc;font-size:9px">—</span>')+'</td>';
       // Collapsed Production Phases: one compact cell instead of 5, click to expand.
       function phSummary(){
