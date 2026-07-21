@@ -2024,6 +2024,9 @@ function rDP(){
 // staff can see at a glance whether production covers what's been sold.
 if(typeof window._pbFlt==='undefined')window._pbFlt={prods:[]};
 if(typeof window._pbDrop==='undefined')window._pbDrop='';
+if(typeof window._pbSizeRatioOpen==='undefined')window._pbSizeRatioOpen=false;
+function togglePbSizeRatio(){window._pbSizeRatioOpen=!window._pbSizeRatioOpen;rendered.pb=false;doR('pb');}
+function setPbSort(col){var cur=window._pbSort||{col:'delayed',asc:false};if(cur.col===col){window._pbSort={col:col,asc:!cur.asc};}else{window._pbSort={col:col,asc:false};}rendered.pb=false;doR('pb');}
 function togglePbFlt(field,val){
   if(!window._pbFlt)window._pbFlt={prods:[]};
   var arr=window._pbFlt[field];
@@ -2063,7 +2066,26 @@ function rPB(){
     g.img=findImg(p.toLowerCase().trim());
     return g;
   });
-  arr.sort(function(a,b){return (b.delayed-a.delayed)||(b.total-a.total);});
+  if(!window._pbSort)window._pbSort={col:'delayed',asc:false};
+  (function(){
+    var _s=window._pbSort;
+    function val(g){
+      switch(_s.col){
+        case 'product':return g.product.toLowerCase();
+        case 's':return g.S;case 'm':return g.M;case 'l':return g.L;case 'xl':return g.XL;
+        case 'total':return g.total;
+        case 'delayed':return g.delayed;
+        case 'eta':return g.poEta||'9999-99-99'; // no ETA sorts last
+        default:return g.delayed;
+      }
+    }
+    arr.sort(function(a,b){
+      var av=val(a),bv=val(b);
+      var r=av<bv?-1:av>bv?1:0;
+      if(r===0)r=b.total-a.total; // stable, sensible tiebreak
+      return _s.asc?r:-r;
+    });
+  })();
 
   var pbAllProducts=arr.map(function(g){return g.product;}).sort();
   if(!window._pbFlt)window._pbFlt={prods:[]};
@@ -2122,24 +2144,31 @@ function rPB(){
     return;
   }
 
+  var pbSrOpen=window._pbSizeRatioOpen;
+  function pbSrtArrow(col){var cur=window._pbSort;if(cur.col===col)return' '+(cur.asc?'▲':'▼');return' <span style="opacity:.25;font-size:9px">↕</span>';}
+  var pbSrToggleBtn='<button onclick="event.stopPropagation();togglePbSizeRatio()" title="'+(pbSrOpen?'Collapse':'Expand')+' Size Ratio" style="background:rgba(255,255,255,.6);border:1px solid #e0c080;border-radius:3px;width:16px;height:16px;line-height:1;cursor:pointer;font-size:10px;font-weight:800;color:#a07030;padding:0;margin-left:4px">'+(pbSrOpen?'−':'+')+'</button>';
+  var pbTh=function(lbl,col,align,extraStyle){return '<th style="padding:8px 10px;text-align:'+(align||'left')+';cursor:pointer;user-select:none'+(extraStyle?';'+extraStyle:'')+'" onclick="setPbSort(\''+col+'\')">'+lbl+pbSrtArrow(col)+'</th>';};
   h+='<div class="tw"><table><thead><tr>'
-   +'<th style="padding:8px 10px;text-align:left">Product</th>'
-   +'<th style="padding:8px 10px;text-align:right">S</th><th style="padding:8px 10px;text-align:right">M</th><th style="padding:8px 10px;text-align:right">L</th><th style="padding:8px 10px;text-align:right">XL</th>'
-   +'<th style="padding:8px 10px;text-align:right">Grand Total</th>'
-   +'<th style="padding:8px 10px;text-align:right;color:var(--red)">Delayed Qty</th>'
+   +pbTh('Product','product','left')
+   +(pbSrOpen?(pbTh('S','s','right')+pbTh('M','m','right')+pbTh('L','l','right')+pbTh('XL','xl','right'))
+             :'<th style="padding:8px 10px;text-align:right;cursor:pointer;user-select:none" onclick="togglePbSizeRatio()" title="Click to expand Size Ratio">S / M / L / XL'+pbSrToggleBtn+'</th>')
+   +pbTh('Grand Total','total','right')
+   +pbTh('Delayed Qty','delayed','right','color:var(--red)')
    +'<th style="padding:8px 10px;text-align:left;background:#faf3df">Upcoming Production</th>'
    +'<th style="padding:8px 10px;text-align:right;background:#faf3df">Qty</th>'
    +'<th style="padding:8px 10px;text-align:left;background:#faf3df">Size Ratio</th>'
-   +'<th style="padding:8px 10px;text-align:left;background:#faf3df">ETA</th>'
+   +pbTh('ETA','eta','left','background:#faf3df')
    +'</tr></thead><tbody>';
   arr.forEach(function(g){
     var thumb=g.img?'<img src="'+g.img+(g.img.indexOf('?')>=0?'&':'?')+'width=60" style="width:32px;height:40px;object-fit:cover;object-position:top center;border-radius:4px;vertical-align:middle;margin-left:8px">':'';
     h+='<tr>'
      +'<td style="padding:8px 10px"><strong>'+g.product+'</strong>'+thumb+'</td>'
-     +'<td style="padding:8px 10px;text-align:right">'+(g.S||'-')+'</td>'
-     +'<td style="padding:8px 10px;text-align:right">'+(g.M||'-')+'</td>'
-     +'<td style="padding:8px 10px;text-align:right">'+(g.L||'-')+'</td>'
-     +'<td style="padding:8px 10px;text-align:right">'+(g.XL||'-')+'</td>'
+     +(pbSrOpen?(
+        '<td style="padding:8px 10px;text-align:right">'+(g.S||'-')+'</td>'
+        +'<td style="padding:8px 10px;text-align:right">'+(g.M||'-')+'</td>'
+        +'<td style="padding:8px 10px;text-align:right">'+(g.L||'-')+'</td>'
+        +'<td style="padding:8px 10px;text-align:right">'+(g.XL||'-')+'</td>'
+      ):'<td style="padding:8px 10px;text-align:right;cursor:pointer;font-size:11px" onclick="togglePbSizeRatio()" title="Click to expand Size Ratio">'+g.S+'/'+g.M+'/'+g.L+'/'+g.XL+'</td>')
      +'<td style="padding:8px 10px;text-align:right;font-weight:700">'+g.total+'</td>'
      +'<td style="padding:8px 10px;text-align:right;'+(g.delayed?'color:var(--red);font-weight:800':'color:#bbb')+'">'+(g.delayed||'-')+'</td>'
      +(g.noProd?
