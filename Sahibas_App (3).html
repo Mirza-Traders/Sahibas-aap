@@ -4939,6 +4939,8 @@ if(typeof window._poPhasesOpen==='undefined')window._poPhasesOpen=false;
 function togglePoPhases(){window._poPhasesOpen=!window._poPhasesOpen;rendered.po=false;doR('po');}
 if(typeof window._poSizeRatioOpen==='undefined')window._poSizeRatioOpen=false;
 function togglePoSizeRatio(){window._poSizeRatioOpen=!window._poSizeRatioOpen;rendered.po=false;doR('po');}
+if(typeof window._poRemarksColOpen==='undefined')window._poRemarksColOpen=false;
+function togglePoRemarksCol(){window._poRemarksColOpen=!window._poRemarksColOpen;rendered.po=false;doR('po');}
 if(typeof window._poHideCompleted==='undefined')window._poHideCompleted=true;
 function togglePoHideCompleted(){window._poHideCompleted=!window._poHideCompleted;rendered.po=false;doR('po');}
 // Size the table to fill whatever space is actually left below it on screen
@@ -5066,11 +5068,12 @@ function rPO(){
   // no matter how many orders accumulate.
   var phOpen=window._poPhasesOpen;
   var srOpen=window._poSizeRatioOpen;
+  var rmkOpen=window._poRemarksColOpen;
   // Product Name shrunk from 225 to 150 (was the widest column by far) with
   // truncation + tooltip already in place below. Size Ratio group is 4x44=176
   // expanded, or one 130px summary column collapsed. Phases group is 5x92=460
   // expanded, or one 150px summary column collapsed.
-  var PO_COLS=[36,92,78,150,92,92,62,62,74].concat(srOpen?[44,44,44,44]:[130]).concat(phOpen?[92,92,92,92,92]:[150]).concat([106,96,170,130]);
+  var PO_COLS=[36,92,78,150,92,92,62,62,74].concat(srOpen?[44,44,44,44]:[130]).concat(phOpen?[92,92,92,92,92]:[150]).concat([106,96,rmkOpen?170:56,130]);
   var PO_TOT=PO_COLS.reduce(function(a,b){return a+b;},0);
   var PO_RH=76; // tallest row = Pending Approval with 6 action buttons (2 lines of 3)
   // Frozen columns: checkbox..Ordered Qty (indices 0-8) stay pinned in place
@@ -5083,6 +5086,7 @@ function rPO(){
   var colgroup='<colgroup>'+PO_COLS.map(function(w){return '<col style="width:'+w+'px">';}).join('')+'</colgroup>';
   var phToggleBtn='<button onclick="event.stopPropagation();togglePoPhases()" title="'+(phOpen?'Collapse':'Expand')+' Production Phases" style="background:rgba(255,255,255,.6);border:1px solid #b8d0ea;border-radius:3px;width:16px;height:16px;line-height:1;cursor:pointer;font-size:10px;font-weight:800;color:#2471a3;padding:0;margin-left:4px">'+(phOpen?'−':'+')+'</button>';
   var srToggleBtn='<button onclick="event.stopPropagation();togglePoSizeRatio()" title="'+(srOpen?'Collapse':'Expand')+' Size Ratio" style="background:rgba(255,255,255,.6);border:1px solid #e0c080;border-radius:3px;width:16px;height:16px;line-height:1;cursor:pointer;font-size:10px;font-weight:800;color:#a07030;padding:0;margin-left:4px">'+(srOpen?'−':'+')+'</button>';
+  var rmkToggleBtn='<button onclick="event.stopPropagation();togglePoRemarksCol()" title="'+(rmkOpen?'Collapse':'Expand')+' Remarks" style="background:rgba(255,255,255,.6);border:1px solid #ddd;border-radius:3px;width:16px;height:16px;line-height:1;cursor:pointer;font-size:10px;font-weight:800;color:#888;padding:0;margin-left:4px">'+(rmkOpen?'−':'+')+'</button>';
   var hdr='<table style="border-collapse:collapse;table-layout:fixed;width:'+PO_TOT+'px;background:#fff">'+colgroup
    +'<thead>'
    // Grouped header row
@@ -5100,7 +5104,7 @@ function rPO(){
    +'<th style="'+TH+'background:#eef3fb;color:#2471a3;border-bottom:none;cursor:pointer;user-select:none" colspan="'+(phOpen?5:1)+'" onclick="setPoSort(\'phases\')" title="Sort by phases completed">Production Phases'+srtArrow('phases')+phToggleBtn+'</th>'
    +'<th style="'+TH+'cursor:pointer;user-select:none" rowspan="3" onclick="setPoSort(\'eta\')">ETA'+srtArrow('eta')+'</th>'
    +'<th style="'+TH+'" rowspan="3">Urgency</th>'
-   +'<th style="'+TH+'" rowspan="3">Remarks</th>'
+   +'<th style="'+TH+'cursor:pointer;user-select:none" rowspan="3">Remarks'+rmkToggleBtn+'</th>'
    +'<th style="'+TH+'" rowspan="3">Actions</th>'
    +'</tr>'
    // Column names
@@ -5194,10 +5198,18 @@ function rPO(){
       var rmks=o.remarks||[];var initNote=o.notes||'';
       var rmkPreview=rmks.length?rmks[rmks.length-1].text:(initNote||'');
       var rmkCount=rmks.length+(initNote?1:0);
-      var rmkCell='<td style="'+TD+'min-width:100px;max-width:160px;vertical-align:top">';
-      if(rmkPreview){rmkCell+='<div onclick="togglePoRemarks(\''+o.id+'\')" style="cursor:pointer;font-size:10px;color:#555;max-height:32px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Click to expand">'+rmkPreview.substring(0,40)+(rmkPreview.length>40?'…':'')+(rmkCount>1?' <span style="color:var(--gold);font-weight:700">('+rmkCount+')</span>':'')+'</div>';}
-      else{rmkCell+='<div onclick="togglePoRemarks(\''+o.id+'\')" style="cursor:pointer;font-size:9px;color:#ccc" title="Click to add remark">+ Add</div>';}
-      rmkCell+='</td>';
+      var rmkCell;
+      if(!rmkOpen){
+        // Collapsed: a compact badge only, click reopens the column (not the
+        // per-row panel) since there's no room to preview text at this width.
+        rmkCell='<td style="'+TD+'text-align:center;cursor:pointer" onclick="togglePoRemarksCol()" title="'+(rmkPreview?rmkPreview.replace(/"/g,'&quot;'):'Click to expand Remarks column')+'">'
+         +(rmkPreview?'<span style="color:var(--gold);font-weight:700;font-size:11px">📝'+(rmkCount>1?' '+rmkCount:'')+'</span>':'<span style="color:#ddd;font-size:11px">—</span>')+'</td>';
+      }else{
+        rmkCell='<td style="'+TD+'min-width:100px;max-width:160px;vertical-align:top">';
+        if(rmkPreview){rmkCell+='<div onclick="togglePoRemarks(\''+o.id+'\')" style="cursor:pointer;font-size:10px;color:#555;max-height:32px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Click to expand">'+rmkPreview.substring(0,40)+(rmkPreview.length>40?'…':'')+(rmkCount>1?' <span style="color:var(--gold);font-weight:700">('+rmkCount+')</span>':'')+'</div>';}
+        else{rmkCell+='<div onclick="togglePoRemarks(\''+o.id+'\')" style="cursor:pointer;font-size:9px;color:#ccc" title="Click to add remark">+ Add</div>';}
+        rmkCell+='</td>';
+      }
       // Compact 2-per-line layout so the tallest possible action set still
       // fits the fixed virtual row height.
       var actCell='<td style="'+TD+'"><div style="display:flex;flex-wrap:wrap;gap:3px">';
