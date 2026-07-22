@@ -3532,7 +3532,7 @@ function rAC(){
 
     // 1. Price mismatch
     if(laamPrice>0&&shopPrice>0&&Math.round(laamPrice)!==Math.round(shopPrice)){
-      priceRows.push({name:p.name,img:img,laam:laamPrice,shop:shopPrice,diff:laamPrice-shopPrice});
+      priceRows.push({name:p.name,img:img,laam:laamPrice,shop:shopPrice,diff:laamPrice-shopPrice,stk:stk});
     }
     // 2. Status mismatch (both statuses known)
     if(laamStatus&&shopStatus){
@@ -3734,10 +3734,11 @@ function rAC(){
     return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'">'+NF(r.laam)+'</td><td style="'+TD+'">'+NF(r.shop)+'</td>'
      +'<td style="'+TD+'font-weight:700;color:'+(r.diff>0?'#c0392b':'#2980b9')+'">'+(r.diff>0?'+':'')+NF(r.diff)+'</td>'
-     +'<td style="'+TD+'color:#888">'+(r.shop>0?Math.round(Math.abs(r.diff)/r.shop*100)+'%':'—')+'</td></tr>';
+     +'<td style="'+TD+'color:#888">'+(r.shop>0?Math.round(Math.abs(r.diff)/r.shop*100)+'%':'—')+'</td>'
+     +'<td style="'+TD+'font-weight:600;color:'+(r.stk===0?'#c0392b':'#333')+'">'+NF(r.stk)+'</td></tr>';
   }).join('');
   var sec1=box(secHead('💰','Price Mismatch — Laam vs Shopify',priceRows.length,'#c0392b','Same article, different selling price on the two platforms','acExpPrice')
-   +(priceRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Laam</th><th style="'+TH+'">Shopify</th><th style="'+TH+'">Diff (L−S)</th><th style="'+TH+'">Diff %</th></tr></thead><tbody>'+h1rows+'</tbody></table>'):empty('All prices match across platforms')),'ac-sec-price');
+   +(priceRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Laam</th><th style="'+TH+'">Shopify</th><th style="'+TH+'">Diff (L−S)</th><th style="'+TH+'">Diff %</th><th style="'+TH+'">Stock in Hand</th></tr></thead><tbody>'+h1rows+'</tbody></table>'):empty('All prices match across platforms')),'ac-sec-price');
 
   // Section 2 — Status mismatches
   var h2rows=statusRows.map(function(r){
@@ -3935,7 +3936,7 @@ function rAC(){
     +sec7+sec8+sec3+sec6+sec5+sec11+sec9+sec4+sec1+sec2
     +'</div>';
 }
-function acExpPrice(){csvDL((window._acData.priceRows||[]).map(function(r){return[r.name,r.laam,r.shop,r.diff];}),['Product','Laam Price','Shopify Price','Diff (Laam-Shopify)'],'price_mismatch.csv');}
+function acExpPrice(){csvDL((window._acData.priceRows||[]).map(function(r){return[r.name,r.laam,r.shop,r.diff,r.stk];}),['Product','Laam Price','Shopify Price','Diff (Laam-Shopify)','Stock in Hand'],'price_mismatch.csv');}
 function acExpStatus(){csvDL((window._acData.statusRows||[]).map(function(r){return[r.name,r.laamStatus,r.shopStatus,r.stk,r.shopStk!=null?r.shopStk:'',r.blocked?'BLOCKED REVENUE':''];}),['Product','Laam Status','Shopify Status','Laam Stock','Shopify Stock','Flag'],'status_mismatch.csv');}
 function acExpReorder(){csvDL((window._acData.reorderRows||[]).map(function(r){return[r.name,r.v30,Math.round(r.rate*100)/100,r.stk,r.inc,r.eta,Math.round(r.cover),r.price||'',r.net===null?'':r.net,r.sug];}),['Product','Sold 30d','Daily Rate','Stock','Incoming PO','PO ETA','Days Cover','Retail Price','Net Per Piece','Suggested Order Qty'],'reorder_list.csv');}
 function acExpAge(){csvDL((window._acData.ageRows||[]).map(function(r){return[r.name,r.lastSale||'never',r.days===null?'':r.days,r.stk,r.cost,r.val];}),['Product','Last Sale','Days Since Sale','Stock','Unit Cost','Value at Cost'],'stock_ageing.csv');}
