@@ -5340,15 +5340,30 @@ function rxAutoAssign(type){
 // we explicitly deleted it ourselves this session. Doesn't require callers
 // to await it -- the local optimistic render still happens instantly.
 window._rxDeletedIds=window._rxDeletedIds||{};
-async function rxSaveAll(){
+// Same class of bug as the earlier orders race fix (savePO): this used to
+// only ADD tickets missing locally, but for any ticket present in BOTH
+// local and server it always kept the LOCAL copy -- so a browser tab open
+// since the morning would silently overwrite every stage/note/photo change
+// anyone else made to those tickets in the meantime, the moment that stale
+// tab saved anything at all. Now: only the ticket(s) THIS save actually
+// touched keep the local version; everything else takes the server's
+// (fresher) copy first, same read-then-merge-then-write pattern as savePO.
+async function rxSaveAll(touchedIds){
+  var touched={};(touchedIds||[]).forEach(function(id){touched[id]=true;});
   try{
     var r=await apiGet('/tickets');
     var serverTickets=await r.json();
     if(Array.isArray(serverTickets)){
+      var serverById={};
+      serverTickets.forEach(function(st){serverById[st.id]=st;});
       var localIds={};
-      (window.TICKETS||[]).forEach(function(t){localIds[t.id]=true;});
+      window.TICKETS=(window.TICKETS||[]).map(function(t){
+        localIds[t.id]=true;
+        if(touched[t.id])return t;
+        return serverById[t.id]||t;
+      });
       serverTickets.forEach(function(st){
-        if(!localIds[st.id]&&!window._rxDeletedIds[st.id])(window.TICKETS=window.TICKETS||[]).push(st);
+        if(!localIds[st.id]&&!window._rxDeletedIds[st.id])window.TICKETS.push(st);
       });
     }
   }catch(e){}
@@ -5611,7 +5626,7 @@ function submitRx(type){
     bankName:v('rxn-bank'),accountTitle:v('rxn-acctitle'),accountNumber:v('rxn-accnum'),
     createdBy:CU?CU.name:'',createdAt:rxNow(),
     history:[{stage:'initiated',by:CU?CU.name:'',at:rxNow(),note:v('rxn-notes')||'Ticket created'}]};
-  T.unshift(t);window.TICKETS=T;rxSaveAll();
+  T.unshift(t);window.TICKETS=T;rxSaveAll([t.id]);
   var m=document.getElementById('rx-new');if(m)m.remove();
   rendered.rx=false;doR('rx');
   showToast('Ticket '+t.id+' created — assigned to '+t.assignedTo);
@@ -5720,7 +5735,7 @@ function rxAdvance(id){
   t.status=next;
   t.history=t.history||[];
   t.history.push({stage:next,by:CU?CU.name:'',at:rxNow(),note:''});
-  rxSaveAll();rendered.rx=false;doR('rx');openRxDetail(id);
+  rxSaveAll([id]);rendered.rx=false;doR('rx');openRxDetail(id);
   showToast(t.id+' → '+rxStageLabel(next,t.type));
 }
 // Generic mandatory-photo handler for any RX_PHOTO_REQ stage: compress, store
@@ -5737,7 +5752,7 @@ function rxStagePhoto(id,input,stage){
       t.status=stage;
       t.history=t.history||[];
       t.history.push({stage:stage,by:CU?CU.name:'',at:rxNow(),note:'📷 '+req.done});
-      rxSaveAll();rendered.rx=false;doR('rx');openRxDetail(id);
+      rxSaveAll([id]);rendered.rx=false;doR('rx');openRxDetail(id);
       showToast(t.id+' → '+rxStageLabel(stage,t.type)+' (photo attached)');
     });
   };
@@ -5765,7 +5780,7 @@ function rxSendBack(id){
   t.status=target;
   t.history=t.history||[];
   t.history.push({stage:target,by:CU?CU.name:'',at:rxNow(),note:reason.trim(),sendBack:true});
-  rxSaveAll();rendered.rx=false;doR('rx');openRxDetail(id);
+  rxSaveAll([id]);rendered.rx=false;doR('rx');openRxDetail(id);
   showToast(t.id+' sent back to '+rxStageLabel(target,t.type));
 }
 function rxAddNote(id){
@@ -5773,7 +5788,7 @@ function rxAddNote(id){
   var t=(window.TICKETS||[]).find(function(x){return x.id===id;});if(!t)return;
   t.history=t.history||[];
   t.history.push({stage:t.status,by:CU?CU.name:'',at:rxNow(),note:inp.value.trim(),noteOnly:true});
-  rxSaveAll();openRxDetail(id);
+  rxSaveAll([id]);openRxDetail(id);
 }
 function rxDelete(id){
   if(rexRole(CU)!=='admin'){showToast('Only Admin can delete tickets.');return;}
