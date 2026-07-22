@@ -5413,11 +5413,39 @@ function rRX(){
    +'<div class="kpi w"><div class="kl">Exchanges Open</div><div class="kv">'+exOpen.length+'</div><div class="ks">Awaiting dispatch</div></div>'
    +'<div class="kpi g"><div class="kl">Closed</div><div class="kv">'+(T.length-open.length)+'</div><div class="ks">All time</div></div>'
    +'</div>';
-  var stOpts=RX_STAGES.map(function(st){return '<option value="'+st+'"'+(f.stage===st?' selected':'')+'>'+rxStageLabel(st,'refund')+'</option>';}).join('');
-  var toolbar='<div style="background:#fafafa;border:1px solid #eee;border-radius:8px;padding:10px 14px;margin:12px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+  // Stage tabs -- replaces the old "All Stages" dropdown, shown as two
+  // separate rows (Refunds / Exchanges) with live per-stage counts, since
+  // the two ticket types move through the workflow independently. Clicking
+  // a tab sets BOTH type and stage together (each row is scoped to its own
+  // type). Counts respect search/"Assigned to me" but never the tab's own
+  // type/stage, so every tab's number is "how many if I picked this".
+  var rowsNoTypeNoStage=T.filter(function(t){
+    if(f.mine&&t.assignedTo!==(CU?CU.name:''))return false;
+    if(f.q){var q=f.q.toLowerCase();
+      if(String(t.order||'').toLowerCase().indexOf(q)<0
+       &&String(t.customer||'').toLowerCase().indexOf(q)<0
+       &&!rxItems(t).some(function(it){return String(it.product||'').toLowerCase().indexOf(q)>=0;})
+       &&String(t.id||'').toLowerCase().indexOf(q)<0)return false;}
+    return true;
+  });
+  function rxStageRow(typeVal,label,color){
+    var tRows=rowsNoTypeNoStage.filter(function(t){return t.type===typeVal;});
+    var counts={};RX_STAGES.forEach(function(st){counts[st]=0;});
+    tRows.forEach(function(t){if(counts[t.status]!==undefined)counts[t.status]++;});
+    function btn(val,lbl,cnt){
+      var active=f.type===typeVal&&f.stage===val;
+      return '<button onclick="window._rxFlt.type=\''+typeVal+'\';window._rxFlt.stage=\''+val+'\';rendered.rx=false;doR(\'rx\')" style="border:1px solid '+(active?color:'#ddd')+';background:'+(active?color:'#fff')+';color:'+(active?'#fff':'#555')+';border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">'+lbl+' ('+cnt+')</button>';
+    }
+    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
+     +'<span style="font-size:9px;color:'+color+';font-weight:800;letter-spacing:.06em;text-transform:uppercase;min-width:66px">'+label+'</span>'
+     +btn('','All',tRows.length)
+     +RX_STAGES.map(function(st){return btn(st,rxStageLabel(st,typeVal),counts[st]);}).join('')
+     +'</div>';
+  }
+  var stageTabs='<div style="margin:12px 0 4px">'+rxStageRow('refund','Refunds','#c0392b')+rxStageRow('exchange','Exchanges','#0F6E56')+'</div>';
+  var toolbar='<div style="background:#fafafa;border:1px solid #eee;border-radius:8px;padding:10px 14px;margin:4px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
    +'<input type="text" value="'+(f.q||'').replace(/"/g,'&quot;')+'" placeholder="Search ticket / order / customer / product…" oninput="window._rxFlt.q=this.value;clearTimeout(window._rxT);window._rxT=setTimeout(function(){rendered.rx=false;doR(\'rx\');var s=document.querySelector(\'#prx input[type=text]\');if(s){s.focus();s.selectionStart=s.selectionEnd=s.value.length;}},350)" style="border:1px solid #ddd;border-radius:6px;padding:5px 10px;font-size:11px;min-width:210px;background:#fff">'
-   +'<select onchange="window._rxFlt.type=this.value;rendered.rx=false;doR(\'rx\')" style="border:1px solid #ddd;border-radius:6px;padding:5px 8px;font-size:11px;background:#fff"><option value="">All Types</option><option value="refund"'+(f.type==='refund'?' selected':'')+'>Refunds</option><option value="exchange"'+(f.type==='exchange'?' selected':'')+'>Exchanges</option></select>'
-   +'<select onchange="window._rxFlt.stage=this.value;rendered.rx=false;doR(\'rx\')" style="border:1px solid #ddd;border-radius:6px;padding:5px 8px;font-size:11px;background:#fff"><option value="">All Stages</option>'+stOpts+'</select>'
+   +(f.type||f.stage?'<button onclick="window._rxFlt.type=\'\';window._rxFlt.stage=\'\';rendered.rx=false;doR(\'rx\')" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">✕ Clear type/stage</button>':'')
    +'<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555;cursor:pointer"><input type="checkbox" '+(f.mine?'checked':'')+' onchange="window._rxFlt.mine=this.checked;rendered.rx=false;doR(\'rx\')" style="accent-color:var(--gold)">Assigned to me</label>'
    +'<div style="margin-left:auto;display:flex;gap:6px">'
    +'<button onclick="rxExport()" style="background:#fff;border:1px solid #27ae60;color:#27ae60;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer">⬇ CSV</button>'
@@ -5447,7 +5475,7 @@ function rRX(){
      +'<td style="'+TD2+'"><span style="'+(STC[t.status]||'')+';padding:2px 9px;border-radius:8px;font-size:9px;font-weight:700;white-space:nowrap">'+rxStageLabel(t.status,t.type)+'</span></td>'
      +'</tr>';
   }).join('');
-  el.innerHTML='<div style="max-width:1150px">'+kh+toolbar
+  el.innerHTML='<div style="max-width:1150px">'+kh+stageTabs+toolbar
    +'<div style="border:1px solid #e8e4dc;border-radius:8px;overflow:hidden;background:#fff"><div style="max-height:62vh;overflow-y:auto;overflow-x:auto">'
    +'<table style="width:100%;border-collapse:collapse;min-width:980px">'
    +'<thead><tr><th style="'+TH2+'">Date</th><th style="'+TH2+'">Ticket</th><th style="'+TH2+'">Type</th><th style="'+TH2+'">Order#</th><th style="'+TH2+'">Customer</th><th style="'+TH2+'">Product</th><th style="'+TH2+'text-align:right">Amount</th><th style="'+TH2+'">Platform</th><th style="'+TH2+'">Assigned</th><th style="'+TH2+'">Stage</th></tr></thead>'
