@@ -1521,7 +1521,45 @@ function csSelAll(){var allC=document.querySelectorAll('#pcs-tbody input[type=ch
 function csSort(el){var c=el.getAttribute('data-c');if(_csSortCol===c)_csSortAsc=!_csSortAsc;else{_csSortCol=c;_csSortAsc=false;}rendered.cs=false;doR('cs');}
 function csRender(){rendered.cs=false;doR('cs');}
 function csApplyFilter(el){var k=el.getAttribute('data-k'),v=el.value;if(k==='min10d'||k==='minStk')_csFilters[k]=parseInt(v)||0;else if(k==='minRate')_csFilters[k]=parseFloat(v)||0;else _csFilters[k]=v;if(k==='search'){clearTimeout(window._csSearchTimer);window._csSearchTimer=setTimeout(csRender,300);}else{csRender();}}
-function csExpRows(rows,fname){csvDL(rows.map(function(p){return[p.name,p.sellingPrice||'',p.discount!=null?p.discount+'%':'',p.avgRet,p.shopPrice||'',p.priceDiff!=null?p.priceDiff:'',p.cost,p.gpUnit||'',p.gpPct!=null?p.gpPct+'%':'',p.rev,p.pat,p.marPct+'%',p.orders,p.delivered,p.open,p.cancelled,p.refunded,p.szS,p.szM,p.szL,p.szXL,p.laamTotal||'',p.shopStock!=null?p.shopStock:'',p.stockStatus,p.statusDiff||'',p.shopStatus||'',p.v10i,p.v10l,p.v10o,p.total10,p.total30,p.daily];}),['Product','GrossPrice','Discount%','RetailPrice(Laam)','RetailPrice(Shopify)','PriceDiff','Cost','Profit/Unit','Profit%','Revenue','NetPAT','NetMargin%','AllOrders','Delivered','Open','Cancelled','Refunded','SoldS','SoldM','SoldL','SoldXL','LaamStock','ShopifyStock','LaamStatus','StatusDiff','ShopifyStatus','10dINT','10dLCL','10dOCT','Total10d','30d','Daily'],fname);}
+// Field names here must match the real keys set on each product object in
+// rCS() (see the Object.assign(p,{...}) block) -- the previous version
+// referenced p.sellingPrice/p.discount/p.avgRet, which don't exist on that
+// object (the real fields are grossPrice/discountAmt/discountPct/retailPrice),
+// so those columns silently exported blank. Rebuilt to mirror every column
+// actually shown in the Summary Sheet table, in the same order.
+function csExpRows(rows,fname){csvDL(rows.map(function(p){return[
+    p.createdAt||'',p.name,p.rating||'',p.ratingN||'',
+    p.grossPrice||'',p.discountAmt||'',p.discountPct||'',
+    p.retailPrice||'',p.shopPrice||'',p.priceDiff!=null?p.priceDiff:'',
+    p.cost||'',p.gpUnit||'',p.gpPct||'',p.commission||'',
+    p.netPat||'',p.netPatPct||'',
+    p.szS,p.szM,p.szL,p.szXL,p.szTotal,
+    p.rev,p.pat,
+    p.orders,p.delivered,p.open,p.cancelled,p.refunded,
+    p.saS||0,p.saM||0,p.saL||0,p.saXL||0,p.saTotal!=null?p.saTotal:'',
+    p.laamS||0,p.laamM||0,p.laamL||0,p.laamXL||0,p.laamTotal!=null?p.laamTotal:'',
+    p.shopStock!=null?p.shopStock:'',p.stockDiff,
+    p.poQty||'',p.poEta?fmtDMY(p.poEta):'',
+    p.v10i,p.v20i||0,p.v30i||0,p.v10l,p.v20l||0,p.v30l||0,p.v10o,p.v20o||0,p.v30o||0,p.total10,
+    p.stockStatus||'',p.statusDiff||'',p.shopStatus||'',
+    p.img||''
+  ];}),[
+    'Created','Product','Rating','RatingCount',
+    'GrossPrice','Discount','Disc%',
+    'RetailPrice(Laam)','RetailPrice(Shopify)','PriceDiff',
+    'Cost','GP','GP%','Commission',
+    'NetProfit','NetProfit%',
+    'SoldS','SoldM','SoldL','SoldXL','TotalSales',
+    'TotalRevenue','TotalNetPAT',
+    'AllOrders','Delivered','Open','Cancelled','Refunded',
+    'SellAheadS','SellAheadM','SellAheadL','SellAheadXL','SellAheadTotal',
+    'LaamStockS','LaamStockM','LaamStockL','LaamStockXL','LaamStockTotal',
+    'ShopifyStock','StockDiff',
+    'POQty','POEta',
+    '10dINT','20dINT','30dINT','10dLCL','20dLCL','30dLCL','10dOCT','20dOCT','30dOCT','Total10d',
+    'LaamStatus','StatusDiff','ShopifyStatus',
+    'ImageURL'
+  ],fname);}
 function csExpSel(){csExpRows((window._csArr||[]).filter(function(p){return _csSelProds.has(p.name);}),'selected.csv');}
 function csExpAll(){csExpRows(window._csArr||[],'all_products.csv');}
 
