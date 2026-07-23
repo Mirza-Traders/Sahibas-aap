@@ -2410,6 +2410,37 @@ function updDrSelBtn(){var b=document.getElementById('dr-exp-sel');if(b){b.style
 function drFlt(k,v){_drFilters[k]=v;applyDrFilters();}
 function drOrdSearch(v){_drFilters.ordSearch=v;clearTimeout(window._drOrdTimer);window._drOrdTimer=setTimeout(applyDrFilters,250);}
 
+// Header-click filter dropdowns (Status/Platform/Dest/Payment). The panel is
+// built on demand and appended to document.body (a portal), positioned from
+// the button's own getBoundingClientRect -- see thf() for why it can't just
+// live inside the header row's DOM.
+function drHFCloseAll(){document.querySelectorAll('.dr-hf-panel').forEach(function(p){p.remove();});}
+function drHFToggle(key,e){
+  if(e)e.stopPropagation();
+  var was=document.getElementById('dr-hf-panel-'+key);
+  drHFCloseAll();
+  if(was)return; // click on an already-open trigger just closes it
+  var btn=document.getElementById('dr-hf-btn-'+key);if(!btn)return;
+  var rect=btn.getBoundingClientRect();
+  var opts=(window._drHFOpts||{})[key]||[];
+  var cur=_drFilters[key]||'';
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+  var panel=document.createElement('div');
+  panel.id='dr-hf-panel-'+key;panel.className='dr-hf-panel';
+  panel.style.cssText='position:fixed;top:'+rect.bottom+'px;left:'+rect.left+'px;z-index:9999;background:#fff;border:1px solid #e0dcd4;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.16);min-width:'+Math.max(rect.width,140)+'px;max-height:280px;overflow-y:auto;padding:4px 0;text-align:left';
+  panel.onclick=function(ev){ev.stopPropagation();};
+  panel.innerHTML='<div class="dr-hf-opt" onclick="drHFSet(\''+key+'\',\'\')" style="padding:5px 12px;cursor:pointer;font-size:11px;font-weight:'+(cur===''?'700':'400')+';color:'+(cur===''?'var(--gold2)':'#333')+'">All</div>'
+    +opts.map(function(o){var v=String(o);return '<div class="dr-hf-opt" onclick="drHFSet(\''+key+'\',\''+v.replace(/'/g,"\\'")+'\')" style="padding:5px 12px;cursor:pointer;font-size:11px;font-weight:'+(cur===v?'700':'400')+';color:'+(cur===v?'var(--gold2)':'#333')+'">'+esc(v)+'</div>';}).join('');
+  document.body.appendChild(panel);
+}
+function drHFSet(key,val){
+  _drFilters[key]=val;
+  drHFCloseAll();
+  var btn=document.getElementById('dr-hf-btn-'+key);
+  if(btn)btn.innerHTML=(val||btn.getAttribute('data-label'))+' <span style="font-size:7px">▾</span>';
+  applyDrFilters();
+}
+
 // Multi-select product dropdown
 function drProdPanel(){
   var p=document.getElementById('dr-prd-panel');
@@ -2440,6 +2471,7 @@ function drProdFilter(val){
 document.addEventListener('click',function(e){
   var wrap=document.getElementById('dr-prd-wrap');
   if(wrap&&!wrap.contains(e.target)){var p=document.getElementById('dr-prd-panel');if(p)p.classList.remove('open');}
+  drHFCloseAll();
 });
 
 function rDR(){
@@ -2456,10 +2488,24 @@ function rDR(){
   var dsts=[...new Set(_drRows.map(function(r){return r[6];}))].filter(Boolean).sort();
   var pays=[...new Set(_drRows.map(function(r){return r[7];}))].filter(Boolean).sort();
   var cpcts=[...new Set(_drRows.map(function(r){return String(r[11])+'%';}))].filter(Boolean).sort(function(a,b){return parseFloat(a)-parseFloat(b);});
+  window._drHFOpts={stat:sts,pf:pfs,dst:dsts,pay:pays};
   var W=DR_W,T=DR_TOT;
 
   function th(w,lbl,al,extra){return '<th style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:7px 6px;text-align:'+(al||'left')+';font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc;white-space:nowrap;user-select:none'+(extra?';'+extra:'')+'">'+(lbl||'')+'</th>';}
   function fsel(k,opts){return '<select onchange="drFlt(\''+k+'\',this.value)" style="width:100%;border:1px solid #e0dcd4;border-radius:3px;padding:2px;font-size:9px;outline:none;background:#fff"><option value="">All</option>'+opts.map(function(o){return'<option value="'+o+'">'+o+'</option>';}).join('')+'</select>';}
+  // Clickable header cell that opens a dropdown of that column's distinct values
+  // (Status/Platform/Dest/Payment) -- replaces the separate filter-row <select>
+  // for these columns so filtering happens directly from the column heading.
+  // The panel itself is portaled onto document.body (see drHFToggle) rather
+  // than nested inside the header row, because the header row's wrapper div
+  // must clip horizontally (to stay in sync with the table's own horizontal
+  // scroll) and a CSS box can't clip one axis while leaving the other open --
+  // nesting the panel there would silently cut it off after ~1 row.
+  function thf(w,key,label){
+    return '<th style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:0;background:#f8f6f2;border-bottom:2px solid #e8e4dc">'
+      +'<div onclick="drHFToggle(\''+key+'\',event)" id="dr-hf-btn-'+key+'" data-label="'+label+'" style="padding:7px 6px;text-align:center;font-size:9px;color:#aaa;text-transform:uppercase;white-space:nowrap;user-select:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px">'+label+' <span style="font-size:7px">▾</span></div>'
+      +'</th>';
+  }
   function fempty(w){return '<td style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:3px 4px;background:#fafafa;border-bottom:1px solid #e8e4dc"></td>';}
   function fcell(w,content){return '<td style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:3px 4px;background:#fafafa;border-bottom:1px solid #e8e4dc">'+content+'</td>';}
 
@@ -2499,7 +2545,7 @@ function rDR(){
     +th(W.onum,'Order#')
     +'<th id="dr-date-sort" onclick="drToggleSort()" style="width:'+W.date+'px;min-width:'+W.date+'px;padding:7px 6px;text-align:left;font-size:9px;color:var(--gold2);text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc;white-space:nowrap;cursor:pointer;user-select:none">Date ↑</th>'
     +th(W.prd,'Product')+th(W.sz,'Sz','center')
-    +th(W.stat,'Status','center')+th(W.pf,'Platform','center')+th(W.dst,'Dest','center')+th(W.pay,'Payment','center')
+    +thf(W.stat,'stat','Status')+thf(W.pf,'pf','Platform')+thf(W.dst,'dst','Dest')+thf(W.pay,'pay','Payment')
     +th(W.days,'Days','right')+th(W.ret,'Retail','right')
     +'<th style="width:'+W.cost+'px;min-width:'+W.cost+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Cost 🟠</th>'
     +'<th style="width:'+W.cpct+'px;min-width:'+W.cpct+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Comm%</th>'
@@ -2514,10 +2560,10 @@ function rDR(){
     +fempty(W.date)
     +fcell(W.prd, prdDropdown)
     +fcell(W.sz, fsel('sz',['S','M','L','XL']))
-    +fcell(W.stat, fsel('stat',sts))
-    +fcell(W.pf, fsel('pf',pfs))
-    +fcell(W.dst, fsel('dst',dsts))
-    +fcell(W.pay, fsel('pay',pays))
+    +fempty(W.stat)
+    +fempty(W.pf)
+    +fempty(W.dst)
+    +fempty(W.pay)
     +fempty(W.days)
     +fempty(W.ret)
     +fempty(W.cost)
@@ -2545,7 +2591,7 @@ function rDR(){
   var rv=document.createElement('div');rv.id='dr-rv';rv.style.cssText='position:absolute;left:0;right:0;top:0';
   sp.appendChild(rv);vs.appendChild(sp);outer.appendChild(hdrDiv);outer.appendChild(vs);container.appendChild(outer);
   _drVis=Math.ceil(500/_drRH)+20;
-  vs.addEventListener('scroll',function(){hdrDiv.scrollLeft=vs.scrollLeft;renderDrVirtual();},{passive:true});
+  vs.addEventListener('scroll',function(){hdrDiv.scrollLeft=vs.scrollLeft;renderDrVirtual();drHFCloseAll();},{passive:true});
   drFitHeight();
   renderDrVirtual();
 }
@@ -2560,11 +2606,11 @@ function drFitHeight(){
 }
 if(!window._drResizeBound){
   window._drResizeBound=true;
-  window.addEventListener('resize',function(){drFitHeight();});
+  window.addEventListener('resize',function(){drFitHeight();drHFCloseAll();});
 }
 
 // Add CSS for product panel open state
-(function(){var s=document.createElement('style');s.textContent='#dr-prd-panel.open{display:block!important}';document.head.appendChild(s);})();
+(function(){var s=document.createElement('style');s.textContent='#dr-prd-panel.open{display:block!important}.dr-hf-opt:hover{background:#f8f6f2}';document.head.appendChild(s);})();
 
 // ── USERS ──
 function rUS(){
