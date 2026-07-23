@@ -2488,7 +2488,7 @@ function rDR(){
   var dsts=[...new Set(_drRows.map(function(r){return r[6];}))].filter(Boolean).sort();
   var pays=[...new Set(_drRows.map(function(r){return r[7];}))].filter(Boolean).sort();
   var cpcts=[...new Set(_drRows.map(function(r){return String(r[11])+'%';}))].filter(Boolean).sort(function(a,b){return parseFloat(a)-parseFloat(b);});
-  window._drHFOpts={stat:sts,pf:pfs,dst:dsts,pay:pays};
+  window._drHFOpts={stat:sts,pf:pfs,dst:dsts,pay:pays,cpct:cpcts};
   var W=DR_W,T=DR_TOT;
 
   function th(w,lbl,al,extra){return '<th style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:7px 6px;text-align:'+(al||'left')+';font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc;white-space:nowrap;user-select:none'+(extra?';'+extra:'')+'">'+(lbl||'')+'</th>';}
@@ -2501,9 +2501,10 @@ function rDR(){
   // must clip horizontally (to stay in sync with the table's own horizontal
   // scroll) and a CSS box can't clip one axis while leaving the other open --
   // nesting the panel there would silently cut it off after ~1 row.
-  function thf(w,key,label){
+  function thf(w,key,label,al){
+    var jc=al==='right'?'flex-end':al==='left'?'flex-start':'center';
     return '<th style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:0;background:#f8f6f2;border-bottom:2px solid #e8e4dc">'
-      +'<div onclick="drHFToggle(\''+key+'\',event)" id="dr-hf-btn-'+key+'" data-label="'+label+'" style="padding:7px 6px;text-align:center;font-size:9px;color:#aaa;text-transform:uppercase;white-space:nowrap;user-select:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px">'+label+' <span style="font-size:7px">▾</span></div>'
+      +'<div onclick="drHFToggle(\''+key+'\',event)" id="dr-hf-btn-'+key+'" data-label="'+label+'" style="padding:7px 6px;text-align:'+(al||'center')+';font-size:9px;color:#aaa;text-transform:uppercase;white-space:nowrap;user-select:none;cursor:pointer;display:flex;align-items:center;justify-content:'+jc+';gap:3px">'+label+' <span style="font-size:7px">▾</span></div>'
       +'</th>';
   }
   function fempty(w){return '<td style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:3px 4px;background:#fafafa;border-bottom:1px solid #e8e4dc"></td>';}
@@ -2548,7 +2549,7 @@ function rDR(){
     +thf(W.stat,'stat','Status')+thf(W.pf,'pf','Platform')+thf(W.dst,'dst','Dest')+thf(W.pay,'pay','Payment')
     +th(W.days,'Days','right')+th(W.ret,'Retail','right')
     +'<th style="width:'+W.cost+'px;min-width:'+W.cost+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Cost 🟠</th>'
-    +'<th style="width:'+W.cpct+'px;min-width:'+W.cpct+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Comm%</th>'
+    +thf(W.cpct,'cpct','Comm%','right')
     +th(W.comm,'Comm','right')+th(W.taxpct,'Tax%','right')+th(W.tax,'Tax','right')+th(W.gp,'GP','right')+th(W.pat,'PAT','right')
     +'<th style="width:'+W.exc+'px;min-width:'+W.exc+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Excess 🔴</th>'
     +'</tr>'
@@ -2567,7 +2568,7 @@ function rDR(){
     +fempty(W.days)
     +fempty(W.ret)
     +fempty(W.cost)
-    +fcell(W.cpct, fsel('cpct',cpcts))
+    +fempty(W.cpct)
     +fempty(W.comm)
     +fempty(W.taxpct)
     +fempty(W.tax)
