@@ -4980,6 +4980,20 @@ function setPoFlt(field,val){
   rendered.po=false;doR('po');
 }
 function clearPoFlt(){window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:[]};rendered.po=false;doR('po');}
+// KPI tiles (Total/In Progress/Pending Approval/Units in Pipeline) act as one-click
+// status filters for the table below -- clicking a tile sets the Status filter to
+// just that status; clicking Total/Units clears it back to everything (and also
+// reveals Completed orders, since "Total Orders" is meant to mean literally all of them).
+function poKpiFilter(status){
+  if(!window._poFlt)window._poFlt={from:'',to:'',ono:'',prods:[],fabs:[],status:[]};
+  if(status){
+    window._poFlt.status=[status];
+  }else{
+    window._poFlt.status=[];
+    window._poHideCompleted=false;
+  }
+  rendered.po=false;doR('po');
+}
 function clearPoFltField(field){if(window._poFlt)window._poFlt[field]=[];rendered.po=false;doR('po');}
 function togglePoDrop(id){window._poDrop=(window._poDrop===id?'':id);rendered.po=false;doR('po');}
 function setPoSort(col){var cur=window._poSort||{col:'date',asc:false};if(cur.col===col){window._poSort={col:col,asc:!cur.asc};}else{window._poSort={col:col,asc:false};}rendered.po=false;doR('po');}
@@ -5102,11 +5116,13 @@ function rPO(){
   var comp=allActive.filter(function(o){return o.status==='Completed';}).length;
   var pending=allActive.filter(function(o){return o.status==='Pending Approval';}).length;
   var totQty=allActive.reduce(function(a,o){return a+(o.total!=null?o.total:(o.S||0)+(o.M||0)+(o.L||0)+(o.XL||0));},0);
+  var curStatus=(f.status&&f.status.length===1)?f.status[0]:'';
+  var kActiveSty='cursor:pointer;outline:2px solid var(--gold);outline-offset:-2px';
   var kh='<div class="krow">'
-   +'<div class="kpi b"><div class="kl">Total Orders</div><div class="kv">'+allActive.length+'</div><div class="ks">'+comp+' completed</div></div>'
-   +'<div class="kpi w"><div class="kl">In Progress</div><div class="kv">'+inProg+'</div><div class="ks">Being produced</div></div>'
-   +(pending?'<div class="kpi" style="background:#fff8e0;border:1px solid #f0d060"><div class="kl" style="color:#a07030">Pending Approval</div><div class="kv" style="color:#d4944a">'+pending+'</div><div class="ks">Awaiting your review</div></div>':'')
-   +'<div class="kpi g"><div class="kl">Units in Pipeline</div><div class="kv">'+NF(totQty)+'</div><div class="ks">Total ordered qty</div></div>'
+   +'<div class="kpi b" onclick="poKpiFilter(\'\')" title="Show every order" style="cursor:pointer;'+(curStatus===''?kActiveSty:'')+'"><div class="kl">Total Orders</div><div class="kv">'+allActive.length+'</div><div class="ks">'+comp+' completed</div></div>'
+   +'<div class="kpi w" onclick="poKpiFilter(\'In Progress\')" title="Show only In Progress orders" style="cursor:pointer;'+(curStatus==='In Progress'?kActiveSty:'')+'"><div class="kl">In Progress</div><div class="kv">'+inProg+'</div><div class="ks">Being produced</div></div>'
+   +(pending?'<div class="kpi" onclick="poKpiFilter(\'Pending Approval\')" title="Show only Pending Approval orders" style="background:#fff8e0;border:1px solid #f0d060;cursor:pointer;'+(curStatus==='Pending Approval'?kActiveSty:'')+'"><div class="kl" style="color:#a07030">Pending Approval</div><div class="kv" style="color:#d4944a">'+pending+'</div><div class="ks">Awaiting your review</div></div>':'')
+   +'<div class="kpi g" onclick="poKpiFilter(\'\')" title="Show every order" style="cursor:pointer;'+(curStatus===''?kActiveSty:'')+'"><div class="kl">Units in Pipeline</div><div class="kv">'+NF(totQty)+'</div><div class="ks">Total ordered qty</div></div>'
    +'</div>';
   // Filter options from all active orders
   var allProds=allActive.map(function(o){return o.product;}).filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
