@@ -2345,6 +2345,7 @@ function updDrSubtotals(){
   _drFiltered.forEach(function(r){sRet+=r[9];sCost+=r[10];sComm+=r[12];sTax+=r[13];sGp+=r[14];sPat+=r[15];sExc+=r[17];});
   var u=function(id,v){var el=document.getElementById(id);if(el)el.textContent=NF(v);};
   u('dr-st-ret',sRet);u('dr-st-cost',sCost);u('dr-st-comm',sComm);u('dr-st-tax',sTax);u('dr-st-gp',sGp);u('dr-st-pat',sPat);u('dr-st-exc',sExc);
+  u('dr-sz-total',_drFiltered.length);
 }
 
 function drSortRows(){
@@ -2481,26 +2482,30 @@ function rDR(){
   var sRet=0,sCost=0,sComm=0,sTax=0,sGp=0,sPat=0,sExc=0;
   _drFiltered.forEach(function(r){sRet+=r[9];sCost+=r[10];sComm+=r[12];sTax+=r[13];sGp+=r[14];sPat+=r[15];sExc+=r[17];});
 
+  // Sz header carries the total unit/line-item count (respecting current
+  // filters), same convention as Production Orders' "Ordered Qty [total]".
+  var szHdr='<th id="dr-sz-hdr" style="width:'+W.sz+'px;min-width:'+W.sz+'px;padding:7px 6px;text-align:center;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc;white-space:nowrap">Sz<br><span id="dr-sz-total" style="font-size:12px;font-weight:800;color:var(--gold2);text-transform:none">'+NF(_drFiltered.length)+'</span></th>';
   var hdr='<table style="table-layout:fixed;width:'+T+'px;border-collapse:collapse;background:#f8f6f2"><thead>'
-    +'<tr>'
-    +'<th style="width:'+W.chk+'px;min-width:'+W.chk+'px;padding:7px 6px;text-align:center;background:#f8f6f2;border-bottom:2px solid #e8e4dc"><input type="checkbox" id="dr-all-cb" onclick="drSelAll()" style="cursor:pointer;accent-color:var(--gold)"></th>'
-    +th(W.conum,'Ch.Order#')
-    +th(W.onum,'Order#')
-    +'<th id="dr-date-sort" onclick="drToggleSort()" style="width:'+W.date+'px;min-width:'+W.date+'px;padding:7px 6px;text-align:left;font-size:9px;color:var(--gold2);text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc;white-space:nowrap;cursor:pointer;user-select:none">Date ↑</th>'
-    +th(W.prd,'Product')+th(W.sz,'Sz','center')
-    +th(W.stat,'Status','center')+th(W.pf,'Platform','center')+th(W.dst,'Dest','center')+th(W.pay,'Payment','center')
-    +th(W.days,'Days','right')+th(W.ret,'Retail','right')
-    +'<th style="width:'+W.cost+'px;min-width:'+W.cost+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Cost 🟠</th>'
-    +'<th style="width:'+W.cpct+'px;min-width:'+W.cpct+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Comm%</th>'
-    +th(W.comm,'Comm','right')+th(W.taxpct,'Tax%','right')+th(W.tax,'Tax','right')+th(W.gp,'GP','right')+th(W.pat,'PAT','right')
-    +'<th style="width:'+W.exc+'px;min-width:'+W.exc+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Excess 🔴</th>'
-    +'</tr>'
+    // SUBTOTAL row now comes FIRST (pinned above the column names).
     +'<tr style="background:#f0ede8;font-weight:800">'
     +ste(W.chk)+ste(W.conum)+ste(W.onum)
     +'<td style="width:'+W.date+'px;min-width:'+W.date+'px;max-width:'+W.date+'px;padding:5px 6px;background:#f0ede8;border-bottom:2px solid var(--gold);font-size:9px;color:var(--gold2);font-weight:800">SUBTOTAL</td>'
     +ste(W.prd)+ste(W.sz)+ste(W.stat)+ste(W.pf)+ste(W.dst)+ste(W.pay)+ste(W.days)
     +stc(W.ret,'dr-st-ret',sRet,'#1a1a1a')+stc(W.cost,'dr-st-cost',sCost,'#c0392b')+ste(W.cpct)+stc(W.comm,'dr-st-comm',sComm,'#d4944a')+ste(W.taxpct)+stc(W.tax,'dr-st-tax',sTax,'#888')+stc(W.gp,'dr-st-gp',sGp,'#27ae60')+stc(W.pat,'dr-st-pat',sPat,'#c8a96e')
     +stc(W.exc,'dr-st-exc',sExc,'#e74c3c')
+    +'</tr>'
+    +'<tr>'
+    +'<th style="width:'+W.chk+'px;min-width:'+W.chk+'px;padding:7px 6px;text-align:center;background:#f8f6f2;border-bottom:2px solid #e8e4dc"><input type="checkbox" id="dr-all-cb" onclick="drSelAll()" style="cursor:pointer;accent-color:var(--gold)"></th>'
+    +th(W.conum,'Ch.Order#')
+    +th(W.onum,'Order#')
+    +'<th id="dr-date-sort" onclick="drToggleSort()" style="width:'+W.date+'px;min-width:'+W.date+'px;padding:7px 6px;text-align:left;font-size:9px;color:var(--gold2);text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc;white-space:nowrap;cursor:pointer;user-select:none">Date ↑</th>'
+    +th(W.prd,'Product')+szHdr
+    +th(W.stat,'Status','center')+th(W.pf,'Platform','center')+th(W.dst,'Dest','center')+th(W.pay,'Payment','center')
+    +th(W.days,'Days','right')+th(W.ret,'Retail','right')
+    +'<th style="width:'+W.cost+'px;min-width:'+W.cost+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Cost 🟠</th>'
+    +'<th style="width:'+W.cpct+'px;min-width:'+W.cpct+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Comm%</th>'
+    +th(W.comm,'Comm','right')+th(W.taxpct,'Tax%','right')+th(W.tax,'Tax','right')+th(W.gp,'GP','right')+th(W.pat,'PAT','right')
+    +'<th style="width:'+W.exc+'px;min-width:'+W.exc+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Excess 🔴</th>'
     +'</tr>'
     +'<tr style="background:#fafafa">'
     +fempty(W.chk)
@@ -2536,13 +2541,27 @@ function rDR(){
 
   var outer=document.createElement('div');outer.style.cssText='overflow-x:auto;border:1px solid #e8e4dc;border-radius:6px';
   var hdrDiv=document.createElement('div');hdrDiv.style.cssText='overflow:hidden';hdrDiv.innerHTML=hdr;
-  var vs=document.createElement('div');vs.id='dr-vs';vs.style.cssText='overflow-y:auto;max-height:60vh;position:relative';
+  var vs=document.createElement('div');vs.id='dr-vs';vs.style.cssText='overflow-y:auto;position:relative';
   var sp=document.createElement('div');sp.id='dr-sp';sp.style.cssText='position:relative;width:'+T+'px';sp.style.height=(_drFiltered.length*_drRH)+'px';
   var rv=document.createElement('div');rv.id='dr-rv';rv.style.cssText='position:absolute;left:0;right:0;top:0';
   sp.appendChild(rv);vs.appendChild(sp);outer.appendChild(hdrDiv);outer.appendChild(vs);container.appendChild(outer);
   _drVis=Math.ceil(500/_drRH)+20;
   vs.addEventListener('scroll',function(){hdrDiv.scrollLeft=vs.scrollLeft;renderDrVirtual();},{passive:true});
+  drFitHeight();
   renderDrVirtual();
+}
+// Fill whatever space is actually left below the toolbar (not a fixed 60vh)
+// so the table's own scrollbar sits at the true bottom of the screen instead
+// of floating mid-page -- same fix as Production Orders and Pre-Booked.
+function drFitHeight(){
+  var vs=document.getElementById('dr-vs');if(!vs)return;
+  var top=vs.getBoundingClientRect().top;
+  var h=Math.max(200,window.innerHeight-top-16);
+  vs.style.maxHeight=h+'px';
+}
+if(!window._drResizeBound){
+  window._drResizeBound=true;
+  window.addEventListener('resize',function(){drFitHeight();});
 }
 
 // Add CSS for product panel open state
