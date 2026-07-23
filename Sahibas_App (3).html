@@ -2482,15 +2482,14 @@ function rDR(){
   var sRet=0,sCost=0,sComm=0,sTax=0,sGp=0,sPat=0,sExc=0;
   _drFiltered.forEach(function(r){sRet+=r[9];sCost+=r[10];sComm+=r[12];sTax+=r[13];sGp+=r[14];sPat+=r[15];sExc+=r[17];});
 
-  // Sz header carries the total unit/line-item count (respecting current
-  // filters), same convention as Production Orders' "Ordered Qty [total]".
-  var szHdr='<th id="dr-sz-hdr" style="width:'+W.sz+'px;min-width:'+W.sz+'px;padding:7px 6px;text-align:center;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc;white-space:nowrap">Sz<br><span id="dr-sz-total" style="font-size:12px;font-weight:800;color:var(--gold2);text-transform:none">'+NF(_drFiltered.length)+'</span></th>';
   var hdr='<table style="table-layout:fixed;width:'+T+'px;border-collapse:collapse;background:#f8f6f2"><thead>'
-    // SUBTOTAL row now comes FIRST (pinned above the column names).
+    // SUBTOTAL row now comes FIRST (pinned above the column names) -- the
+    // Sz column's cell here carries the total unit/line-item count (live
+    // with filters), sitting alongside Retail/Cost/etc. the same way.
     +'<tr style="background:#f0ede8;font-weight:800">'
     +ste(W.chk)+ste(W.conum)+ste(W.onum)
     +'<td style="width:'+W.date+'px;min-width:'+W.date+'px;max-width:'+W.date+'px;padding:5px 6px;background:#f0ede8;border-bottom:2px solid var(--gold);font-size:9px;color:var(--gold2);font-weight:800">SUBTOTAL</td>'
-    +ste(W.prd)+ste(W.sz)+ste(W.stat)+ste(W.pf)+ste(W.dst)+ste(W.pay)+ste(W.days)
+    +ste(W.prd)+stc(W.sz,'dr-sz-total',_drFiltered.length,'#1a1a1a')+ste(W.stat)+ste(W.pf)+ste(W.dst)+ste(W.pay)+ste(W.days)
     +stc(W.ret,'dr-st-ret',sRet,'#1a1a1a')+stc(W.cost,'dr-st-cost',sCost,'#c0392b')+ste(W.cpct)+stc(W.comm,'dr-st-comm',sComm,'#d4944a')+ste(W.taxpct)+stc(W.tax,'dr-st-tax',sTax,'#888')+stc(W.gp,'dr-st-gp',sGp,'#27ae60')+stc(W.pat,'dr-st-pat',sPat,'#c8a96e')
     +stc(W.exc,'dr-st-exc',sExc,'#e74c3c')
     +'</tr>'
@@ -2499,7 +2498,7 @@ function rDR(){
     +th(W.conum,'Ch.Order#')
     +th(W.onum,'Order#')
     +'<th id="dr-date-sort" onclick="drToggleSort()" style="width:'+W.date+'px;min-width:'+W.date+'px;padding:7px 6px;text-align:left;font-size:9px;color:var(--gold2);text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc;white-space:nowrap;cursor:pointer;user-select:none">Date ↑</th>'
-    +th(W.prd,'Product')+szHdr
+    +th(W.prd,'Product')+th(W.sz,'Sz','center')
     +th(W.stat,'Status','center')+th(W.pf,'Platform','center')+th(W.dst,'Dest','center')+th(W.pay,'Payment','center')
     +th(W.days,'Days','right')+th(W.ret,'Retail','right')
     +'<th style="width:'+W.cost+'px;min-width:'+W.cost+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Cost 🟠</th>'
