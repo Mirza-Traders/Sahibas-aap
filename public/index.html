@@ -970,6 +970,28 @@ function showDash(){
   if(CU&&CU.role!=='Owner'&&CU.role!=='Accountant')defTab='cs';
   setTimeout(()=>{if(defTab==='ov'){rOV();showCostAlert();}else{doST(defTab);}},30);
 }
+// The sidebar's CSS used a plain "height:calc(100vh - 39px)" to stay exactly
+// one viewport tall (so its own position:sticky keeps it fully visible while
+// the page scrolls). Under this app's body{zoom:1.15}, vh units resolve to
+// the REAL (un-zoomed) viewport size while the resulting length is then
+// rendered inside the zoomed subtree -- so the sidebar's calc'd height gets
+// rescaled by zoom on top of already matching the full viewport, making it
+// ~15% taller than the viewport. That's what was forcing the whole page to
+// become scrollable (and dragging every screen's own "fits the viewport"
+// content, like the Summary Sheet table, up and out of view along with it).
+// Same zoomScale()-aware fix as csFitHeight/drFitHeight/poFitHeight, just
+// measured once at dashboard load (and on resize) since the sidebar persists
+// across screens rather than being rebuilt per-tab.
+function sbFitHeight(){
+  var sb=document.getElementById('sidebar');if(!sb)return;
+  var top=sb.getBoundingClientRect().top;
+  var h=Math.max(200,(window.innerHeight-top)/zoomScale());
+  sb.style.height=h+'px';
+}
+if(!window._sbResizeBound){
+  window._sbResizeBound=true;
+  window.addEventListener('resize',function(){sbFitHeight();});
+}
 // Data Publisher right — Owner always has it; others get it via the Users page
 function isPublisher(u){
   if(!u)return false;
@@ -1043,6 +1065,7 @@ function applyRoleNav(){
       if(id==='us'||id==='ml')el.style.display='none';
     });
   }
+  sbFitHeight();
 }
 function goUpload(){
   document.getElementById('uscreen').style.display='flex';
@@ -1949,10 +1972,40 @@ function rCS(){
   tbody+='</tbody>';
 
   var _showMore=arr.length>_csLimit?'<div style="text-align:center;padding:12px 0"><button onclick="window._csShowAll=true;rendered.cs=false;doR(\'cs\')" style="border:1px solid var(--gold);color:var(--gold2);background:#fffdf0;border-radius:6px;padding:8px 24px;font-size:12px;cursor:pointer;font-weight:600">Show all '+arr.length+' products (first '+_csLimit+' shown)</button></div>':'';
-  el.innerHTML=kh+fh+'<div id="cs-scroll" style="overflow:auto;border:1px solid #e8e4dc;border-radius:6px;height:calc(100vh - 170px);min-height:300px"><table style="border-collapse:separate;border-spacing:0;font-size:11px;background:#fff;min-width:1400px">'+thead+tbody+'</table></div>'+_showMore;
+  el.innerHTML=kh+fh+'<div id="cs-scroll" style="overflow:auto;border:1px solid #e8e4dc;border-radius:6px;min-height:300px"><table style="border-collapse:separate;border-spacing:0;font-size:11px;background:#fff;min-width:1400px">'+thead+tbody+'</table></div>'+_showMore;
   if(_csFilters.search){var _si=el.querySelector('[data-k="search"]');if(_si){var _sv=_si.value.length;_si.focus();_si.setSelectionRange(_sv,_sv);}}
   if(_csActiveRow>=0){var _tb=document.getElementById('pcs-tbody');if(_tb){var _rs=_tb.querySelectorAll('tr');if(_rs[_csActiveRow])_rs[_csActiveRow].classList.add('cs-kr');}}
   csFixFreeze();
+  csFitHeight();
+}
+// The table box used to size itself with a hardcoded "height: calc(100vh -
+// 170px)" guess, assuming the KPI cards + filter bar above it always add up
+// to exactly 170px. They don't -- both wrap differently depending on window
+// width and how many filters are active -- so the guess was frequently wrong,
+// making the whole PAGE scrollable instead of just this box. Once the page
+// itself scrolled, this box's sticky header (anchored to its own scroll
+// container, not the page) scrolled away with it. Measuring the real
+// leftover space instead (same fix already used for Production Orders and
+// Detail Report) keeps this box's own scrollbar as the only one that moves,
+// so its header stays pinned in view no matter what's above it.
+function csFitHeight(){
+  var cs=document.getElementById('cs-scroll');if(!cs)return;
+  var top=cs.getBoundingClientRect().top;
+  var h=Math.max(200,(window.innerHeight-top-16)/zoomScale());
+  cs.style.height=h+'px';
+}
+// The page is rendered at body{zoom:1.15} -- a non-standard CSS property that
+// scales everything visually, including what getBoundingClientRect()/
+// window.innerHeight report (both are in post-zoom viewport pixels). But an
+// inline style.height/.maxHeight assignment on an element is read back in
+// that element's own PRE-zoom local pixels. Mixing the two without dividing
+// out the zoom factor makes the box render ~15% taller than intended and
+// overshoot the bottom of the viewport -- shared by every "fill remaining
+// viewport height" helper (csFitHeight/drFitHeight/poFitHeight).
+function zoomScale(){return parseFloat(getComputedStyle(document.body).zoom)||1;}
+if(!window._csResizeBound){
+  window._csResizeBound=true;
+  window.addEventListener('resize',function(){csFitHeight();});
 }
 function csFixFreeze(){
   var tbl=document.querySelector('#cs-scroll table');if(!tbl)return;
@@ -2602,7 +2655,7 @@ function rDR(){
 function drFitHeight(){
   var vs=document.getElementById('dr-vs');if(!vs)return;
   var top=vs.getBoundingClientRect().top;
-  var h=Math.max(200,window.innerHeight-top-16);
+  var h=Math.max(200,(window.innerHeight-top-16)/zoomScale());
   vs.style.maxHeight=h+'px';
 }
 if(!window._drResizeBound){
@@ -5068,7 +5121,7 @@ function togglePoHideCompleted(){window._poHideCompleted=!window._poHideComplete
 function poFitHeight(){
   var vs=document.getElementById('po-vs');if(!vs)return;
   var top=vs.getBoundingClientRect().top;
-  var h=Math.max(200,window.innerHeight-top-16);
+  var h=Math.max(200,(window.innerHeight-top-16)/zoomScale());
   vs.style.maxHeight=h+'px';
 }
 if(!window._poResizeBound){
