@@ -2729,7 +2729,7 @@ function rUS(){
         ?'<span style="color:#8e44ad;font-weight:700;font-size:10px">admin \u2713</span>'
         :(isAdmin
           ?'<select onchange="saveRexRole('+i+',this.value)" style="background:#fff;border:1px solid #e0dcd4;border-radius:4px;padding:3px 6px;font-size:9px;cursor:pointer">'
-            +['','admin','accountant','dispatch','warehouse','member'].map(function(rr){return '<option value="'+rr+'"'+(((window.REXROLES||{})[u.email]||'')===rr?' selected':'')+'>'+(rr||'\u2014 none')+'</option>';}).join('')
+            +['','admin','manager','accountant','dispatch','warehouse','member'].map(function(rr){return '<option value="'+rr+'"'+(((window.REXROLES||{})[u.email]||'')===rr?' selected':'')+'>'+(rr||'\u2014 none')+'</option>';}).join('')
             +'</select>'
           :((window.REXROLES||{})[u.email]?'<span style="color:#8e44ad;font-weight:700;font-size:10px">'+(window.REXROLES||{})[u.email]+'</span>':'<span style="color:#ddd">\u2014</span>')))+'</td>'
       +'<td style="padding:9px 10px">'+actions+'</td>'
@@ -5587,9 +5587,12 @@ async function rxSaveAll(touchedIds){
   cloudSave('tickets',window.TICKETS||[]);
 }
 // Which stage transitions may the current user perform on this ticket?
+// "manager" gets the same full stage-advance rights as "admin" (every
+// transition, not just their own job's step) but is deliberately kept out of
+// isAdm below -- Send Back and Delete stay admin-only regardless of this.
 function rxCanAdvance(t,next){
   var r=rexRole(CU);if(!r)return false;
-  if(r==='admin')return true;
+  if(r==='admin'||r==='manager')return true;
   if(next==='received')return r==='warehouse';
   if(next==='approved')return false;
   if(next==='paid')return t.type==='refund'?(r==='accountant'):(r==='dispatch'||r==='warehouse');
@@ -5879,7 +5882,7 @@ function submitRx(type){
 function openRxDetail(id){
   var t=(window.TICKETS||[]).find(function(x){return x.id===id;});if(!t)return;
   var r=rexRole(CU),isAdm=r==='admin';
-  var canBank=isAdm||r==='accountant';
+  var canBank=isAdm||r==='manager'||r==='accountant';
   var idx=RX_STAGES.indexOf(t.status);
   var bars=RX_STAGES.map(function(st,i){return '<div style="flex:1;height:7px;border-radius:3px;background:'+(i<=idx?'#0F6E56':'#e5e2db')+'"></div>';}).join('');
   var lbls=RX_STAGES.map(function(st,i){return '<div style="flex:1;font-size:8px;text-align:center;font-weight:'+(i===idx?'800':'400')+';color:'+(i<=idx?'#0F6E56':'#bbb')+'">'+rxStageLabel(st,t.type)+'</div>';}).join('');
