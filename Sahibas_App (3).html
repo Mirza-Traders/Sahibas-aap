@@ -1540,7 +1540,21 @@ function phov(n){return ' data-prod-hover="'+String(n||'').toLowerCase().trim().
   });
 })();
 function csToggle(el){var n=el.getAttribute('data-n');if(el.checked)_csSelProds.add(n);else _csSelProds.delete(n);var b=document.getElementById('cs-exp-sel');if(b)b.style.display=_csSelProds.size>0?'':'none';}
-function csSelAll(){var allC=document.querySelectorAll('#pcs-tbody input[type=checkbox]');var doAdd=_csSelProds.size<(window._csArr||[]).length;_csSelProds.clear();allC.forEach(function(cb){cb.checked=doAdd;if(doAdd)_csSelProds.add(cb.getAttribute('data-n'));});var b=document.getElementById('cs-exp-sel');if(b)b.style.display=_csSelProds.size>0?'':'none';}
+// doAdd came from comparing _csSelProds.size (a Set keyed by product NAME) to
+// the filtered array's length -- if two products ever share a name, the Set
+// under-counts relative to the row count, so this comparison could decide
+// "select all" even when every row was already checked, leaving the header
+// checkbox unchecked (its own native click toggle) while every row checkbox
+// got reselected. Reading the header checkbox's own post-click state instead
+// is unambiguous: checked means select every visible row, unchecked means
+// clear them all.
+function csSelAll(headCb){
+  var allC=document.querySelectorAll('#pcs-tbody input[type=checkbox]');
+  var doAdd=headCb?headCb.checked:_csSelProds.size<(window._csArr||[]).length;
+  _csSelProds.clear();
+  allC.forEach(function(cb){cb.checked=doAdd;if(doAdd)_csSelProds.add(cb.getAttribute('data-n'));});
+  var b=document.getElementById('cs-exp-sel');if(b)b.style.display=_csSelProds.size>0?'':'none';
+}
 function csSort(el){var c=el.getAttribute('data-c');if(_csSortCol===c)_csSortAsc=!_csSortAsc;else{_csSortCol=c;_csSortAsc=false;}rendered.cs=false;doR('cs');}
 function csRender(){rendered.cs=false;doR('cs');}
 function csApplyFilter(el){var k=el.getAttribute('data-k'),v=el.value;if(k==='min10d'||k==='minStk')_csFilters[k]=parseInt(v)||0;else if(k==='minRate')_csFilters[k]=parseFloat(v)||0;else _csFilters[k]=v;if(k==='search'){clearTimeout(window._csSearchTimer);window._csSearchTimer=setTimeout(csRender,300);}else{csRender();}}
@@ -1807,7 +1821,8 @@ function rCS(){
   function fmtCDate(d){if(!d)return '—';var dt=new Date(d);if(isNaN(dt.getTime()))return d.split(' ')[0]||'—';var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];return dt.getDate()+' '+m+"'"+(dt.getFullYear()%100).toString().padStart(2,'0');}
   var freezeUpTo='retailPrice';
   var cRow='<tr>';
-  cRow+='<th data-fl="1" style="padding:6px 8px;background:'+hbg+';border-bottom:2px solid #e8e4dc;min-width:30px"><input type="checkbox" onclick="csSelAll()" style="cursor:pointer;accent-color:var(--gold)"></th>';
+  var allRowsSelected=arr.length>0&&arr.every(function(p){return _csSelProds.has(p.name);});
+  cRow+='<th data-fl="1" style="padding:6px 8px;background:'+hbg+';border-bottom:2px solid #e8e4dc;min-width:30px"><input type="checkbox" '+(allRowsSelected?'checked':'')+' onclick="csSelAll(this)" style="cursor:pointer;accent-color:var(--gold)"></th>';
   cRow+='<th data-fl="1" data-c="createdAtTs" onclick="csSort(this)" style="padding:6px 8px;background:'+hbg+';border-bottom:2px solid #e8e4dc;text-align:center;min-width:75px;white-space:nowrap;cursor:pointer;user-select:none">Created'+((_csSortCol==='createdAtTs'&&_csSortAsc)?' ↑':(_csSortCol==='createdAtTs'&&!_csSortAsc)?' ↓':'')+'</th>';
   cRow+='<th data-fl="1" data-c="name" onclick="csSort(this)" style="padding:6px 8px;background:'+hbg+';border-bottom:2px solid #e8e4dc;text-align:left;min-width:140px;white-space:nowrap;cursor:pointer;user-select:none">Product'+((_csSortCol==='name'&&_csSortAsc)?' ↑':(_csSortCol==='name'&&!_csSortAsc)?' ↓':'')+'</th>';
   cRow+='<th data-fl="1" style="padding:6px 6px;background:'+hbg+';border-bottom:2px solid #e8e4dc;width:64px;min-width:64px">IMG</th>';
@@ -1898,7 +1913,10 @@ function rCS(){
    +'<td style="padding:5px 4px;background:'+totBg+';position:sticky;right:0;z-index:6;text-align:center;color:#bbb;width:'+stW+'px;min-width:'+stW+'px;max-width:'+stW+'px">—</td>'
    +'</tr>';
 
-  var thead='<thead>'+gRow+cRow+trow+'</thead>';
+  // SUBTOTAL row pinned on top (above the group/column-name rows) -- same
+  // layout the Detail Report already uses -- so the quantity/revenue totals
+  // are visible immediately instead of being buried below two header rows.
+  var thead='<thead>'+trow+gRow+cRow+'</thead>';
 
   // ── DATA ROWS ──
   var _csLimit=window._csShowAll?arr.length:200;
@@ -2009,7 +2027,15 @@ if(!window._csResizeBound){
 }
 function csFixFreeze(){
   var tbl=document.querySelector('#cs-scroll table');if(!tbl)return;
-  var hdr=tbl.querySelector('thead tr:nth-child(2)');if(!hdr)return;
+  var rows=Array.from(tbl.querySelectorAll('thead tr'));
+  // Width/left-offset measurements need a row with exactly one cell per
+  // column (no colspans) -- the group-label row uses colspans to span
+  // several columns under one label, so it can't be used for this. Find
+  // whichever row qualifies instead of assuming a fixed row index, since
+  // the SUBTOTAL row and the group/column-name rows get reordered depending
+  // on which is pinned on top.
+  var hdr=rows.find(function(r){return Array.from(r.children).every(function(c){return (parseInt(c.getAttribute('colspan'))||1)===1;});});
+  if(!hdr)return;
   var hCells=Array.from(hdr.children);
   // Batch-read all widths at once (one layout pass, no thrashing)
   var widths=hCells.map(function(th){return th.offsetWidth;});
@@ -2020,17 +2046,18 @@ function csFixFreeze(){
   }
   if(!Object.keys(flCols).length)return;
   // Style header rows individually — only 3 rows × ~20 cells, negligible cost
-  tbl.querySelectorAll('thead tr').forEach(function(row,ri){
+  rows.forEach(function(row){
     var cells=row.children;var cIdx=0;
+    var isGrouped=Array.from(cells).some(function(c){return (parseInt(c.getAttribute('colspan'))||1)>1;});
     for(var ci=0;ci<cells.length;ci++){
       var cell=cells[ci];var span=parseInt(cell.getAttribute('colspan'))||1;
-      if(ri===0){
+      if(isGrouped){
         var allFrozen=true;
         for(var s=0;s<span;s++){if(!flCols.hasOwnProperty(cIdx+s))allFrozen=false;}
         if(allFrozen&&span>0){cell.style.position='sticky';cell.style.left=(flCols[cIdx]||0)+'px';cell.style.zIndex='9';if(flCols[cIdx]===lastFrozenLeft)cell.style.borderRight='2px solid #c8a96e';}
         cIdx+=span;continue;
       }
-      if(flCols.hasOwnProperty(cIdx)){cell.style.position='sticky';cell.style.left=flCols[cIdx]+'px';cell.style.zIndex=ri<=2?'7':'4';if(flCols[cIdx]===lastFrozenLeft)cell.style.borderRight='2px solid #c8a96e';}
+      if(flCols.hasOwnProperty(cIdx)){cell.style.position='sticky';cell.style.left=flCols[cIdx]+'px';cell.style.zIndex='7';if(flCols[cIdx]===lastFrozenLeft)cell.style.borderRight='2px solid #c8a96e';}
       cIdx+=span;
     }
   });
