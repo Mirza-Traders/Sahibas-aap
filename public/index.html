@@ -2191,6 +2191,13 @@ if(typeof window._pbFlt==='undefined')window._pbFlt={prods:[]};
 if(typeof window._pbDrop==='undefined')window._pbDrop='';
 if(typeof window._pbSizeRatioOpen==='undefined')window._pbSizeRatioOpen=false;
 function togglePbSizeRatio(){window._pbSizeRatioOpen=!window._pbSizeRatioOpen;rendered.pb=false;doR('pb');}
+// Virtual stock = the stock file's "Sell Ahead" column (sellable before it
+// physically lands). On-hand stock = its "On Hand Inventory" column. Both are
+// collapsed to just their Total by default; expanding shows the size split.
+if(typeof window._pbVirtOpen==='undefined')window._pbVirtOpen=false;
+function togglePbVirt(){window._pbVirtOpen=!window._pbVirtOpen;rendered.pb=false;doR('pb');}
+if(typeof window._pbOnHandOpen==='undefined')window._pbOnHandOpen=false;
+function togglePbOnHand(){window._pbOnHandOpen=!window._pbOnHandOpen;rendered.pb=false;doR('pb');}
 function setPbSort(col){var cur=window._pbSort||{col:'delayed',asc:false};if(cur.col===col){window._pbSort={col:col,asc:!cur.asc};}else{window._pbSort={col:col,asc:false};}rendered.pb=false;doR('pb');}
 function togglePbFlt(field,val){
   if(!window._pbFlt)window._pbFlt={prods:[]};
@@ -2228,6 +2235,15 @@ function rPB(){
     }else{
       g.poIds=[];g.poQty=0;g.poEta='';g.noProd=true;
     }
+    // Stock split by size, from the last uploaded Laam stock file. Products
+    // with no row in that file get zeros and a "no stock data" marker rather
+    // than silently reading as genuinely zero stock.
+    var sp=(STOCK_PRODS||{})[p.toLowerCase().trim()]||null;
+    g.hasStock=!!sp;
+    g.vS=sp?(sp.saS||0):0;g.vM=sp?(sp.saM||0):0;g.vL=sp?(sp.saL||0):0;g.vXL=sp?(sp.saXL||0):0;
+    g.vTot=sp?(sp.saTotal||0):0;
+    g.oS=sp?(sp.S||0):0;g.oM=sp?(sp.M||0):0;g.oL=sp?(sp.L||0):0;g.oXL=sp?(sp.XL||0):0;
+    g.oTot=sp?(sp.total||0):0;
     g.img=findImg(p.toLowerCase().trim());
     return g;
   });
@@ -2240,6 +2256,10 @@ function rPB(){
         case 's':return g.S;case 'm':return g.M;case 'l':return g.L;case 'xl':return g.XL;
         case 'total':return g.total;
         case 'delayed':return g.delayed;
+        case 'vs':return g.vS;case 'vm':return g.vM;case 'vl':return g.vL;case 'vxl':return g.vXL;
+        case 'vtot':return g.vTot;
+        case 'os':return g.oS;case 'om':return g.oM;case 'ol':return g.oL;case 'oxl':return g.oXL;
+        case 'otot':return g.oTot;
         case 'eta':return g.poEta||'9999-99-99'; // no ETA sorts last
         default:return g.delayed;
       }
@@ -2313,6 +2333,14 @@ function rPB(){
   function pbSrtArrow(col){var cur=window._pbSort;if(cur.col===col)return' '+(cur.asc?'▲':'▼');return' <span style="opacity:.25;font-size:9px">↕</span>';}
   var pbSrToggleBtn='<button onclick="event.stopPropagation();togglePbSizeRatio()" title="'+(pbSrOpen?'Collapse':'Expand')+' Size Ratio" style="background:rgba(255,255,255,.6);border:1px solid #e0c080;border-radius:3px;width:16px;height:16px;line-height:1;cursor:pointer;font-size:10px;font-weight:800;color:#a07030;padding:0;margin-left:4px">'+(pbSrOpen?'−':'+')+'</button>';
   var pbTh=function(lbl,col,align,extraStyle){return '<th style="padding:8px 10px;text-align:'+(align||'left')+';cursor:pointer;user-select:none'+(extraStyle?';'+extraStyle:'')+'" onclick="setPbSort(\''+col+'\')">'+lbl+pbSrtArrow(col)+'</th>';};
+  // Same colour language as the Summary Sheet: Sell Ahead purple, Stock blue.
+  var pbVirtOpen=window._pbVirtOpen,pbOnHandOpen=window._pbOnHandOpen;
+  var VSTY='background:#eeeaff;color:#5050b0',OSTY='background:#e4eef8;color:#2471a3';
+  var pbGrpBtn=function(fn,open,label,border,color){
+    return '<button onclick="event.stopPropagation();'+fn+'()" title="'+(open?'Collapse ':'Expand ')+label+'" style="background:rgba(255,255,255,.7);border:1px solid '+border+';border-radius:3px;width:16px;height:16px;line-height:1;cursor:pointer;font-size:10px;font-weight:800;color:'+color+';padding:0;margin-left:4px">'+(open?'−':'+')+'</button>';
+  };
+  var pbVirtToggleBtn=pbGrpBtn('togglePbVirt',pbVirtOpen,'Virtual Stock','#b8b0e0','#5050b0');
+  var pbOnHandToggleBtn=pbGrpBtn('togglePbOnHand',pbOnHandOpen,'On-Hand Stock','#a8c4e0','#2471a3');
   h+='<div class="tw" style="max-height:none"><table><thead><tr>'
    +pbTh('Product','product','left')
    +'<th style="padding:8px 10px;text-align:left">Image</th>'
@@ -2324,11 +2352,37 @@ function rPB(){
              :'<th style="padding:8px 10px;text-align:right;cursor:pointer;user-select:none" onclick="togglePbSizeRatio()" title="Click to expand Size Ratio">S / M / L / XL'+pbSrToggleBtn+'</th>')
    +pbTh('Grand Total','total','right')
    +pbTh('Delayed Qty','delayed','right','color:var(--red)')
+   // Virtual (Sell Ahead) and On-Hand stock groups. Collapsed each shows only
+   // its Total; expanded, the size split appears ahead of it. The toggle
+   // button rides on the leftmost column of the group in both states, so
+   // there's always a way back (same fix as the size-ratio group above).
+   +(pbVirtOpen?('<th style="padding:8px 10px;text-align:right;cursor:pointer;user-select:none;'+VSTY+'" onclick="setPbSort(\'vs\')">S'+pbSrtArrow('vs')+pbVirtToggleBtn+'</th>'
+                +pbTh('M','vm','right',VSTY)+pbTh('L','vl','right',VSTY)+pbTh('XL','vxl','right',VSTY)
+                +pbTh('Virtual Total','vtot','right',VSTY+';font-weight:800'))
+               :'<th style="padding:8px 10px;text-align:right;cursor:pointer;user-select:none;'+VSTY+';font-weight:800" onclick="setPbSort(\'vtot\')" title="Sell Ahead stock — click ⊞ to split by size">⏩ Virtual'+pbSrtArrow('vtot')+pbVirtToggleBtn+'</th>')
+   +(pbOnHandOpen?('<th style="padding:8px 10px;text-align:right;cursor:pointer;user-select:none;'+OSTY+'" onclick="setPbSort(\'os\')">S'+pbSrtArrow('os')+pbOnHandToggleBtn+'</th>'
+                  +pbTh('M','om','right',OSTY)+pbTh('L','ol','right',OSTY)+pbTh('XL','oxl','right',OSTY)
+                  +pbTh('On-Hand Total','otot','right',OSTY+';font-weight:800'))
+                 :'<th style="padding:8px 10px;text-align:right;cursor:pointer;user-select:none;'+OSTY+';font-weight:800" onclick="setPbSort(\'otot\')" title="On Hand Inventory — click ⊞ to split by size">📦 On-Hand'+pbSrtArrow('otot')+pbOnHandToggleBtn+'</th>')
    +'<th style="padding:8px 10px;text-align:left;background:#faf3df">Upcoming Production</th>'
    +'<th style="padding:8px 10px;text-align:right;background:#faf3df">Qty</th>'
    +'<th style="padding:8px 10px;text-align:left;background:#faf3df">Size Ratio</th>'
    +pbTh('ETA','eta','left','background:#faf3df')
    +'</tr></thead><tbody>';
+  // A product missing from the stock file shows a muted dash, not "0" -- zero
+  // stock and no-data-at-all are very different things when you're deciding
+  // whether to raise a production order.
+  function pbStockCells(g){
+    var cell=function(v,sty,bold){
+      var txt=g.hasStock?(v||'<span style="color:#bbb">-</span>'):'<span style="color:#ccc" title="Not in the last uploaded stock file">—</span>';
+      return '<td style="padding:8px 10px;text-align:right;'+sty+(bold?';font-weight:800':'')+'">'+txt+'</td>';
+    };
+    var vBg='background:#f6f4ff',oBg='background:#eef4fa';
+    return (pbVirtOpen?(cell(g.vS,vBg)+cell(g.vM,vBg)+cell(g.vL,vBg)+cell(g.vXL,vBg)+cell(g.vTot,vBg+';color:#5050b0',true))
+                      :cell(g.vTot,vBg+';color:#5050b0',true))
+         +(pbOnHandOpen?(cell(g.oS,oBg)+cell(g.oM,oBg)+cell(g.oL,oBg)+cell(g.oXL,oBg)+cell(g.oTot,oBg+';color:#2471a3',true))
+                       :cell(g.oTot,oBg+';color:#2471a3',true));
+  }
   arr.forEach(function(g){
     var thumb=g.img?'<img src="'+g.img+(g.img.indexOf('?')>=0?'&':'?')+'width=100" style="width:42px;height:53px;object-fit:cover;object-position:top center;border-radius:4px;border:1px solid #eee">':'<span style="color:#ccc;font-size:9px">—</span>';
     h+='<tr>'
@@ -2342,6 +2396,7 @@ function rPB(){
       ):'<td style="padding:8px 10px;text-align:right;cursor:pointer;font-size:11px" onclick="togglePbSizeRatio()" title="Click to expand Size Ratio">'+g.S+'/'+g.M+'/'+g.L+'/'+g.XL+'</td>')
      +'<td style="padding:8px 10px;text-align:right;font-weight:700">'+g.total+'</td>'
      +'<td style="padding:8px 10px;text-align:right;'+(g.delayed?'color:var(--red);font-weight:800':'color:#bbb')+'">'+(g.delayed||'-')+'</td>'
+     +pbStockCells(g)
      +(g.noProd?
         '<td colspan="4" style="padding:8px 10px;background:#fdeeee;color:var(--red);font-weight:700">⚠ No production plan found — raise a Production Order</td>'
        :'<td style="padding:8px 10px;background:#faf8f3">'+g.poIds.join(', ')+'</td>'
