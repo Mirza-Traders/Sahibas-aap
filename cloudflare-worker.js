@@ -4,6 +4,7 @@ const COSTS_PATH = 'data/costs.json';
 const ORDERS_PATH = 'data/orders.json';
 const CUSTOMERS_PATH = 'data/customers.json';
 const FABRICS_PATH = 'data/fabrics.json';
+const BRIEF_PATH = 'data/daily-brief.json';
 const SALES_SNAPSHOT_PATH = 'data/sales-snapshot.json';
 const SHOPIFY_SNAPSHOT_PATH = 'data/shopify-snapshot.json';
 const COSTS_BRANCH = 'main';
@@ -348,6 +349,32 @@ export default {
           customMetadata: { publishedAt: new Date().toISOString() },
         });
         return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // GET /daily-brief — the latest published brief (small JSON).
+      if (path === '/daily-brief' && request.method === 'GET') {
+        const v = await env.PO_STORE.get('daily_brief');
+        return new Response(v || 'null', { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+
+      // POST /daily-brief — save the brief and mirror it into the repo, so the
+      // scheduled briefing can read it from GitHub without touching the 11MB
+      // sales snapshot. Same pattern as /costs: KV is the live copy, GitHub is
+      // the readable one, and a failed mirror never fails the save.
+      if (path === '/daily-brief' && request.method === 'POST') {
+        const body = await request.text();
+        JSON.parse(body); // reject broken payloads
+        await env.PO_STORE.put('daily_brief', body);
+        try {
+          await mirrorJsonToGitHub(env, BRIEF_PATH, body, 'Auto-sync daily brief from app');
+        } catch (mirrorErr) {
+          return new Response(JSON.stringify({ ok: true, githubMirror: 'failed', detail: mirrorErr.message }), {
+            headers: { ...cors, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true, githubMirror: 'ok' }), {
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
       }
