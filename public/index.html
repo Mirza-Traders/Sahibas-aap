@@ -3894,6 +3894,27 @@ var DB_DEAD_DAYS=30;      // no unit sold in the last 30d with stock on hand
 var DB_OVER_COVER=120;    // more than this many days of cover = overstocked
 
 function dbNum(v){return Math.round(v)||0;}
+// Brief-sized placeholder + its own onerror handler. imgFail() swaps in the
+// 52x52 prodPH box, which would break this row's alignment.
+function dbPH(n){return '<div style="width:34px;height:44px;border-radius:4px;background:'+prodColor(n)+';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;flex-shrink:0">'+prodInitials(n)+'</div>';}
+function dbImgFail(el){var n=el.getAttribute('data-n')||'';el.outerHTML=dbPH(n);}
+// Three honest outcomes: the product's own photo, a clearly-marked borrowed
+// one, or initials. findImg() falls back to a similarly-named product's photo
+// (e.g. "Veil Peach" borrowing "Veil"), so showing that unmarked would have
+// you looking at the wrong garment -- same ≈ badge the Summary Sheet uses.
+function dbThumb(name){
+  var k=String(name||'').toLowerCase().trim();
+  var url=k?findImg(k):'';
+  if(!url)return dbPH(name||'?');
+  var esc=String(name||'').replace(/"/g,'&quot;');
+  var img='<img src="'+url+(url.indexOf('?')>=0?'&':'?')+'width=90" loading="lazy" data-n="'+esc+'" onerror="dbImgFail(this)" style="width:34px;height:44px;object-fit:cover;object-position:top center;border-radius:4px;border:1px solid rgba(0,0,0,.10);display:block">';
+  var from=imgBorrowedParent(name);
+  if(from){
+    img='<span style="position:relative;display:inline-block;flex-shrink:0" title="Not this product&#39;s own photo — showing &quot;'+from.replace(/"/g,'')+'&quot;">'+img
+      +'<span style="position:absolute;top:1px;right:1px;background:rgba(30,30,30,.8);color:#ffd76e;font-size:9px;font-weight:700;border-radius:3px;padding:0 3px;line-height:13px">≈</span></span>';
+  }
+  return img;
+}
 // How old is the underlying dataset? META.max_date is the newest order date
 // in the data, which is the honest measure of freshness -- unlike META.gen,
 // which is just "when this browser parsed it" and always looks like today.
@@ -4000,7 +4021,7 @@ function dbBuild(){
     why:'Laam charged above the agreed rate.',
     action:'Claim it back — see the Excess Comm page.',
     impact:dbNum(exc),impactLabel:'claimable from Laam',
-    items:excN?[{name:excN+' order lines overcharged',impact:dbNum(exc)}]:[]});
+    items:excN?[{name:excN+' order lines overcharged',impact:dbNum(exc),noThumb:true}]:[]});
 
   // 9. Pre-booked demand with nothing in production behind it.
   var noPlan=[];
@@ -4113,7 +4134,8 @@ function rDB(){
       else if(a.id==='status')extra='Laam '+it.laam+' vs Shopify '+it.shopify;
       else if(a.id==='noplan')extra=it.pending+' units pre-booked';
       var amt=money[a.id]?'PKR '+NF(it.impact):'';
-      return '<div style="display:flex;gap:10px;align-items:baseline;padding:4px 0;border-top:1px solid rgba(0,0,0,.05);font-size:11px">'
+      return '<div style="display:flex;gap:10px;align-items:center;padding:4px 0;border-top:1px solid rgba(0,0,0,.05);font-size:11px">'
+        +(it.noThumb?'':'<span style="flex-shrink:0;display:flex"'+phov(it.name)+'>'+dbThumb(it.name)+'</span>')
         +'<span style="font-weight:700;min-width:150px"'+phov(it.name)+'>'+it.name+'</span>'
         +'<span style="color:#777;flex:1">'+extra+'</span>'
         +'<span style="font-family:monospace;font-weight:700;color:'+s.fg+'">'+amt+'</span>'
@@ -4122,7 +4144,7 @@ function rDB(){
     // Every product is listed, not a top-5 sample. Long lists scroll inside
     // their own card so one big group can't push the rest off the page.
     var body=a.items.length>8
-      ?'<div style="max-height:260px;overflow-y:auto">'+rows+'</div>'
+      ?'<div style="max-height:400px;overflow-y:auto">'+rows+'</div>'
       :rows;
     return '<div style="background:'+s.bg+';border:1px solid '+s.bd+';border-radius:8px;padding:12px 14px;margin-bottom:10px">'
       +'<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'
