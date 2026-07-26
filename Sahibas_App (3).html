@@ -2316,7 +2316,11 @@ function rPB(){
   h+='<div class="tw" style="max-height:none"><table><thead><tr>'
    +pbTh('Product','product','left')
    +'<th style="padding:8px 10px;text-align:left">Image</th>'
-   +(pbSrOpen?(pbTh('S','s','right')+pbTh('M','m','right')+pbTh('L','l','right')+pbTh('XL','xl','right'))
+   // Expanded, the S header carries the collapse button -- without it there is
+   // no way back once expanded (the four size headers are plain sort headers,
+   // and only the collapsed combined header used to call togglePbSizeRatio).
+   +(pbSrOpen?('<th style="padding:8px 10px;text-align:right;cursor:pointer;user-select:none" onclick="setPbSort(\'s\')">S'+pbSrtArrow('s')+pbSrToggleBtn+'</th>'
+              +pbTh('M','m','right')+pbTh('L','l','right')+pbTh('XL','xl','right'))
              :'<th style="padding:8px 10px;text-align:right;cursor:pointer;user-select:none" onclick="togglePbSizeRatio()" title="Click to expand Size Ratio">S / M / L / XL'+pbSrToggleBtn+'</th>')
    +pbTh('Grand Total','total','right')
    +pbTh('Delayed Qty','delayed','right','color:var(--red)')
