@@ -4200,6 +4200,24 @@ function rDB(){
   var cards=live.map(function(a,i){
     var s=SEV[a.sev]||SEV.low;
     var val=money[a.id]?('PKR '+NF(a.impact)):(NF(a.impact)+' item'+(a.impact===1?'':'s'));
+    // The last column before the impact holds action-specific detail, so its
+    // heading changes with the action. Widths here mirror the row below
+    // exactly -- change one, change both.
+    var DETAIL_HDR={reorder:'Stock · Rate · Cover',loss:'Price vs Cost',cost:'Delivered',
+      dead:'Unsold',over:'Stock · Cover',price:'Laam vs Shopify',status:'Laam vs Shopify',
+      noplan:'Pre-booked',excess:''};
+    var hasProductRows=a.items.some(function(it){return !it.noThumb;});
+    var hdr=hasProductRows
+      ?'<div style="display:flex;gap:10px;align-items:center;padding:7px 0 4px;font-size:8px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#a09a8e;border-top:1px solid rgba(0,0,0,.07)">'
+        +'<span style="width:34px;flex-shrink:0">Image</span>'
+        +'<span style="min-width:140px;max-width:140px">Product</span>'
+        +'<span style="width:62px;flex-shrink:0;text-align:center">Status</span>'
+        +'<span style="width:104px;flex-shrink:0;text-align:right" title="Stock on hand by size">On-Hand S/M/L/XL</span>'
+        +'<span style="width:96px;flex-shrink:0;text-align:right" title="Net profit per unit at the current price">NP / Unit</span>'
+        +'<span style="flex:1;min-width:0">'+(DETAIL_HDR[a.id]||'')+'</span>'
+        +'<span style="width:110px;flex-shrink:0;text-align:right">'+(money[a.id]?'Impact':'')+'</span>'
+      +'</div>'
+      :'';
     var rows=a.items.map(function(it){
       var extra='';
       if(a.id==='reorder')extra=it.stock+' left · '+it.daily+'/day · '+it.cover+'d cover';
@@ -4218,14 +4236,16 @@ function rDB(){
         +'<span style="width:104px;flex-shrink:0;text-align:right;font-family:monospace;color:#555">'+dbSizeCell(it)+'</span>'
         +'<span style="width:96px;flex-shrink:0;text-align:right;font-family:monospace">'+dbNpCell(it)+'</span>'
         +'<span style="color:#777;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+extra+'</span>'
-        +'<span style="font-family:monospace;font-weight:700;color:'+s.fg+';flex-shrink:0">'+amt+'</span>'
+        +'<span style="width:110px;flex-shrink:0;text-align:right;font-family:monospace;font-weight:700;color:'+s.fg+'">'+amt+'</span>'
         +'</div>';
     }).join('');
     // Every product is listed, not a top-5 sample. Long lists scroll inside
     // their own card so one big group can't push the rest off the page.
-    var body=a.items.length>8
+    // Header sits outside the scroll box, so it stays put while a long list
+    // scrolls underneath it.
+    var body=hdr+(a.items.length>8
       ?'<div style="max-height:400px;overflow-y:auto">'+rows+'</div>'
-      :rows;
+      :rows);
     return '<div style="background:'+s.bg+';border:1px solid '+s.bd+';border-radius:8px;padding:12px 14px;margin-bottom:10px">'
       +'<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'
       +'<span style="font-size:13px">'+s.dot+'</span>'
