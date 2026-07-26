@@ -4038,8 +4038,10 @@ function dbBuild(){
   };
 }
 
-// Compact payload for the scheduled brief -- top 5 items per action only,
-// so the file stays a few KB instead of shipping the whole catalogue.
+// Compact payload for the scheduled brief. The page lists every product, but
+// the published file caps each action at 25 -- plenty to write a briefing
+// from, and it keeps the file tens of KB rather than shipping the catalogue.
+// `count` always carries the true total so nothing looks smaller than it is.
 function dbPayload(){
   var b=dbBuild();
   return {
@@ -4048,7 +4050,7 @@ function dbPayload(){
     actions:b.actions.map(function(a){
       return{id:a.id,severity:a.sev,title:a.title,why:a.why,action:a.action,
         impact:a.impact,impactLabel:a.impactLabel,count:a.items.length,
-        top:a.items.slice(0,5)};
+        top:a.items.slice(0,25)};
     })
   };
 }
@@ -4100,7 +4102,7 @@ function rDB(){
   var cards=live.map(function(a,i){
     var s=SEV[a.sev]||SEV.low;
     var val=money[a.id]?('PKR '+NF(a.impact)):(NF(a.impact)+' item'+(a.impact===1?'':'s'));
-    var rows=a.items.slice(0,5).map(function(it){
+    var rows=a.items.map(function(it){
       var extra='';
       if(a.id==='reorder')extra=it.stock+' left · '+it.daily+'/day · '+it.cover+'d cover';
       else if(a.id==='loss')extra='PKR '+NF(it.price)+' vs cost '+NF(it.cost)+' · '+NF(it.perUnit)+'/unit';
@@ -4117,7 +4119,11 @@ function rDB(){
         +'<span style="font-family:monospace;font-weight:700;color:'+s.fg+'">'+amt+'</span>'
         +'</div>';
     }).join('');
-    var more=a.items.length>5?'<div style="font-size:10px;color:#999;padding-top:5px">+ '+(a.items.length-5)+' more</div>':'';
+    // Every product is listed, not a top-5 sample. Long lists scroll inside
+    // their own card so one big group can't push the rest off the page.
+    var body=a.items.length>8
+      ?'<div style="max-height:260px;overflow-y:auto">'+rows+'</div>'
+      :rows;
     return '<div style="background:'+s.bg+';border:1px solid '+s.bd+';border-radius:8px;padding:12px 14px;margin-bottom:10px">'
       +'<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'
       +'<span style="font-size:13px">'+s.dot+'</span>'
@@ -4127,7 +4133,7 @@ function rDB(){
       +'</div>'
       +'<div style="font-size:10px;color:#888;margin:2px 0 2px">'+a.impactLabel+'</div>'
       +'<div style="font-size:11px;color:#555;margin-bottom:6px">'+a.why+' <strong style="color:'+s.fg+'">'+a.action+'</strong></div>'
-      +rows+more
+      +body
       +'</div>';
   }).join('');
 
