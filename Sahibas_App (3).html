@@ -4582,16 +4582,28 @@ async function savePO(arr,touchedIds){
 }
 // Compress image to JPEG before storing (prevents localStorage bloat & page freezes)
 function compressImg(dataUrl,maxPx,quality,cb){
+  // PDFs (allowed on the Size Chart uploaders) can never load into an <img>
+  // element, so routing them through canvas compression left both onload and
+  // onerror unfired -- the upload silently did nothing, the checkmark never
+  // appeared, and Save kept saying "attach the size chart" forever. Skip
+  // compression for anything that isn't a decodable image.
+  if(!/^data:image\//.test(dataUrl)){cb(dataUrl);return;}
+  var done=false;
+  var finish=function(v){if(done)return;done=true;cb(v);};
   var img=new Image();
   img.onload=function(){
     var w=img.width,h=img.height;
     if(w>maxPx||h>maxPx){var s=Math.min(maxPx/w,maxPx/h);w=Math.round(w*s);h=Math.round(h*s);}
     var c=document.createElement('canvas');c.width=w;c.height=h;
     c.getContext('2d').drawImage(img,0,0,w,h);
-    cb(c.toDataURL('image/jpeg',quality));
+    finish(c.toDataURL('image/jpeg',quality));
   };
-  img.onerror=function(){cb(dataUrl);};
+  img.onerror=function(){finish(dataUrl);};
   img.src=dataUrl;
+  // Some browsers neither load nor error on an image subtype they can't
+  // decode (e.g. HEIC straight off an iPhone) -- same silent-hang symptom.
+  // Fall back to the uncompressed original rather than waiting forever.
+  setTimeout(function(){finish(dataUrl);},4000);
 }
 
 var _poSizeChart='';var _poSizeChartName='';
