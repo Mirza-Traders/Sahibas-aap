@@ -2400,7 +2400,7 @@ function rPB(){
   };
   var pbVirtToggleBtn=pbGrpBtn('togglePbVirt',pbVirtOpen,'Virtual Stock','#b8b0e0','#5050b0');
   var pbOnHandToggleBtn=pbGrpBtn('togglePbOnHand',pbOnHandOpen,'On-Hand Stock','#a8c4e0','#2471a3');
-  h+='<div class="tw" style="max-height:none"><table><thead><tr>'
+  h+='<div id="pb-scroll" style="overflow:auto;border:1px solid #e8e4dc;border-radius:6px;min-height:300px"><table><thead><tr>'
    +pbTh('Product','product','left')
    +'<th style="padding:8px 10px;text-align:left">Image</th>'
    // Expanded, the S header carries the collapse button -- without it there is
@@ -2476,6 +2476,21 @@ function rPB(){
   h+='</tbody></table></div>';
   var pbOverlay=window._pbDrop?'<div onclick="togglePbDrop(\'\')" style="position:fixed;inset:0;z-index:499"></div>':'';
   document.getElementById('ppb').innerHTML=pbOverlay+h;
+  pbFitHeight();
+}
+// Same "fill remaining viewport" fix already applied to Summary Sheet, Detail
+// Report, Production Orders and the sidebar: without a height cap the table
+// has nothing to scroll inside, so the whole page scrolls instead and drags
+// the filters/KPI tiles/column header off screen with it.
+function pbFitHeight(){
+  var ps=document.getElementById('pb-scroll');if(!ps)return;
+  var top=ps.getBoundingClientRect().top;
+  var h=Math.max(200,(window.innerHeight-top-16)/zoomScale());
+  ps.style.height=h+'px';
+}
+if(!window._pbResizeBound){
+  window._pbResizeBound=true;
+  window.addEventListener('resize',function(){pbFitHeight();});
 }
 
 // ── EXCESS COMM ──
