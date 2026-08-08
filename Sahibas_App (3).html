@@ -2347,7 +2347,10 @@ function rPB(){
   if(pbOpen){
     pbDD='<div class="po-dd-panel" style="position:absolute;top:calc(100% + 4px);left:0;z-index:500;background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px;min-width:220px;max-height:280px;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,.15)">'
      +'<input type="text" placeholder="Search products…" oninput="poDropFilter(this)" onclick="event.stopPropagation()" style="width:100%;border:1px solid #e0dcd4;border-radius:5px;padding:5px 8px;font-size:11px;outline:none;box-sizing:border-box;margin-bottom:5px">'
-     +(pbSel.length?'<div onclick="clearPbFltField(\'prods\')" style="font-size:10px;color:#c0392b;cursor:pointer;padding:2px 4px;margin-bottom:4px;border-radius:4px;background:#fff5f5">✕ Clear all</div>':'')
+     // Always reserve this row's space -- see the matching note in rPO()'s
+     // mkDrop() -- otherwise checking the first item shifts every checkbox
+     // below it down by a row and the next click lands on the wrong one.
+     +'<div onclick="'+(pbSel.length?'clearPbFltField(\'prods\')':'')+'" style="font-size:10px;color:'+(pbSel.length?'#c0392b':'#ccc')+';cursor:'+(pbSel.length?'pointer':'default')+';padding:2px 4px;margin-bottom:4px;border-radius:4px;background:'+(pbSel.length?'#fff5f5':'transparent')+'">✕ Clear all'+(pbSel.length?' ('+pbSel.length+')':'')+'</div>'
      +pbAllProducts.map(function(p){
         var chk=pbSel.indexOf(p)>=0;
         return '<label data-nm="'+p.toLowerCase().replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:7px;padding:5px 6px;cursor:pointer;border-radius:4px;font-size:12px;white-space:nowrap"><input type="checkbox" '+(chk?'checked':'')+' onchange="togglePbFlt(\'prods\',\''+p.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\')" style="cursor:pointer;accent-color:var(--gold)">'+p+'</label>';
@@ -5634,7 +5637,13 @@ function rPO(){
     if(!open)return btn;
     var dd='<div class="po-dd-panel" style="position:absolute;top:calc(100% + 4px);left:0;z-index:500;background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px;min-width:190px;max-height:260px;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,.15)">';
     if(opts.length>4)dd+='<input type="text" placeholder="Search '+label.toLowerCase()+'..." oninput="poDropFilter(this)" onclick="event.stopPropagation()" style="width:100%;border:1px solid #e0dcd4;border-radius:5px;padding:5px 8px;font-size:11px;outline:none;box-sizing:border-box;margin-bottom:5px">';
-    if(cnt>0)dd+='<div onclick="clearPoFltField(\''+id+'\')" style="font-size:10px;color:#c0392b;cursor:pointer;padding:2px 4px;margin-bottom:4px;border-radius:4px;background:#fff5f5">✕ Clear all</div>';
+    // Always reserve this row's space, whether or not anything is selected --
+    // making it appear only once cnt>0 shifted every checkbox below it down by
+    // one row the instant you checked your first item, so your next click (at
+    // the same screen position) landed on whatever slid up into that spot
+    // instead of the item you meant, and toggling it back off looked like the
+    // selection "disappeared" or like only one item could ever be selected.
+    dd+='<div onclick="'+(cnt>0?'clearPoFltField(\''+id+'\')':'')+'" style="font-size:10px;color:'+(cnt>0?'#c0392b':'#ccc')+';cursor:'+(cnt>0?'pointer':'default')+';padding:2px 4px;margin-bottom:4px;border-radius:4px;background:'+(cnt>0?'#fff5f5':'transparent')+'">✕ Clear all'+(cnt>0?' ('+cnt+')':'')+'</div>';
     opts.forEach(function(opt){
       var chk=(selArr||[]).indexOf(opt)>=0;
       dd+='<label data-nm="'+opt.toLowerCase().replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:7px;padding:5px 6px;cursor:pointer;border-radius:4px;font-size:12px;white-space:nowrap;hover:background:#f5f5f5"><input type="checkbox" '+(chk?'checked':'')+' onchange="togglePoFlt(\''+id+'\',\''+opt.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\')" style="cursor:pointer;accent-color:var(--gold)">'+opt+'</label>';
