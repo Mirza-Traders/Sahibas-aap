@@ -3510,7 +3510,15 @@ function rCO(){
   // firing until a real cost is entered.
   var coThumb=function(n){
     var img=findImg(n.toLowerCase().trim());
-    return img?'<img src="'+img+'" loading="lazy" data-n="'+n.replace(/"/g,'')+'" onerror="imgFail(this)" style="width:32px;height:40px;object-fit:cover;object-position:top center;border-radius:4px;display:block">':prodPH(n).replace('width:52px;height:52px;font-size:14px','width:32px;height:40px;font-size:11px;border-radius:4px');
+    return img?'<img src="'+img+'" loading="lazy" data-n="'+n.replace(/"/g,'')+'" onerror="imgFail(this)" onclick="rxViewPhoto(\''+img.replace(/'/g,"\\'")+'\')" title="Click to enlarge" style="width:32px;height:40px;object-fit:cover;object-position:top center;border-radius:4px;display:block;cursor:zoom-in">':prodPH(n).replace('width:52px;height:52px;font-size:14px','width:32px;height:40px;font-size:11px;border-radius:4px');
+  };
+  // Name gets the same hover-preview + click-to-enlarge treatment as the
+  // Summary Sheet -- the thumbnail alone isn't always in view once the row
+  // list scrolls, so the name needs to carry it too.
+  var coNameCell=function(n){
+    var img=findImg(n.toLowerCase().trim());
+    var _pnh=phov(n);
+    return img?'<span'+_pnh+' onclick="rxViewPhoto(\''+img.replace(/'/g,"\\'")+'\')" style="cursor:zoom-in">'+n+'</span>':'<span'+_pnh+'>'+n+'</span>';
   };
   // Case-insensitive: saveCost() stores under the name as typed ("Swaye Pink"),
   // while cloud-loaded costs are lowercased, so CM holds a mix. A plain
@@ -3523,7 +3531,7 @@ function rCO(){
     var esc=n.replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return '<tr style="border-bottom:1px solid #f6e3e3;background:#fdf4f4">'
       +'<td style="padding:6px 10px;width:44px">'+coThumb(n)+'</td>'
-      +'<td style="padding:8px 10px;font-size:11px;font-weight:600">'+n
+      +'<td style="padding:8px 10px;font-size:11px;font-weight:600">'+coNameCell(n)
         +' <span style="background:#fdeeee;color:#c0392b;border-radius:3px;padding:1px 6px;font-size:8px;font-weight:700;margin-left:5px">NO COST</span></td>'
       +'<td style="padding:5px 10px;text-align:right">'
         +'<input type="number" min="0" placeholder="0" onkeydown="if(event.key===\'Enter\')saveCost(\''+esc+'\',this.value)" style="border:1px solid #e0a0a0;border-radius:4px;padding:5px 8px;font-size:11px;width:96px;text-align:right;background:#fff;font-weight:700">'
@@ -3538,7 +3546,7 @@ function rCO(){
     var thumb=coThumb(n);
     return '<tr style="border-bottom:1px solid #f0ede8">'
       +'<td style="padding:6px 10px;width:44px">'+thumb+'</td>'
-      +'<td style="padding:8px 10px;font-size:11px;font-weight:600">'+n+'</td>'
+      +'<td style="padding:8px 10px;font-size:11px;font-weight:600">'+coNameCell(n)+'</td>'
       +'<td style="padding:8px 10px;font-size:11px;text-align:right;font-family:monospace">PKR '+Number(cm[n]).toLocaleString()+'</td>'
       +'<td style="padding:8px 10px;text-align:right">'
       +'<button data-n="'+safeAttr+'" onclick="coEditClick(this)" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#666;font-weight:600;margin-right:4px">✎ Edit</button>'
