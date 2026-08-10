@@ -494,6 +494,14 @@ var SHOP_IMG={};
 // Shopify product handle (the /products/<handle> slug), keyed by lowercase
 // title. Captured from the "Handle" column of a Shopify product export.
 var SHOP_HANDLE={};
+// Shopify's OWN on-hand split by size, keyed by lowercase title. The export is
+// one row per variant, so the size dimension is right there in the Option
+// columns -- it just used to be summed away into a single per-product total.
+// The Shopify sheet has to answer with Shopify's stock, not the warehouse's:
+// the two genuinely disagree (Nayal is 44/43/43/23 here against 25/86/55/73 in
+// the Laam file), and a split that doesn't match the Stock beside it is worse
+// than no split at all.
+var SHOP_SIZES={};
 var SHOP_STORE='sahiba-clothing'; // <store>.myshopify.com — the admin URL still needs this
 // The storefront's real domain. The .myshopify.com address does redirect here,
 // but it bounces through Shopify first and flashes the wrong brand in the
@@ -673,6 +681,7 @@ async function initCloud(){
       if(data5.stock)SHOP_STOCK=data5.stock;
       if(data5.price)SHOP_PRICE=data5.price;
       if(data5.compare)SHOP_COMPARE=data5.compare;
+      if(data5.sizes)SHOP_SIZES=data5.sizes;
       if(data5.status)SHOP_STATUS=data5.status;
       if(data5.handle)SHOP_HANDLE=data5.handle;
       if(data5.img){
@@ -733,8 +742,14 @@ async function generate(){
       setProg(11,'Loading Shopify products...');
       var shTxt=await readFile(shopFile);
       var shRows=Papa.parse(shTxt,{header:true,skipEmptyLines:true}).data;
-      SHOP_STOCK={};SHOP_PRICE={};SHOP_COMPARE={};SHOP_IMG={};SHOP_HANDLE={};
+      SHOP_STOCK={};SHOP_PRICE={};SHOP_COMPARE={};SHOP_IMG={};SHOP_HANDLE={};SHOP_SIZES={};
       var lastTitle='';
+      // Which Option column holds the size varies by product (Size is usually
+      // Option1, but a product with a colour option can push it to 2 or 3), and
+      // Shopify only prints the Option *names* on a product's first row -- the
+      // extra variant rows carry values with blank names. So remember the names
+      // per product, the same way lastTitle covers the blank Title cells.
+      var lastOpt=['','',''];
       shRows.forEach(function(r){
         var t=(r['Title']||r['title']||'').trim();
         if(t)lastTitle=t;
@@ -747,6 +762,23 @@ async function generate(){
         if(key&&s)SHOP_STATUS[key]=s;
         var qty=parseInt(r['Variant Inventory Qty']||r['variant inventory qty']||0)||0;
         if(key){if(!SHOP_STOCK[key])SHOP_STOCK[key]=0;SHOP_STOCK[key]+=qty;}
+        // A product's first row names its options; reset on a new product so one
+        // product's option layout never leaks into the next.
+        if(t)lastOpt=['','',''];
+        for(var oi=0;oi<3;oi++){
+          var on=(r['Option'+(oi+1)+' Name']||r['option'+(oi+1)+' name']||'').trim();
+          if(on)lastOpt[oi]=on;
+        }
+        if(key){
+          var szIdx=-1;
+          for(var oj=0;oj<3;oj++)if(/^size$/i.test(lastOpt[oj])){szIdx=oj;break;}
+          // No option is called Size (a one-size product, say) -- its pieces are
+          // still real stock, so they land in "other" rather than vanishing.
+          var sv=szIdx>=0?String(r['Option'+(szIdx+1)+' Value']||r['option'+(szIdx+1)+' value']||'').trim().toUpperCase():'';
+          if(!SHOP_SIZES[key])SHOP_SIZES[key]={S:0,M:0,L:0,XL:0,other:0};
+          if(sv==='S'||sv==='M'||sv==='L'||sv==='XL')SHOP_SIZES[key][sv]+=qty;
+          else SHOP_SIZES[key].other+=qty;
+        }
         var vp=parseFloat(r['Variant Price']||r['variant price']||0)||0;
         if(key&&vp>0&&!SHOP_PRICE[key])SHOP_PRICE[key]=vp;
         var cap=parseFloat(r['Variant Compare At Price']||r['variant compare at price']||0)||0;
@@ -3268,7 +3300,7 @@ async function publishSnapshot(){
     if(window._shopFresh){
       try{
         var r2=await fetch(CLOUD_API+'/shopify-data',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),
-          body:JSON.stringify({stock:SHOP_STOCK,price:SHOP_PRICE,compare:SHOP_COMPARE,status:SHOP_STATUS,img:SHOP_IMG,handle:SHOP_HANDLE,gen:new Date().toISOString()})});
+          body:JSON.stringify({stock:SHOP_STOCK,price:SHOP_PRICE,compare:SHOP_COMPARE,status:SHOP_STATUS,img:SHOP_IMG,handle:SHOP_HANDLE,sizes:SHOP_SIZES,gen:new Date().toISOString()})});
         var j2=await r2.json();
         if(r2.ok&&j2.ok)msg+=' + Shopify snapshot ✓';
       }catch(e2){}
@@ -3861,25 +3893,26 @@ function fsRows(){
     // keeps its own count, which is identical on ~96% of products and can sit
     // either side of the split on the rest.
     var stockShown=src==='shopify'?(SHOP_STOCK[k]||0):(sp.total||0);
-    var szSum=(sp.S||0)+(sp.M||0)+(sp.L||0)+(sp.XL||0);
+    // Each sheet answers with its own source's split, so the four numbers always
+    // belong to the Stock total sitting next to them. An export from before the
+    // size columns were read gives no Shopify split at all -- that renders "—",
+    // never Laam's numbers under a Shopify heading.
+    var szSrc=src==='shopify'?SHOP_SIZES[k]:sp;
+    var szS=szSrc?(szSrc.S||0):0,szM=szSrc?(szSrc.M||0):0,
+        szL=szSrc?(szSrc.L||0):0,szXL=szSrc?(szSrc.XL||0):0;
+    var szSum=szS+szM+szL+szXL;
     out.push({
       key:rk,name:sp.title,img:findImg(k)||sp.img||'',
       createdAt:sp.createdAt||'',
       cost:cost,gross:gross,retail:retail,
       curDisc:curDisc,curDiscPct:curDiscPct,
       stock:stockShown,
-      // On-hand split by size, same S/M/L/XL breakdown the Pre-Booked sheet
-      // shows. It's one physical warehouse, so the split is the same garments
-      // on both sheets -- only the Stock number beside it changes source.
-      // "other" = pieces in sizes outside S/M/L/XL (kids 5-6Y..12-13Y, XXL,
-      // Standard Size). buildStockProds only buckets the four, so without this
-      // the four numbers would silently fail to add up to the Stock column.
-      // Derived from whichever total is displayed, so the row always reconciles.
-      // "over" marks the case that arithmetic can't fix: Shopify reporting FEWER
-      // units than the size split accounts for (the two systems genuinely
-      // disagree). Flagged in the cell rather than quietly clamped away.
-      sizes:{S:sp.S||0,M:sp.M||0,L:sp.L||0,XL:sp.XL||0,
-        other:Math.max(0,stockShown-szSum),over:szSum>stockShown?szSum-stockShown:0},
+      // "other" = pieces outside S/M/L/XL (kids 5-6Y..12-13Y, XXL, Standard
+      // Size). Derived from whichever total is displayed, so the row always
+      // reconciles. "over" marks what arithmetic can't fix: a split accounting
+      // for MORE units than the Stock total, flagged rather than clamped away.
+      sizes:szSrc?{S:szS,M:szM,L:szL,XL:szXL,
+        other:Math.max(0,stockShown-szSum),over:szSum>stockShown?szSum-stockShown:0}:null,
       status:src==='shopify'?(SHOP_STATUS[k]||''):(sp.status||''),
       be:be,trueBe:trueBe,beCustom:beCustom,beDisc:beDisc,disc:disc,sale:sale,
       gp:p.gp,gpPct:sale>0?Math.round(p.gp/sale*1000)/10:0,
