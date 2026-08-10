@@ -4014,7 +4014,17 @@ function rFS(){
   var body=rows.map(function(r){
     var sel=!!fs.sel[r.key];
     var bg=sel?'#fff8e0':r.belowBE?'#fdf0f0':'';
-    var img=r.img?'<img src="'+r.img+(r.img.indexOf('?')>=0?'&':'?')+'width=80" loading="lazy" data-n="'+r.name.replace(/"/g,'')+'" onerror="imgFail(this)" onclick="rxViewPhoto(\''+String(r.img).replace(/'/g,"\\'")+'\')" title="Click to enlarge" style="width:34px;height:43px;object-fit:cover;object-position:top center;border-radius:4px;border:1px solid #eee;cursor:zoom-in;display:block">':'<span style="color:#ddd;font-size:9px">—</span>';
+    // Photo column, same presentation as Hand Stock: a 52x65 thumbnail, an
+    // initials tile (never a bare dash) when no photo exists, and the "≈" badge
+    // when the photo is borrowed from a similar-named product. Only http URLs
+    // are turned into <img> -- anything else would render as a broken icon.
+    var _fimg=(r.img&&String(r.img).indexOf('http')===0)
+      ?r.img+(String(r.img).indexOf('?')>=0?'&':'?')+'width=120':'';
+    var img=_fimg
+      ?'<img src="'+_fimg+'" loading="lazy" data-n="'+r.name.replace(/"/g,'')+'" onerror="imgFail(this)" onclick="event.stopPropagation();rxViewPhoto(\''+String(r.img).replace(/'/g,"\\'")+'\')" title="Click to enlarge" style="width:52px;height:65px;object-fit:cover;object-position:top center;border-radius:6px;border:1px solid #eee;cursor:zoom-in;display:block">'
+      :prodPH(r.name).replace('width:52px;height:52px','width:52px;height:65px');
+    var _fbp=_fimg?imgBorrowedParent(r.name):'';
+    if(_fbp)img='<div style="position:relative;width:52px">'+img+'<span title="Not this product\'s own photo — showing &quot;'+_fbp.replace(/"/g,'')+'&quot; (no photo exists for '+r.name.replace(/"/g,'')+')" style="position:absolute;top:2px;right:2px;background:rgba(30,30,30,.78);color:#ffd76e;font-size:11px;font-weight:700;border-radius:4px;padding:0 4px;line-height:15px;cursor:help">≈</span></div>';
     var td=function(v,st){return '<td style="padding:5px 8px;text-align:right;white-space:nowrap;font-family:monospace;'+(st||'')+'">'+v+'</td>';};
     return '<tr style="border-bottom:1px solid #f2efe9;'+(bg?'background:'+bg+';':'')+'">'
       +'<td style="padding:5px 8px;text-align:center"><input type="checkbox" '+(sel?'checked':'')+' onchange="fsToggle(\''+r.key.replace(/'/g,"\\'")+'\')" style="cursor:pointer;accent-color:var(--gold)"></td>'
@@ -4094,7 +4104,7 @@ function rFS(){
       +'<th style="'+TH+'text-align:center;cursor:default"><input type="checkbox" '+(allSel?'checked':'')+' onclick="fsSelAll(this)" style="cursor:pointer;accent-color:var(--gold)"></th>'
       +th('Created','createdAt','center')
       +th('Product','name','left')
-      +'<th style="'+TH+'text-align:center;cursor:default">Img</th>'
+      +'<th style="'+TH+'text-align:center;cursor:default;width:64px;min-width:64px">Img</th>'
       +'<th style="'+TH+'text-align:center;cursor:default">★ Rating</th>'
       +th('Stock','stock')
       +th(isShopSrc?'Compare At':'Gross Price','gross',null,GBG,isShopSrc?'Shopify Compare At Price — the struck-through anchor discounts come off':'Laam Original Price — the anchor discounts come off')
