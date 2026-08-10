@@ -3858,6 +3858,16 @@ function fsRows(){
       cost:cost,gross:gross,retail:retail,
       curDisc:curDisc,curDiscPct:curDiscPct,
       stock:src==='shopify'?(SHOP_STOCK[k]||0):(sp.total||0),
+      // On-hand split by size, same S/M/L/XL breakdown the Pre-Booked sheet
+      // shows. The Shopify export carries one stock number per product with no
+      // size dimension, so that source gets null -- rendered as "—", never as
+      // 0/0/0/0, which would read as "in stock, none in any size".
+      // "other" = pieces in sizes outside S/M/L/XL (kids 5-6Y..12-13Y, XXL,
+      // Standard Size). buildStockProds only buckets the four, but sp.total
+      // counts every row, so without this the four numbers would silently fail
+      // to add up to the Stock column.
+      sizes:src==='shopify'?null:{S:sp.S||0,M:sp.M||0,L:sp.L||0,XL:sp.XL||0,
+        other:Math.max(0,(sp.total||0)-((sp.S||0)+(sp.M||0)+(sp.L||0)+(sp.XL||0)))},
       status:src==='shopify'?(SHOP_STATUS[k]||''):(sp.status||''),
       be:be,trueBe:trueBe,beCustom:beCustom,beDisc:beDisc,disc:disc,sale:sale,
       gp:p.gp,gpPct:sale>0?Math.round(p.gp/sale*1000)/10:0,
@@ -3935,12 +3945,13 @@ function fsExport(){
   var isShop=(fs.src||'laam')==='shopify';
   var out=Object.keys(fs.sel).length?rows.filter(function(r){return fs.sel[r.key];}):rows;
   csvDL(out.map(function(r){return[
-    r.createdAt?fmtCDate(r.createdAt):'',r.name,r.status,r.stock,
+    r.createdAt?fmtCDate(r.createdAt):'',r.name,r.status,
+    r.sizes?r.sizes.S:'',r.sizes?r.sizes.M:'',r.sizes?r.sizes.L:'',r.sizes?r.sizes.XL:'',r.stock,
     r.gross,r.curDisc,r.curDiscPct,r.retail,r.cost,
     Math.round(r.be),r.beDisc!==null?Math.round(r.beDisc*10)/10:'',
     r.disc,r.sale,Math.round(r.gp),r.gpPct,Math.round(r.commission),
     Math.round(r.netProfit),Math.round(r.netPct*10)/10,r.belowBE?'BELOW BREAKEVEN':''
-  ];}),['Created','Product',isShop?'ShopifyStatus':'LaamStatus','Stock',
+  ];}),['Created','Product',isShop?'ShopifyStatus':'LaamStatus','S','M','L','XL','Stock',
     isShop?'CompareAtPrice':'GrossPrice','CurrentDiscount','CurrentDisc%',
     isShop?'ShopifyRetail':'LaamRetail','Cost',
     'BreakEvenPrice','MaxSafeDisc%','SaleDisc%','SalePrice','GP','GP%','Commission',
@@ -4032,7 +4043,10 @@ function rFS(){
       +'<td style="padding:5px 8px;font-weight:700;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis"'+phov(r.name)+'>'+r.name+'</td>'
       +'<td style="padding:4px 6px;text-align:center">'+img+'</td>'
       +'<td style="padding:4px 6px;text-align:center;white-space:nowrap">'+(ratingChip(r.name)||'<span style="color:#ccc;font-size:9px">—</span>')+'</td>'
-      +td(r.stock||'—','color:#888')
+      +td(r.sizes?(r.sizes.S+'/'+r.sizes.M+'/'+r.sizes.L+'/'+r.sizes.XL
+          +(r.sizes.other?'<span title="'+r.sizes.other+' pcs in other sizes (kids / XXL / Standard) — counted in Stock but not in S/M/L/XL" style="color:#c89a4a;font-weight:600"> +'+r.sizes.other+'</span>':'')):'—',
+          'background:#fff8e0;color:'+(r.sizes?'#a07030':'#ccc')+';font-size:10px;font-weight:700')
+      +td(r.stock||'—','color:#888;font-weight:700')
       // ── Gross Price & Disc% (today's live position) ──
       +td(r.gross?NF(r.gross):'—','background:'+GBG+';font-weight:600')
       +td(r.curDisc?NF(r.curDisc):'—','background:'+GBG+';color:'+(r.curDisc?'#c0392b':'#bbb'))
@@ -4067,6 +4081,10 @@ function rFS(){
   var sumCost=rows.reduce(function(a,r){return a+r.cost*r.stock;},0);
   var sumGp=rows.reduce(function(a,r){return a+r.gp*r.stock;},0);
   var sumComm=rows.reduce(function(a,r){return a+r.commission*r.stock;},0);
+  // null on the Shopify sheet -- that export has no size dimension to total.
+  var sumSizes=rows.length&&rows[0].sizes?rows.reduce(function(a,r){
+    if(r.sizes){a.S+=r.sizes.S;a.M+=r.sizes.M;a.L+=r.sizes.L;a.XL+=r.sizes.XL;a.other+=r.sizes.other;}return a;
+  },{S:0,M:0,L:0,XL:0,other:0}):null;
   var tdc=function(v,ex){return '<td style="padding:5px 8px;text-align:right;font-family:monospace;background:'+totBg+';'+(ex||'')+'">'+v+'</td>';};
   var trow='<tr style="background:'+totBg+';font-weight:700;font-size:11px;border-bottom:3px solid var(--gold)">'
    +'<td style="padding:5px 8px;background:'+totBg+'"></td>'
@@ -4074,6 +4092,9 @@ function rFS(){
    +'<td style="padding:5px 8px;background:'+totBg+';font-weight:800;white-space:nowrap;color:var(--gold2)">SUBTOTAL — '+rows.length+' products</td>'
    +'<td style="padding:5px 8px;background:'+totBg+'"></td>'
    +'<td style="padding:5px 8px;background:'+totBg+';text-align:center;color:#bbb">—</td>'
+   +tdc(sumSizes?(NF(sumSizes.S)+'/'+NF(sumSizes.M)+'/'+NF(sumSizes.L)+'/'+NF(sumSizes.XL)
+        +(sumSizes.other?'<span title="'+NF(sumSizes.other)+' pcs in other sizes (kids / XXL / Standard)" style="color:#c89a4a"> +'+NF(sumSizes.other)+'</span>':'')):'—',
+        'background:#fdf6e0;color:'+(sumSizes?'#a07030':'#bbb')+';font-size:10px;font-weight:800')
    +tdc(NF(totUnits),'font-weight:800')
    +tdc(NF(Math.round(sumGross)),'background:'+GBG)+tdc('—','background:'+GBG+';color:#bbb')+tdc('—','background:'+GBG+';color:#bbb')
    +tdc(NF(Math.round(sumRetail)),'background:'+RBG+';color:#2471a3;font-weight:800')
@@ -4090,7 +4111,7 @@ function rFS(){
 
   // Row 1: group bands, mirroring the Summary Sheet's banded layout.
   var gRow='<tr>'
-   +'<th colspan="6" style="padding:4px 10px;background:#f0ede8;color:var(--gold2);text-align:left;font-size:10px;font-weight:700;border-bottom:1px solid #e0dcd4">'+(isShopSrc?'Shopify Prices':'Laam Prices')+'</th>'
+   +'<th colspan="7" style="padding:4px 10px;background:#f0ede8;color:var(--gold2);text-align:left;font-size:10px;font-weight:700;border-bottom:1px solid #e0dcd4">'+(isShopSrc?'Shopify Prices':'Laam Prices')+'</th>'
    +'<th colspan="3" style="padding:4px;background:'+GBG+';color:#a35b00;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #e8cfa8">Gross Price &amp; Disc%</th>'
    +'<th style="padding:4px;background:'+RBG+';color:#2471a3;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #b8d0f0">Retail Price</th>'
    +'<th style="padding:4px;background:#f8f6f2;border-bottom:1px solid #e0dcd4"></th>'
@@ -4106,6 +4127,7 @@ function rFS(){
       +th('Product','name','left')
       +'<th style="'+TH+'text-align:center;cursor:default;width:64px;min-width:64px">Img</th>'
       +'<th style="'+TH+'text-align:center;cursor:default">★ Rating</th>'
+      +'<th style="'+TH+'background:#fff8e0;color:#a07030;font-size:9px;cursor:default" title="'+(isShopSrc?'The Shopify export has no size breakdown — Laam Prices shows it':'On-hand pieces per size')+'">S / M / L / XL</th>'
       +th('Stock','stock')
       +th(isShopSrc?'Compare At':'Gross Price','gross',null,GBG,isShopSrc?'Shopify Compare At Price — the struck-through anchor discounts come off':'Laam Original Price — the anchor discounts come off')
       +th('Discount','curDisc',null,GBG,'Rupees currently off the anchor price')
