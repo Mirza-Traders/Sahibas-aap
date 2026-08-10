@@ -3984,28 +3984,25 @@ function rFS(){
   var fs=window._fs,rows=fsRows();
   var isShopSrc=(fs.src||'laam')==='shopify';
   var selCount=Object.keys(fs.sel).length;
-  var customCount=rows.filter(function(r){return r.isCustom;}).length;
-  var belowCount=rows.filter(function(r){return r.belowBE;}).length;
   var _ci=dcCostIdx();
   var noCostTotal=Object.keys(STOCK_PRODS||{}).filter(function(k){
     return !_ci[k]&&(!isShopSrc||SHOP_PRICE[k]>0);
   }).length;
-  // Totals across the plan, weighted by stock on hand -- "if every unit sold
-  // at these prices, this is what the sale earns (or costs) you".
+  // How many pieces this plan covers -- the one total that is a real count
+  // rather than a sum of prices that never get paid together.
   var totUnits=rows.reduce(function(a,r){return a+r.stock;},0);
-  var totRev=rows.reduce(function(a,r){return a+r.sale*r.stock;},0);
-  var totNet=rows.reduce(function(a,r){return a+r.netProfit*r.stock;},0);
 
-  var kh='<div class="krow">'
-   +'<div class="kpi b"><div class="kl">Products</div><div class="kv">'+rows.length+'</div><div class="ks">'+(customCount?customCount+' custom priced':'all at break-even')+'</div></div>'
-   +'<div class="kpi '+(belowCount?'r':'g')+'"><div class="kl">Below Break-Even</div><div class="kv">'+belowCount+'</div><div class="ks">'+(belowCount?'these lose money':'nothing loses money')+'</div></div>'
-   +'<div class="kpi w"><div class="kl">Units in Stock</div><div class="kv">'+NF(totUnits)+'</div><div class="ks">across this plan</div></div>'
-   +'<div class="kpi e"><div class="kl">Revenue if all sold</div><div class="kv">'+NF(Math.round(totRev))+'</div><div class="ks">at these sale prices</div></div>'
-   +'<div class="kpi '+(totNet<0?'r':'g')+'"><div class="kl">Net Profit if all sold</div><div class="kv">'+(totNet<0?'-':'')+NF(Math.abs(Math.round(totNet)))+'</div><div class="ks">'+(totNet<0?'⚠ a loss at these prices':'after 25% commission')+'</div></div>'
-   +'</div>';
+  // No KPI cards and no pinned subtotal row -- every one of those totals summed
+  // rupees across products that never sell together, and each row of furniture
+  // above the table is a row of real data pushed out of view. The plan's size
+  // rides in the toolbar instead, as plain text that costs no vertical space.
+  var kh='';
+  var planCount='<span style="color:#888;font-size:10px;white-space:nowrap">'
+   +'<b style="color:var(--gold2)">'+NF(rows.length)+'</b> products · <b style="color:var(--gold2)">'+NF(totUnits)+'</b> units</span>';
 
   var bar='<div style="background:#fafafa;border:1px solid #eee;border-radius:8px;padding:10px 14px;margin:12px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
    +'<input type="text" value="'+(fs.search||'').replace(/"/g,'&quot;')+'" placeholder="Search product…" oninput="fsSearch(this.value)" style="border:1px solid #ddd;border-radius:6px;padding:5px 10px;font-size:11px;min-width:170px;background:#fff">'
+   +planCount
    +'<span style="color:#ccc">|</span>'
    +'<span style="font-size:10px;color:#888;font-weight:700">Bulk set discount:</span>'
    +'<input type="number" id="fs-bulk" placeholder="%" min="0" max="99" style="border:1px solid #d8b96e;border-radius:6px;padding:5px 8px;font-size:11px;width:70px;background:#fffdf5;font-weight:700;text-align:right">'
@@ -4088,44 +4085,6 @@ function rFS(){
   // SUBTOTAL row pinned above the header rows, same as the Summary Sheet --
   // stock-weighted, so it answers "what does this whole plan earn if it all
   // sells" without scrolling to the bottom.
-  var totBg='#faf6ec';
-  var sumGross=rows.reduce(function(a,r){return a+r.gross*r.stock;},0);
-  var sumRetail=rows.reduce(function(a,r){return a+r.retail*r.stock;},0);
-  var sumCost=rows.reduce(function(a,r){return a+r.cost*r.stock;},0);
-  var sumGp=rows.reduce(function(a,r){return a+r.gp*r.stock;},0);
-  var sumComm=rows.reduce(function(a,r){return a+r.commission*r.stock;},0);
-  // overN = how many products Shopify counts short of their size split, so the
-  // subtotal can say the two systems disagree instead of just not adding up.
-  var sumSizes=rows.length?rows.reduce(function(a,r){
-    if(r.sizes){a.S+=r.sizes.S;a.M+=r.sizes.M;a.L+=r.sizes.L;a.XL+=r.sizes.XL;a.other+=r.sizes.other;
-      if(r.sizes.over){a.over+=r.sizes.over;a.overN++;}}return a;
-  },{S:0,M:0,L:0,XL:0,other:0,over:0,overN:0}):null;
-  if(sumSizes&&!(sumSizes.S+sumSizes.M+sumSizes.L+sumSizes.XL))sumSizes=null;
-  var tdc=function(v,ex){return '<td style="padding:5px 8px;text-align:right;font-family:monospace;background:'+totBg+';'+(ex||'')+'">'+v+'</td>';};
-  var trow='<tr style="background:'+totBg+';font-weight:700;font-size:11px;border-bottom:3px solid var(--gold)">'
-   +'<td style="padding:5px 8px;background:'+totBg+'"></td>'
-   +'<td style="padding:4px 6px;background:'+totBg+';text-align:center;font-size:9px;font-style:italic;color:var(--gold2)">TOT</td>'
-   +'<td style="padding:5px 8px;background:'+totBg+';font-weight:800;white-space:nowrap;color:var(--gold2)">SUBTOTAL — '+rows.length+' products</td>'
-   +'<td style="padding:5px 8px;background:'+totBg+'"></td>'
-   +'<td style="padding:5px 8px;background:'+totBg+';text-align:center;color:#bbb">—</td>'
-   +tdc(sumSizes?(NF(sumSizes.S)+'/'+NF(sumSizes.M)+'/'+NF(sumSizes.L)+'/'+NF(sumSizes.XL)
-        +(sumSizes.other?'<span title="'+NF(sumSizes.other)+' pcs in other sizes (kids / XXL / Standard)" style="color:#c89a4a"> +'+NF(sumSizes.other)+'</span>':'')
-        +(sumSizes.overN?'<span title="'+sumSizes.overN+' product'+(sumSizes.overN>1?'s':'')+' where Shopify counts fewer units than the size split accounts for ('+NF(sumSizes.over)+' pcs in total) — marked ⚠ in the rows below" style="color:#c0392b;font-weight:800;cursor:help"> ⚠'+sumSizes.overN+'</span>':'')):'—',
-        'background:#fdf6e0;color:'+(sumSizes?'#a07030':'#bbb')+';font-size:10px;font-weight:800')
-   +tdc(NF(totUnits),'font-weight:800')
-   +tdc(NF(Math.round(sumGross)),'background:'+GBG)+tdc('—','background:'+GBG+';color:#bbb')+tdc('—','background:'+GBG+';color:#bbb')
-   +tdc(NF(Math.round(sumRetail)),'background:'+RBG+';color:#2471a3;font-weight:800')
-   +tdc(NF(Math.round(sumCost)),'color:#c0392b')
-   +tdc('—','background:'+BBG+';color:#bbb')+tdc('—','background:'+BBG+';color:#bbb')
-   +tdc('—','background:'+SBG+';color:#bbb')
-   +tdc(NF(Math.round(totRev)),'background:'+SBG+';font-weight:800')
-   +tdc(NF(Math.round(sumGp)),'background:#ecfaec;color:#27ae60;font-weight:800')
-   +tdc(totRev>0?Math.round(sumGp/totRev*1000)/10+'%':'—','background:#ecfaec;color:#27ae60;font-weight:800')
-   +tdc(NF(Math.round(sumComm)),'background:#f9f5ff;color:#8e44ad')
-   +tdc((totNet<0?'-':'')+NF(Math.abs(Math.round(totNet))),'background:'+NBG+';font-weight:800;color:'+(totNet<0?'#c0392b':'#27ae60'))
-   +tdc(totRev>0?Math.round(totNet/totRev*1000)/10+'%':'—','background:'+NBG+';font-weight:800;color:'+(totNet<0?'#c0392b':'#27ae60'))
-   +'</tr>';
-
   // Row 1: group bands, mirroring the Summary Sheet's banded layout.
   var gRow='<tr>'
    +'<th colspan="7" style="padding:4px 10px;background:#f0ede8;color:var(--gold2);text-align:left;font-size:10px;font-weight:700;border-bottom:1px solid #e0dcd4">'+(isShopSrc?'Shopify Prices':'Laam Prices')+'</th>'
@@ -4163,7 +4122,7 @@ function rFS(){
     +'</tr>';
 
   var table='<div id="fs-scroll" style="overflow:auto;border:1px solid #e8e4dc;border-radius:6px;min-height:200px"><table style="width:100%;border-collapse:collapse;font-size:11px;background:#fff">'
-    +'<thead>'+trow+gRow+cRow+'</thead>'
+    +'<thead>'+gRow+cRow+'</thead>'
     +'<tbody>'+(body||'<tr><td colspan="20" style="padding:30px;text-align:center;color:#aaa;font-size:12px">No products match — try clearing the search, or show no-cost products.</td></tr>')+'</tbody></table></div>';
 
   // Two independent plans -- Laam and Shopify sell the same articles at
