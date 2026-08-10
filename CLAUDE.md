@@ -1,8 +1,22 @@
 # Sahibas by Mirza / OPS — working notes
 
 ## Screenshots
-Always send screenshots with `display: "render"` so they show full-size
-inline, not as a small download card.
+**Show screenshots with the Read tool, not SendUserFile.** Reading an image
+renders it full-width inline; SendUserFile only ever shows a small preview
+card, whatever `display` is set to.
+
+Capture them readable in the first place: `deviceScaleFactor: 2`, and hide the
+app chrome before shooting so every pixel is the report —
+
+```js
+document.getElementById('sidebar').style.display='none';
+document.querySelector('.top').style.display='none';
+document.querySelector('.fbar').style.display='none';
+document.getElementById('main-area').style.marginLeft='0';
+document.body.style.zoom=1;
+```
+
+then `page.screenshot({clip: <#panel boundingBox>})`.
 
 ## Repo layout
 - `public/index.html` — the entire app (single file, vanilla JS, no build step).
