@@ -3789,7 +3789,7 @@ function rDC(){
 // Discount Calculator (DC_COMM_RATE) so the two never disagree.
 // This is a planning sheet only -- it never writes prices anywhere.
 // ═══════════════════════════════════════════════════════════════════
-window._fs={disc:{},sel:{},search:'',sort:'name',asc:true,hideNoCost:true,src:'laam'};
+window._fs={disc:{},be:{},sel:{},search:'',sort:'name',asc:true,hideNoCost:true,src:'laam'};
 
 // Break-even retail = the price where Net Profit is exactly zero after
 // commission: price - cost - price*0.25 = 0  =>  price = cost/(1-0.25).
@@ -3797,6 +3797,7 @@ function fsBreakEven(cost){return cost>0?cost/(1-DC_COMM_RATE):0;}
 
 function fsRows(){
   var costIdx=dcCostIdx(),fs=window._fs,q=(fs.search||'').toLowerCase().trim();
+  if(!fs.be)fs.be={}; // survives a session that started before target prices existed
   var src=fs.src||'laam';
   var out=[];
   Object.keys(STOCK_PRODS||{}).forEach(function(k){
@@ -3818,19 +3819,33 @@ function fsRows(){
     }
     if(fs.hideNoCost&&!cost)return;
     if(q&&k.indexOf(q)<0)return;
-    var be=fsBreakEven(cost);
-    // The discount off Gross Price that lands exactly on break-even. This is
-    // the default -- "how low can this article go before it starts losing".
-    // Floored (never rounded up) to 0.1%: rounding a 46.66% break-even up to
-    // 46.7% would push the sale price a few rupees UNDER break-even and flag
-    // an otherwise-fine article as loss-making, so always err toward safety.
-    var beDisc=(gross>0&&be>0)?Math.max(0,Math.floor((1-be/gross)*1000)/10):null;
+    // trueBe is the cost-derived floor and never moves -- the loss warning has
+    // to keep measuring against reality even when a custom target price is
+    // typed over the displayed value.
+    var trueBe=fsBreakEven(cost);
     // Discounts/selections are namespaced by source, so a discount planned on
     // the Laam sheet never leaks onto the Shopify one (same article, different
     // prices, so the same % means a different rupee price on each).
     var rk=src+'|'+k;
-    var disc=(fs.disc[rk]!==undefined&&fs.disc[rk]!==null)?fs.disc[rk]:(beDisc!==null?beDisc:0);
-    var sale=gross>0?Math.round(gross*(1-disc/100)):0;
+    var beOv=fs.be[rk];
+    var beCustom=(beOv!==undefined&&beOv!==null&&beOv>0);
+    var be=beCustom?beOv:trueBe;
+    // The discount off Gross Price that lands exactly on the target price.
+    // Floored (never rounded up) to 0.1%: rounding a 46.66% break-even up to
+    // 46.7% would push the sale price a few rupees UNDER break-even and flag
+    // an otherwise-fine article as loss-making, so always err toward safety.
+    var beDisc=(gross>0&&be>0)?Math.max(0,Math.floor((1-be/gross)*1000)/10):null;
+    // Two ways in, and the last one edited wins: type a price in B/E Price and
+    // the discount is derived from it; type a Disc% and the price follows.
+    // fsSetBE/fsSetDisc clear each other so the two can never disagree.
+    var disc,sale;
+    if(beCustom){
+      sale=Math.round(be);
+      disc=gross>0?Math.max(0,Math.round((1-sale/gross)*1000)/10):0;
+    }else{
+      disc=(fs.disc[rk]!==undefined&&fs.disc[rk]!==null)?fs.disc[rk]:(beDisc!==null?beDisc:0);
+      sale=gross>0?Math.round(gross*(1-disc/100)):0;
+    }
     var p=dcPnl(sale,cost);
     // Today's live discount off the anchor -- the "where it sits right now"
     // half of the sheet, same Gross → Discount → Disc% → Retail chain the
@@ -3844,11 +3859,14 @@ function fsRows(){
       curDisc:curDisc,curDiscPct:curDiscPct,
       stock:src==='shopify'?(SHOP_STOCK[k]||0):(sp.total||0),
       status:src==='shopify'?(SHOP_STATUS[k]||''):(sp.status||''),
-      be:be,beDisc:beDisc,disc:disc,sale:sale,
+      be:be,trueBe:trueBe,beCustom:beCustom,beDisc:beDisc,disc:disc,sale:sale,
       gp:p.gp,gpPct:sale>0?Math.round(p.gp/sale*1000)/10:0,
       commission:p.commission,netProfit:p.netProfit,netPct:p.netPct,
-      belowBE:be>0&&sale>0&&sale<Math.floor(be),
-      isCustom:fs.disc[rk]!==undefined&&fs.disc[rk]!==null
+      // Always measured against the real cost-derived floor, never against a
+      // typed-in target -- otherwise typing a loss-making price would silently
+      // switch the warning off.
+      belowBE:trueBe>0&&sale>0&&sale<Math.floor(trueBe),
+      isCustom:beCustom||(fs.disc[rk]!==undefined&&fs.disc[rk]!==null)
     });
   });
   var col=fs.sort,asc=fs.asc;
@@ -3859,9 +3877,20 @@ function fsRows(){
   });
   return out;
 }
+// Price-driven entry: type the price you actually want and the discount,
+// profit and margin all follow from it. Clears any Disc% override for the row
+// so the two inputs can never hold contradictory plans -- last edit wins.
+function fsSetBE(key,val){
+  var fs=window._fs;
+  var v=parseFloat(String(val).replace(/,/g,''));
+  if(isNaN(v)||v<=0){delete fs.be[key];}         // blank/0 -> back to computed break-even
+  else{fs.be[key]=Math.round(v);delete fs.disc[key];}
+  rendered.fs=false;doR('fs');
+}
 function fsSetDisc(key,val){
   var v=parseFloat(val);
   window._fs.disc[key]=(isNaN(v)?0:Math.max(0,Math.min(99,v)));
+  delete window._fs.be[key]; // percent-driven now; drop any typed target price
   rendered.fs=false;doR('fs');
 }
 function fsSearch(v){window._fs.search=v;clearTimeout(window._fsTimer);window._fsTimer=setTimeout(function(){rendered.fs=false;doR('fs');},250);}
@@ -3889,7 +3918,7 @@ function fsBulkApply(){
   v=Math.max(0,Math.min(99,v));
   var fs=window._fs,rows=fsRows();
   var targets=Object.keys(fs.sel).length?rows.filter(function(r){return fs.sel[r.key];}):rows;
-  targets.forEach(function(r){fs.disc[r.key]=v;});
+  targets.forEach(function(r){fs.disc[r.key]=v;delete fs.be[r.key];});
   rendered.fs=false;doR('fs');
   showToast('Applied '+v+'% to '+targets.length+' product'+(targets.length!==1?'s':'')+'.');
 }
@@ -3897,7 +3926,7 @@ function fsBulkApply(){
 function fsResetBE(){
   var fs=window._fs,rows=fsRows();
   var targets=Object.keys(fs.sel).length?rows.filter(function(r){return fs.sel[r.key];}):rows;
-  targets.forEach(function(r){delete fs.disc[r.key];});
+  targets.forEach(function(r){delete fs.disc[r.key];delete fs.be[r.key];});
   rendered.fs=false;doR('fs');
   showToast('Reset '+targets.length+' product'+(targets.length!==1?'s':'')+' to break-even.');
 }
@@ -4001,8 +4030,10 @@ function rFS(){
       // ── Retail Price: only this tab's platform ──
       +td(r.retail?NF(r.retail):'—','background:'+RBG+';color:#2471a3;font-weight:700')
       +td(r.cost?NF(r.cost):'—','color:#c0392b')
-      // ── Break-Even ──
-      +td(r.be?NF(Math.round(r.be)):'—','background:'+BBG+';font-weight:800;color:#1e5c33')
+      // ── Break-Even / target price (editable: type your own price here) ──
+      +'<td style="padding:4px 6px;text-align:right;background:'+BBG+'">'
+        +(r.trueBe?'<input type="number" value="'+Math.round(r.be)+'" min="0" step="50" onchange="fsSetBE(\''+r.key.replace(/'/g,"\\'")+'\',this.value)" title="'+(r.beCustom?'Your own target price — clear the box to go back to break-even '+NF(Math.round(r.trueBe)):'Break-even price — type your own price to override')+'" style="border:1px solid '+(r.beCustom?'#8e44ad':'#a8d5b5')+';border-radius:4px;padding:4px 6px;font-size:11px;width:74px;background:'+(r.beCustom?'#f9f2ff':'#fbfffc')+';font-weight:800;color:'+(r.beCustom?'#8e44ad':'#1e5c33')+';text-align:right">':'<span style="color:#bbb">—</span>')
+      +'</td>'
       +td(r.beDisc!==null?(r.beDisc>=0?r.beDisc.toFixed(1)+'%':'0%'):'—','background:'+BBG+';color:'+(r.beDisc!==null&&r.beDisc<0?'#c0392b':'#2d6b3f'))
       // ── Your Sale Price ──
       +'<td style="padding:4px 6px;text-align:right;background:'+SBG+'"><input type="number" value="'+r.disc+'" min="0" max="99" step="0.5" onchange="fsSetDisc(\''+r.key.replace(/'/g,"\\'")+'\',this.value)" style="border:1px solid #d8b96e;border-radius:4px;padding:4px 6px;font-size:11px;width:62px;background:#fffdf5;font-weight:700;text-align:right"></td>'
@@ -4071,7 +4102,7 @@ function rFS(){
       +th('Disc%','curDiscPct',null,GBG,'Today\'s live discount, before any flash-sale change')
       +th(retLbl,'retail',null,RBG,isShopSrc?'Current Shopify selling price':'Current Laam selling price')
       +th('Cost','cost')
-      +th('B/E Price','be',null,BBG,'Retail price where Net Profit is exactly zero after 25% commission')
+      +th('B/E Price ✎','be',null,BBG,'Break-even price by default — editable: type your own target price and the Disc%, Sale Price and profit all follow from it')
       +th('Max Disc%','beDisc',null,BBG,'Biggest discount off the anchor price that still breaks even')
       +th('Disc%','disc',null,SBG,'Editable — set your flash-sale discount here')
       +th('Sale Price','sale',null,SBG)
