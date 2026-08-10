@@ -1545,6 +1545,9 @@ function csToggleAll(){var allOn=Object.values(_csGroups).every(Boolean);Object.
 function prodInitials(n){var w=n.split(/[\s\-]/);return(w.length>=2?(w[0][0]+(w[1][0]||'')):n.substring(0,2)).toUpperCase();}
 function prodColor(n){var c=['#c8a96e','#2980b9','#27ae60','#8e44ad','#e67e22','#c0392b','#1abc9c','#d35400'];var h=n.split('').reduce(function(a,v){return a+v.charCodeAt(0);},0);return c[h%c.length];}
 function prodPH(n){return '<div style="width:52px;height:52px;border-radius:6px;background:'+prodColor(n)+';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0">'+prodInitials(n)+'</div>';}
+// Short "1 May'26" launch date. Global (was local to rCS) so the Flash Sale
+// Planner's Created column renders dates identically to the Summary Sheet.
+function fmtCDate(d){if(!d)return '—';var dt=new Date(d);if(isNaN(dt.getTime()))return String(d).split(' ')[0]||'—';var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];return dt.getDate()+' '+m+"'"+(dt.getFullYear()%100).toString().padStart(2,'0');}
 function imgFail(el){var n=el.getAttribute('data-n');el.outerHTML=prodPH(n);}
 var _PIDX=null;
 function findImg(k){
@@ -1883,7 +1886,6 @@ function rCS(){
   gRow+='</tr>';
 
   // Row 2: Column headers
-  function fmtCDate(d){if(!d)return '—';var dt=new Date(d);if(isNaN(dt.getTime()))return d.split(' ')[0]||'—';var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];return dt.getDate()+' '+m+"'"+(dt.getFullYear()%100).toString().padStart(2,'0');}
   var freezeUpTo='retailPrice';
   var cRow='<tr>';
   var allRowsSelected=arr.length>0&&arr.every(function(p){return _csSelProds.has(p.name);});
@@ -3830,13 +3832,21 @@ function fsRows(){
     var disc=(fs.disc[rk]!==undefined&&fs.disc[rk]!==null)?fs.disc[rk]:(beDisc!==null?beDisc:0);
     var sale=gross>0?Math.round(gross*(1-disc/100)):0;
     var p=dcPnl(sale,cost);
+    // Today's live discount off the anchor -- the "where it sits right now"
+    // half of the sheet, same Gross → Discount → Disc% → Retail chain the
+    // Summary Sheet shows, before any of the planning columns.
+    var curDisc=(gross>0&&retail>0&&gross>retail)?(gross-retail):0;
+    var curDiscPct=(gross>0&&curDisc>0)?Math.round(curDisc/gross*1000)/10:0;
     out.push({
       key:rk,name:sp.title,img:findImg(k)||sp.img||'',
+      createdAt:sp.createdAt||'',
       cost:cost,gross:gross,retail:retail,
+      curDisc:curDisc,curDiscPct:curDiscPct,
       stock:src==='shopify'?(SHOP_STOCK[k]||0):(sp.total||0),
       status:src==='shopify'?(SHOP_STATUS[k]||''):(sp.status||''),
       be:be,beDisc:beDisc,disc:disc,sale:sale,
-      gp:p.gp,commission:p.commission,netProfit:p.netProfit,netPct:p.netPct,
+      gp:p.gp,gpPct:sale>0?Math.round(p.gp/sale*1000)/10:0,
+      commission:p.commission,netProfit:p.netProfit,netPct:p.netPct,
       belowBE:be>0&&sale>0&&sale<Math.floor(be),
       isCustom:fs.disc[rk]!==undefined&&fs.disc[rk]!==null
     });
@@ -3896,13 +3906,15 @@ function fsExport(){
   var isShop=(fs.src||'laam')==='shopify';
   var out=Object.keys(fs.sel).length?rows.filter(function(r){return fs.sel[r.key];}):rows;
   csvDL(out.map(function(r){return[
-    r.name,r.status,r.stock,r.cost,r.gross,r.retail,
+    r.createdAt?fmtCDate(r.createdAt):'',r.name,r.status,r.stock,
+    r.gross,r.curDisc,r.curDiscPct,r.retail,r.cost,
     Math.round(r.be),r.beDisc!==null?Math.round(r.beDisc*10)/10:'',
-    r.disc,r.sale,Math.round(r.gp),Math.round(r.commission),
+    r.disc,r.sale,Math.round(r.gp),r.gpPct,Math.round(r.commission),
     Math.round(r.netProfit),Math.round(r.netPct*10)/10,r.belowBE?'BELOW BREAKEVEN':''
-  ];}),['Product',isShop?'ShopifyStatus':'LaamStatus','Stock','Cost',
-    isShop?'CompareAtPrice':'GrossPrice',isShop?'CurrentShopifyPrice':'CurrentRetail',
-    'BreakEvenPrice','MaxSafeDisc%','SaleDisc%','SalePrice','GP','Commission',
+  ];}),['Created','Product',isShop?'ShopifyStatus':'LaamStatus','Stock',
+    isShop?'CompareAtPrice':'GrossPrice','CurrentDiscount','CurrentDisc%',
+    isShop?'ShopifyRetail':'LaamRetail','Cost',
+    'BreakEvenPrice','MaxSafeDisc%','SaleDisc%','SalePrice','GP','GP%','Commission',
     'NetProfit','NetProfit%','Flag'],
     isShop?'flash_sale_plan_shopify.csv':'flash_sale_plan_laam.csv');
 }
@@ -3965,56 +3977,114 @@ function rFS(){
   var allSel=rows.length>0&&rows.every(function(r){return fs.sel[r.key];});
   var GBG='#fdf3e8',BBG='#f0f7f0',SBG='#fff8e6',NBG='#f0fff4';
 
+  // Colour language copied from the Summary Sheet so the two sheets read the
+  // same way: gold = anchor price & discount, blue = the live retail price,
+  // green = profit, purple = commission.
+  var RBG=isShopSrc?'#e8f0fb':'#eaf3fb'; // retail band -- Shopify blue / Laam blue
+  var retLbl=isShopSrc?'SHOPIFY':'LAAM';
   var body=rows.map(function(r){
     var sel=!!fs.sel[r.key];
     var bg=sel?'#fff8e0':r.belowBE?'#fdf0f0':'';
-    var img=r.img?'<img src="'+r.img+(r.img.indexOf('?')>=0?'&':'?')+'width=80" loading="lazy" style="width:30px;height:38px;object-fit:cover;object-position:top center;border-radius:3px;border:1px solid #eee" onerror="this.style.display=\'none\'">':'<span style="color:#ddd;font-size:9px">—</span>';
+    var img=r.img?'<img src="'+r.img+(r.img.indexOf('?')>=0?'&':'?')+'width=80" loading="lazy" data-n="'+r.name.replace(/"/g,'')+'" onerror="imgFail(this)" onclick="rxViewPhoto(\''+String(r.img).replace(/'/g,"\\'")+'\')" title="Click to enlarge" style="width:34px;height:43px;object-fit:cover;object-position:top center;border-radius:4px;border:1px solid #eee;cursor:zoom-in;display:block">':'<span style="color:#ddd;font-size:9px">—</span>';
     var td=function(v,st){return '<td style="padding:5px 8px;text-align:right;white-space:nowrap;font-family:monospace;'+(st||'')+'">'+v+'</td>';};
     return '<tr style="border-bottom:1px solid #f2efe9;'+(bg?'background:'+bg+';':'')+'">'
       +'<td style="padding:5px 8px;text-align:center"><input type="checkbox" '+(sel?'checked':'')+' onchange="fsToggle(\''+r.key.replace(/'/g,"\\'")+'\')" style="cursor:pointer;accent-color:var(--gold)"></td>'
-      +'<td style="padding:4px 6px;text-align:center">'+img+'</td>'
+      +'<td style="padding:4px 6px;text-align:center;font-size:10px;color:#888;white-space:nowrap">'+fmtCDate(r.createdAt)+'</td>'
       +'<td style="padding:5px 8px;font-weight:700;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis"'+phov(r.name)+'>'+r.name+'</td>'
+      +'<td style="padding:4px 6px;text-align:center">'+img+'</td>'
+      +'<td style="padding:4px 6px;text-align:center;white-space:nowrap">'+(ratingChip(r.name)||'<span style="color:#ccc;font-size:9px">—</span>')+'</td>'
       +td(r.stock||'—','color:#888')
+      // ── Gross Price & Disc% (today's live position) ──
+      +td(r.gross?NF(r.gross):'—','background:'+GBG+';font-weight:600')
+      +td(r.curDisc?NF(r.curDisc):'—','background:'+GBG+';color:'+(r.curDisc?'#c0392b':'#bbb'))
+      +td(r.curDiscPct?r.curDiscPct+'%':'—','background:'+GBG+';color:'+(r.curDiscPct?'#c0392b':'#bbb'))
+      // ── Retail Price: only this tab's platform ──
+      +td(r.retail?NF(r.retail):'—','background:'+RBG+';color:#2471a3;font-weight:700')
       +td(r.cost?NF(r.cost):'—','color:#c0392b')
-      +td(r.gross?NF(r.gross):'—','background:'+GBG)
-      +td(r.retail?NF(r.retail):'—','color:#2980b9')
+      // ── Break-Even ──
       +td(r.be?NF(Math.round(r.be)):'—','background:'+BBG+';font-weight:800;color:#1e5c33')
       +td(r.beDisc!==null?(r.beDisc>=0?r.beDisc.toFixed(1)+'%':'0%'):'—','background:'+BBG+';color:'+(r.beDisc!==null&&r.beDisc<0?'#c0392b':'#2d6b3f'))
+      // ── Your Sale Price ──
       +'<td style="padding:4px 6px;text-align:right;background:'+SBG+'"><input type="number" value="'+r.disc+'" min="0" max="99" step="0.5" onchange="fsSetDisc(\''+r.key.replace(/'/g,"\\'")+'\',this.value)" style="border:1px solid #d8b96e;border-radius:4px;padding:4px 6px;font-size:11px;width:62px;background:#fffdf5;font-weight:700;text-align:right"></td>'
       +td(r.sale?NF(r.sale):'—','background:'+SBG+';font-weight:800;'+(r.belowBE?'color:#c0392b':'color:#1a1a1a'))
-      +td(r.cost?NF(Math.round(r.gp)):'—','color:#27ae60')
-      +td(NF(Math.round(r.commission)),'color:#d4944a')
+      // ── Gross Profit ──
+      +td(r.cost?NF(Math.round(r.gp)):'—','background:#ecfaec;color:#27ae60;font-weight:700')
+      +td(r.cost&&r.sale?r.gpPct+'%':'—','background:#ecfaec;color:#27ae60;font-weight:700')
+      // ── Net P&L ──
+      +td(NF(Math.round(r.commission)),'background:#f9f5ff;color:#8e44ad')
       +td((r.netProfit<0?'-':'')+NF(Math.abs(Math.round(r.netProfit)))+(r.netProfit<0?' ⚠':''),'background:'+NBG+';font-weight:800;color:'+(r.netProfit<0?'#c0392b':r.netProfit===0?'#888':'#27ae60'))
       +td(r.cost?r.netPct.toFixed(1)+'%':'—','background:'+NBG+';color:'+(r.netPct<0?'#c0392b':r.netPct===0?'#888':'#27ae60'))
       +'</tr>';
   }).join('');
 
-  var table='<div id="fs-scroll" style="overflow:auto;border:1px solid #e8e4dc;border-radius:6px;min-height:200px"><table style="width:100%;border-collapse:collapse;font-size:11px;background:#fff">'
-    +'<thead>'
-    +'<tr>'
-      +'<th colspan="7" style="padding:4px;background:#f0ede8;color:var(--gold2);text-align:left;font-size:10px;font-weight:700;border-bottom:1px solid #e0dcd4;padding-left:10px">Current</th>'
-      +'<th colspan="2" style="padding:4px;background:'+BBG+';color:#2d6b3f;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #a8d5b5">Break-Even</th>'
-      +'<th colspan="2" style="padding:4px;background:'+SBG+';color:var(--gold2);text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #e8d8a8">Your Sale Price</th>'
-      +'<th colspan="4" style="padding:4px;background:'+NBG+';color:#27ae60;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #b8e8d0">Result at that price</th>'
-    +'</tr>'
-    +'<tr>'
+  // SUBTOTAL row pinned above the header rows, same as the Summary Sheet --
+  // stock-weighted, so it answers "what does this whole plan earn if it all
+  // sells" without scrolling to the bottom.
+  var totBg='#faf6ec';
+  var sumGross=rows.reduce(function(a,r){return a+r.gross*r.stock;},0);
+  var sumRetail=rows.reduce(function(a,r){return a+r.retail*r.stock;},0);
+  var sumCost=rows.reduce(function(a,r){return a+r.cost*r.stock;},0);
+  var sumGp=rows.reduce(function(a,r){return a+r.gp*r.stock;},0);
+  var sumComm=rows.reduce(function(a,r){return a+r.commission*r.stock;},0);
+  var tdc=function(v,ex){return '<td style="padding:5px 8px;text-align:right;font-family:monospace;background:'+totBg+';'+(ex||'')+'">'+v+'</td>';};
+  var trow='<tr style="background:'+totBg+';font-weight:700;font-size:11px;border-bottom:3px solid var(--gold)">'
+   +'<td style="padding:5px 8px;background:'+totBg+'"></td>'
+   +'<td style="padding:4px 6px;background:'+totBg+';text-align:center;font-size:9px;font-style:italic;color:var(--gold2)">TOT</td>'
+   +'<td style="padding:5px 8px;background:'+totBg+';font-weight:800;white-space:nowrap;color:var(--gold2)">SUBTOTAL — '+rows.length+' products</td>'
+   +'<td style="padding:5px 8px;background:'+totBg+'"></td>'
+   +'<td style="padding:5px 8px;background:'+totBg+';text-align:center;color:#bbb">—</td>'
+   +tdc(NF(totUnits),'font-weight:800')
+   +tdc(NF(Math.round(sumGross)),'background:'+GBG)+tdc('—','background:'+GBG+';color:#bbb')+tdc('—','background:'+GBG+';color:#bbb')
+   +tdc(NF(Math.round(sumRetail)),'background:'+RBG+';color:#2471a3;font-weight:800')
+   +tdc(NF(Math.round(sumCost)),'color:#c0392b')
+   +tdc('—','background:'+BBG+';color:#bbb')+tdc('—','background:'+BBG+';color:#bbb')
+   +tdc('—','background:'+SBG+';color:#bbb')
+   +tdc(NF(Math.round(totRev)),'background:'+SBG+';font-weight:800')
+   +tdc(NF(Math.round(sumGp)),'background:#ecfaec;color:#27ae60;font-weight:800')
+   +tdc(totRev>0?Math.round(sumGp/totRev*1000)/10+'%':'—','background:#ecfaec;color:#27ae60;font-weight:800')
+   +tdc(NF(Math.round(sumComm)),'background:#f9f5ff;color:#8e44ad')
+   +tdc((totNet<0?'-':'')+NF(Math.abs(Math.round(totNet))),'background:'+NBG+';font-weight:800;color:'+(totNet<0?'#c0392b':'#27ae60'))
+   +tdc(totRev>0?Math.round(totNet/totRev*1000)/10+'%':'—','background:'+NBG+';font-weight:800;color:'+(totNet<0?'#c0392b':'#27ae60'))
+   +'</tr>';
+
+  // Row 1: group bands, mirroring the Summary Sheet's banded layout.
+  var gRow='<tr>'
+   +'<th colspan="6" style="padding:4px 10px;background:#f0ede8;color:var(--gold2);text-align:left;font-size:10px;font-weight:700;border-bottom:1px solid #e0dcd4">'+(isShopSrc?'Shopify Prices':'Laam Prices')+'</th>'
+   +'<th colspan="3" style="padding:4px;background:'+GBG+';color:#a35b00;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #e8cfa8">Gross Price &amp; Disc%</th>'
+   +'<th style="padding:4px;background:'+RBG+';color:#2471a3;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #b8d0f0">Retail Price</th>'
+   +'<th style="padding:4px;background:#f8f6f2;border-bottom:1px solid #e0dcd4"></th>'
+   +'<th colspan="2" style="padding:4px;background:'+BBG+';color:#2d6b3f;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #a8d5b5">Break-Even</th>'
+   +'<th colspan="2" style="padding:4px;background:'+SBG+';color:var(--gold2);text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #e8d8a8">Your Sale Price</th>'
+   +'<th colspan="2" style="padding:4px;background:#ecfaec;color:#27ae60;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #b8e8d0">Gross Profit</th>'
+   +'<th colspan="3" style="padding:4px;background:'+NBG+';color:#27ae60;text-align:center;font-size:9px;font-weight:700;border-bottom:1px solid #b8e8d0">Net P&amp;L</th>'
+   +'</tr>';
+
+  var cRow='<tr>'
       +'<th style="'+TH+'text-align:center;cursor:default"><input type="checkbox" '+(allSel?'checked':'')+' onclick="fsSelAll(this)" style="cursor:pointer;accent-color:var(--gold)"></th>'
-      +'<th style="'+TH+'text-align:center;cursor:default">Img</th>'
+      +th('Created','createdAt','center')
       +th('Product','name','left')
+      +'<th style="'+TH+'text-align:center;cursor:default">Img</th>'
+      +'<th style="'+TH+'text-align:center;cursor:default">★ Rating</th>'
       +th('Stock','stock')
+      +th(isShopSrc?'Compare At':'Gross Price','gross',null,GBG,isShopSrc?'Shopify Compare At Price — the struck-through anchor discounts come off':'Laam Original Price — the anchor discounts come off')
+      +th('Discount','curDisc',null,GBG,'Rupees currently off the anchor price')
+      +th('Disc%','curDiscPct',null,GBG,'Today\'s live discount, before any flash-sale change')
+      +th(retLbl,'retail',null,RBG,isShopSrc?'Current Shopify selling price':'Current Laam selling price')
       +th('Cost','cost')
-      +th(isShopSrc?'Compare At':'Gross','gross',null,GBG,isShopSrc?'Shopify Compare At Price — the struck-through anchor discounts come off':'Laam Original Price — the anchor discounts come off')
-      +th(isShopSrc?'Shopify Now':'Retail Now','retail',null,null,isShopSrc?'Current Shopify selling price':'Current Laam selling price')
       +th('B/E Price','be',null,BBG,'Retail price where Net Profit is exactly zero after 25% commission')
-      +th('Max Disc%','beDisc',null,BBG,'Biggest discount off Gross Price that still breaks even')
+      +th('Max Disc%','beDisc',null,BBG,'Biggest discount off the anchor price that still breaks even')
       +th('Disc%','disc',null,SBG,'Editable — set your flash-sale discount here')
       +th('Sale Price','sale',null,SBG)
-      +th('GP','gp')
-      +th('Comm','commission')
+      +th('GP','gp',null,'#ecfaec')
+      +th('GP%','gpPct',null,'#ecfaec','Gross Profit as % of your sale price')
+      +th('Commission','commission',null,'#f9f5ff')
       +th('Net Profit','netProfit',null,NBG)
-      +th('NP%','netPct',null,NBG)
-    +'</tr>'
-    +'</thead><tbody>'+(body||'<tr><td colspan="15" style="padding:30px;text-align:center;color:#aaa;font-size:12px">No products match — try clearing the search, or show no-cost products.</td></tr>')+'</tbody></table></div>';
+      +th('Net Profit%','netPct',null,NBG)
+    +'</tr>';
+
+  var table='<div id="fs-scroll" style="overflow:auto;border:1px solid #e8e4dc;border-radius:6px;min-height:200px"><table style="width:100%;border-collapse:collapse;font-size:11px;background:#fff">'
+    +'<thead>'+trow+gRow+cRow+'</thead>'
+    +'<tbody>'+(body||'<tr><td colspan="20" style="padding:30px;text-align:center;color:#aaa;font-size:12px">No products match — try clearing the search, or show no-cost products.</td></tr>')+'</tbody></table></div>';
 
   // Two independent plans -- Laam and Shopify sell the same articles at
   // different prices, so a single sheet can't plan both. Each tab keeps its
