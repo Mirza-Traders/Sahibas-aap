@@ -481,6 +481,12 @@ var SALES_IMG={};
 var filters={from:'',to:'',stats:[],pf:'',dst:''};
 var SHOP_STOCK={};
 var SHOP_PRICE={};
+// Shopify's "Compare At Price" -- the pre-discount anchor Shopify itself shows
+// struck through, equivalent to Laam's "Original/Gross Price". Needed so the
+// Shopify Flash Sale Planner has something to discount FROM, same as the Laam
+// one uses Gross. Falls back to the live Variant Price when a product has no
+// compare-at price set (nothing to discount from but its own current price).
+var SHOP_COMPARE={};
 // Featured photo per Shopify product (lowercase title -> URL). Parsed from the
 // uploaded Shopify export's "Image Src" column and published to the cloud with
 // the rest of the Shopify snapshot — the authoritative photo source.
@@ -662,6 +668,7 @@ async function initCloud(){
     if(data5&&typeof data5==='object'){
       if(data5.stock)SHOP_STOCK=data5.stock;
       if(data5.price)SHOP_PRICE=data5.price;
+      if(data5.compare)SHOP_COMPARE=data5.compare;
       if(data5.status)SHOP_STATUS=data5.status;
       if(data5.handle)SHOP_HANDLE=data5.handle;
       if(data5.img){
@@ -722,7 +729,7 @@ async function generate(){
       setProg(11,'Loading Shopify products...');
       var shTxt=await readFile(shopFile);
       var shRows=Papa.parse(shTxt,{header:true,skipEmptyLines:true}).data;
-      SHOP_STOCK={};SHOP_PRICE={};SHOP_IMG={};SHOP_HANDLE={};
+      SHOP_STOCK={};SHOP_PRICE={};SHOP_COMPARE={};SHOP_IMG={};SHOP_HANDLE={};
       var lastTitle='';
       shRows.forEach(function(r){
         var t=(r['Title']||r['title']||'').trim();
@@ -738,6 +745,8 @@ async function generate(){
         if(key){if(!SHOP_STOCK[key])SHOP_STOCK[key]=0;SHOP_STOCK[key]+=qty;}
         var vp=parseFloat(r['Variant Price']||r['variant price']||0)||0;
         if(key&&vp>0&&!SHOP_PRICE[key])SHOP_PRICE[key]=vp;
+        var cap=parseFloat(r['Variant Compare At Price']||r['variant compare at price']||0)||0;
+        if(key&&cap>0&&!SHOP_COMPARE[key])SHOP_COMPARE[key]=cap;
         // Featured photo: first non-empty Image Src per product (position-1 row).
         // Extra image rows carry an empty Title, so lastTitle attributes them
         // to the right product. Without this capture, publishing a Shopify
@@ -3253,7 +3262,7 @@ async function publishSnapshot(){
     if(window._shopFresh){
       try{
         var r2=await fetch(CLOUD_API+'/shopify-data',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),
-          body:JSON.stringify({stock:SHOP_STOCK,price:SHOP_PRICE,status:SHOP_STATUS,img:SHOP_IMG,handle:SHOP_HANDLE,gen:new Date().toISOString()})});
+          body:JSON.stringify({stock:SHOP_STOCK,price:SHOP_PRICE,compare:SHOP_COMPARE,status:SHOP_STATUS,img:SHOP_IMG,handle:SHOP_HANDLE,gen:new Date().toISOString()})});
         var j2=await r2.json();
         if(r2.ok&&j2.ok)msg+=' + Shopify snapshot ✓';
       }catch(e2){}
@@ -3778,7 +3787,7 @@ function rDC(){
 // Discount Calculator (DC_COMM_RATE) so the two never disagree.
 // This is a planning sheet only -- it never writes prices anywhere.
 // ═══════════════════════════════════════════════════════════════════
-window._fs={disc:{},sel:{},search:'',sort:'name',asc:true,hideNoCost:true};
+window._fs={disc:{},sel:{},search:'',sort:'name',asc:true,hideNoCost:true,src:'laam'};
 
 // Break-even retail = the price where Net Profit is exactly zero after
 // commission: price - cost - price*0.25 = 0  =>  price = cost/(1-0.25).
@@ -3786,11 +3795,25 @@ function fsBreakEven(cost){return cost>0?cost/(1-DC_COMM_RATE):0;}
 
 function fsRows(){
   var costIdx=dcCostIdx(),fs=window._fs,q=(fs.search||'').toLowerCase().trim();
+  var src=fs.src||'laam';
   var out=[];
   Object.keys(STOCK_PRODS||{}).forEach(function(k){
     var sp=STOCK_PRODS[k];
     var cost=costIdx[k]||0;
-    var gross=sp.grossPrice||0,retail=sp.price||0;
+    var gross,retail;
+    if(src==='shopify'){
+      // Nothing to plan a sale on without a Shopify price -- skip rather than
+      // show a row of dashes for a product that isn't actually sold there.
+      if(!(SHOP_PRICE[k]>0))return;
+      retail=SHOP_PRICE[k];
+      // Shopify's own struck-through "Compare At Price" is the anchor to
+      // discount from here, same role Laam's Gross/Original Price plays for
+      // the Laam plan. Falls back to the live price when no compare-at is
+      // set (nothing above current price to discount from).
+      gross=SHOP_COMPARE[k]||SHOP_PRICE[k];
+    }else{
+      gross=sp.grossPrice||0;retail=sp.price||0;
+    }
     if(fs.hideNoCost&&!cost)return;
     if(q&&k.indexOf(q)<0)return;
     var be=fsBreakEven(cost);
@@ -3800,16 +3823,22 @@ function fsRows(){
     // 46.7% would push the sale price a few rupees UNDER break-even and flag
     // an otherwise-fine article as loss-making, so always err toward safety.
     var beDisc=(gross>0&&be>0)?Math.max(0,Math.floor((1-be/gross)*1000)/10):null;
-    var disc=(fs.disc[k]!==undefined&&fs.disc[k]!==null)?fs.disc[k]:(beDisc!==null?beDisc:0);
+    // Discounts/selections are namespaced by source, so a discount planned on
+    // the Laam sheet never leaks onto the Shopify one (same article, different
+    // prices, so the same % means a different rupee price on each).
+    var rk=src+'|'+k;
+    var disc=(fs.disc[rk]!==undefined&&fs.disc[rk]!==null)?fs.disc[rk]:(beDisc!==null?beDisc:0);
     var sale=gross>0?Math.round(gross*(1-disc/100)):0;
     var p=dcPnl(sale,cost);
     out.push({
-      key:k,name:sp.title,img:findImg(k)||sp.img||'',
-      cost:cost,gross:gross,retail:retail,stock:sp.total||0,status:sp.status||'',
+      key:rk,name:sp.title,img:findImg(k)||sp.img||'',
+      cost:cost,gross:gross,retail:retail,
+      stock:src==='shopify'?(SHOP_STOCK[k]||0):(sp.total||0),
+      status:src==='shopify'?(SHOP_STATUS[k]||''):(sp.status||''),
       be:be,beDisc:beDisc,disc:disc,sale:sale,
       gp:p.gp,commission:p.commission,netProfit:p.netProfit,netPct:p.netPct,
       belowBE:be>0&&sale>0&&sale<Math.floor(be),
-      isCustom:fs.disc[k]!==undefined&&fs.disc[k]!==null
+      isCustom:fs.disc[rk]!==undefined&&fs.disc[rk]!==null
     });
   });
   var col=fs.sort,asc=fs.asc;
@@ -3834,6 +3863,14 @@ function fsSelAll(cb){
   rendered.fs=false;doR('fs');
 }
 function fsToggleNoCost(){window._fs.hideNoCost=!window._fs.hideNoCost;rendered.fs=false;doR('fs');}
+// Switch between the Laam-priced and Shopify-priced plans. Selections are
+// cleared on switch -- they key off the row list, which changes entirely.
+function fsSetSrc(src){
+  var fs=window._fs;
+  if(fs.src===src)return;
+  fs.src=src;fs.sel={};
+  rendered.fs=false;doR('fs');
+}
 // Bulk apply -- to the ticked rows, or to every visible row when none are ticked.
 function fsBulkApply(){
   var el=document.getElementById('fs-bulk');if(!el)return;
@@ -3856,15 +3893,18 @@ function fsResetBE(){
 }
 function fsExport(){
   var fs=window._fs,rows=fsRows();
+  var isShop=(fs.src||'laam')==='shopify';
   var out=Object.keys(fs.sel).length?rows.filter(function(r){return fs.sel[r.key];}):rows;
   csvDL(out.map(function(r){return[
     r.name,r.status,r.stock,r.cost,r.gross,r.retail,
     Math.round(r.be),r.beDisc!==null?Math.round(r.beDisc*10)/10:'',
     r.disc,r.sale,Math.round(r.gp),Math.round(r.commission),
     Math.round(r.netProfit),Math.round(r.netPct*10)/10,r.belowBE?'BELOW BREAKEVEN':''
-  ];}),['Product','LaamStatus','Stock','Cost','GrossPrice','CurrentRetail',
+  ];}),['Product',isShop?'ShopifyStatus':'LaamStatus','Stock','Cost',
+    isShop?'CompareAtPrice':'GrossPrice',isShop?'CurrentShopifyPrice':'CurrentRetail',
     'BreakEvenPrice','MaxSafeDisc%','SaleDisc%','SalePrice','GP','Commission',
-    'NetProfit','NetProfit%','Flag'],'flash_sale_plan.csv');
+    'NetProfit','NetProfit%','Flag'],
+    isShop?'flash_sale_plan_shopify.csv':'flash_sale_plan_laam.csv');
 }
 function fsFitHeight(){
   var el=document.getElementById('fs-scroll');if(!el)return;
@@ -3882,10 +3922,14 @@ function rFS(){
   var el=document.getElementById('pfs');
   if(!allowed){el.innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Not authorized.</div>';return;}
   var fs=window._fs,rows=fsRows();
+  var isShopSrc=(fs.src||'laam')==='shopify';
   var selCount=Object.keys(fs.sel).length;
   var customCount=rows.filter(function(r){return r.isCustom;}).length;
   var belowCount=rows.filter(function(r){return r.belowBE;}).length;
-  var noCostTotal=Object.keys(STOCK_PRODS||{}).filter(function(k){return !dcCostIdx()[k];}).length;
+  var _ci=dcCostIdx();
+  var noCostTotal=Object.keys(STOCK_PRODS||{}).filter(function(k){
+    return !_ci[k]&&(!isShopSrc||SHOP_PRICE[k]>0);
+  }).length;
   // Totals across the plan, weighted by stock on hand -- "if every unit sold
   // at these prices, this is what the sale earns (or costs) you".
   var totUnits=rows.reduce(function(a,r){return a+r.stock;},0);
@@ -3959,8 +4003,8 @@ function rFS(){
       +th('Product','name','left')
       +th('Stock','stock')
       +th('Cost','cost')
-      +th('Gross','gross',null,GBG)
-      +th('Retail Now','retail')
+      +th(isShopSrc?'Compare At':'Gross','gross',null,GBG,isShopSrc?'Shopify Compare At Price — the struck-through anchor discounts come off':'Laam Original Price — the anchor discounts come off')
+      +th(isShopSrc?'Shopify Now':'Retail Now','retail',null,null,isShopSrc?'Current Shopify selling price':'Current Laam selling price')
       +th('B/E Price','be',null,BBG,'Retail price where Net Profit is exactly zero after 25% commission')
       +th('Max Disc%','beDisc',null,BBG,'Biggest discount off Gross Price that still breaks even')
       +th('Disc%','disc',null,SBG,'Editable — set your flash-sale discount here')
@@ -3972,8 +4016,25 @@ function rFS(){
     +'</tr>'
     +'</thead><tbody>'+(body||'<tr><td colspan="15" style="padding:30px;text-align:center;color:#aaa;font-size:12px">No products match — try clearing the search, or show no-cost products.</td></tr>')+'</tbody></table></div>';
 
+  // Two independent plans -- Laam and Shopify sell the same articles at
+  // different prices, so a single sheet can't plan both. Each tab keeps its
+  // own discounts (fs.disc is namespaced per source in fsRows/fsSetDisc).
+  var srcTab=function(id,label,note){
+    var on=(fs.src||'laam')===id;
+    return '<button onclick="fsSetSrc(\''+id+'\')" title="'+note+'" style="border:1px solid '+(on?'var(--gold)':'#ddd')+';border-bottom:'+(on?'2px solid var(--gold)':'1px solid #ddd')+';background:'+(on?'#fffdf5':'#f7f7f7')+';color:'+(on?'#111':'#888')+';border-radius:6px 6px 0 0;padding:7px 16px;font-size:11px;font-weight:'+(on?'800':'600')+';cursor:pointer">'+label+'</button>';
+  };
+  var srcBar='<div style="display:flex;gap:4px;margin:8px 0 0;border-bottom:1px solid #e8e4dc">'
+   +srcTab('laam','🛍️ Laam Prices','Prices from the last Laam stock file — discounts off Laam\'s Original Price')
+   +srcTab('shopify','🛒 Shopify Prices','Prices from the last Shopify product export — discounts off Shopify\'s Compare At Price')
+   +'</div>';
+  var isShop=(fs.src||'laam')==='shopify';
+  var srcNote=isShop
+    ?'Prices come from your last <b>Shopify product export</b> — discounts apply off Shopify\'s Compare At Price (the struck-through price). Products with no Shopify price are not listed.'
+    :'Prices come from your last <b>Laam stock file</b> — discounts apply off Laam\'s Original Price.';
   el.innerHTML='<div style="font-size:14px;font-weight:700;color:var(--dk)">Flash Sale Planner</div>'
-   +'<div style="font-size:10px;color:#aaa;margin-bottom:6px">Every product starts priced at its break-even — the lowest price that still doesn\'t lose money after Laam\'s 25% commission. Change any Disc% to see what that price does to Net Profit. This sheet only plans; it never changes live prices.</div>'
+   +'<div style="font-size:10px;color:#aaa;margin-bottom:6px">Every product starts priced at its break-even — the lowest price that still doesn\'t lose money after the 25% commission. Change any Disc% to see what that price does to Net Profit. This sheet only plans; it never changes live prices.</div>'
+   +srcBar
+   +'<div style="font-size:10px;color:#888;margin:7px 0 2px">'+srcNote+'</div>'
    +kh+bar+table;
   fsFitHeight();
 }
