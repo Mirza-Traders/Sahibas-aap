@@ -3852,22 +3852,30 @@ function fsRows(){
     // Summary Sheet shows, before any of the planning columns.
     var curDisc=(gross>0&&retail>0&&gross>retail)?(gross-retail):0;
     var curDiscPct=(gross>0&&curDisc>0)?Math.round(curDisc/gross*1000)/10:0;
+    // The Stock number this sheet shows, and the size split measured against
+    // it. Laam totals every stock row so szSum can never exceed it; Shopify
+    // keeps its own count, which is identical on ~96% of products and can sit
+    // either side of the split on the rest.
+    var stockShown=src==='shopify'?(SHOP_STOCK[k]||0):(sp.total||0);
+    var szSum=(sp.S||0)+(sp.M||0)+(sp.L||0)+(sp.XL||0);
     out.push({
       key:rk,name:sp.title,img:findImg(k)||sp.img||'',
       createdAt:sp.createdAt||'',
       cost:cost,gross:gross,retail:retail,
       curDisc:curDisc,curDiscPct:curDiscPct,
-      stock:src==='shopify'?(SHOP_STOCK[k]||0):(sp.total||0),
+      stock:stockShown,
       // On-hand split by size, same S/M/L/XL breakdown the Pre-Booked sheet
-      // shows. The Shopify export carries one stock number per product with no
-      // size dimension, so that source gets null -- rendered as "—", never as
-      // 0/0/0/0, which would read as "in stock, none in any size".
+      // shows. It's one physical warehouse, so the split is the same garments
+      // on both sheets -- only the Stock number beside it changes source.
       // "other" = pieces in sizes outside S/M/L/XL (kids 5-6Y..12-13Y, XXL,
-      // Standard Size). buildStockProds only buckets the four, but sp.total
-      // counts every row, so without this the four numbers would silently fail
-      // to add up to the Stock column.
-      sizes:src==='shopify'?null:{S:sp.S||0,M:sp.M||0,L:sp.L||0,XL:sp.XL||0,
-        other:Math.max(0,(sp.total||0)-((sp.S||0)+(sp.M||0)+(sp.L||0)+(sp.XL||0)))},
+      // Standard Size). buildStockProds only buckets the four, so without this
+      // the four numbers would silently fail to add up to the Stock column.
+      // Derived from whichever total is displayed, so the row always reconciles.
+      // "over" marks the case that arithmetic can't fix: Shopify reporting FEWER
+      // units than the size split accounts for (the two systems genuinely
+      // disagree). Flagged in the cell rather than quietly clamped away.
+      sizes:{S:sp.S||0,M:sp.M||0,L:sp.L||0,XL:sp.XL||0,
+        other:Math.max(0,stockShown-szSum),over:szSum>stockShown?szSum-stockShown:0},
       status:src==='shopify'?(SHOP_STATUS[k]||''):(sp.status||''),
       be:be,trueBe:trueBe,beCustom:beCustom,beDisc:beDisc,disc:disc,sale:sale,
       gp:p.gp,gpPct:sale>0?Math.round(p.gp/sale*1000)/10:0,
@@ -4034,6 +4042,13 @@ function rFS(){
     var img=_fimg
       ?'<img src="'+_fimg+'" loading="lazy" data-n="'+r.name.replace(/"/g,'')+'" onerror="imgFail(this)" onclick="event.stopPropagation();rxViewPhoto(\''+String(r.img).replace(/'/g,"\\'")+'\')" title="Click to enlarge" style="width:52px;height:65px;object-fit:cover;object-position:top center;border-radius:6px;border:1px solid #eee;cursor:zoom-in;display:block">'
       :prodPH(r.name).replace('width:52px;height:52px','width:52px;height:65px');
+    // A product with no size rows at all shows "—", not 0/0/0/0 -- "no split on
+    // file" and "none left in any size" are different answers.
+    var z=r.sizes,szTxt=(z&&(z.S+z.M+z.L+z.XL))
+      ?(z.S+'/'+z.M+'/'+z.L+'/'+z.XL
+        +(z.other?'<span title="'+z.other+' pcs in other sizes (kids / XXL / Standard) — counted in Stock but not in S/M/L/XL" style="color:#c89a4a;font-weight:600"> +'+z.other+'</span>':'')
+        +(z.over?'<span title="Shopify counts '+z.over+' fewer units than the S/M/L/XL split accounts for — the warehouse split and Shopify’s stock number disagree on this product" style="color:#c0392b;font-weight:800;cursor:help"> ⚠</span>':''))
+      :'';
     var _fbp=_fimg?imgBorrowedParent(r.name):'';
     if(_fbp)img='<div style="position:relative;width:52px">'+img+'<span title="Not this product\'s own photo — showing &quot;'+_fbp.replace(/"/g,'')+'&quot; (no photo exists for '+r.name.replace(/"/g,'')+')" style="position:absolute;top:2px;right:2px;background:rgba(30,30,30,.78);color:#ffd76e;font-size:11px;font-weight:700;border-radius:4px;padding:0 4px;line-height:15px;cursor:help">≈</span></div>';
     var td=function(v,st){return '<td style="padding:5px 8px;text-align:right;white-space:nowrap;font-family:monospace;'+(st||'')+'">'+v+'</td>';};
@@ -4043,9 +4058,7 @@ function rFS(){
       +'<td style="padding:5px 8px;font-weight:700;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis"'+phov(r.name)+'>'+r.name+'</td>'
       +'<td style="padding:4px 6px;text-align:center">'+img+'</td>'
       +'<td style="padding:4px 6px;text-align:center;white-space:nowrap">'+(ratingChip(r.name)||'<span style="color:#ccc;font-size:9px">—</span>')+'</td>'
-      +td(r.sizes?(r.sizes.S+'/'+r.sizes.M+'/'+r.sizes.L+'/'+r.sizes.XL
-          +(r.sizes.other?'<span title="'+r.sizes.other+' pcs in other sizes (kids / XXL / Standard) — counted in Stock but not in S/M/L/XL" style="color:#c89a4a;font-weight:600"> +'+r.sizes.other+'</span>':'')):'—',
-          'background:#fff8e0;color:'+(r.sizes?'#a07030':'#ccc')+';font-size:10px;font-weight:700')
+      +td(szTxt||'—','background:#fff8e0;color:'+(szTxt?'#a07030':'#ccc')+';font-size:10px;font-weight:700')
       +td(r.stock||'—','color:#888;font-weight:700')
       // ── Gross Price & Disc% (today's live position) ──
       +td(r.gross?NF(r.gross):'—','background:'+GBG+';font-weight:600')
@@ -4081,10 +4094,13 @@ function rFS(){
   var sumCost=rows.reduce(function(a,r){return a+r.cost*r.stock;},0);
   var sumGp=rows.reduce(function(a,r){return a+r.gp*r.stock;},0);
   var sumComm=rows.reduce(function(a,r){return a+r.commission*r.stock;},0);
-  // null on the Shopify sheet -- that export has no size dimension to total.
-  var sumSizes=rows.length&&rows[0].sizes?rows.reduce(function(a,r){
-    if(r.sizes){a.S+=r.sizes.S;a.M+=r.sizes.M;a.L+=r.sizes.L;a.XL+=r.sizes.XL;a.other+=r.sizes.other;}return a;
-  },{S:0,M:0,L:0,XL:0,other:0}):null;
+  // overN = how many products Shopify counts short of their size split, so the
+  // subtotal can say the two systems disagree instead of just not adding up.
+  var sumSizes=rows.length?rows.reduce(function(a,r){
+    if(r.sizes){a.S+=r.sizes.S;a.M+=r.sizes.M;a.L+=r.sizes.L;a.XL+=r.sizes.XL;a.other+=r.sizes.other;
+      if(r.sizes.over){a.over+=r.sizes.over;a.overN++;}}return a;
+  },{S:0,M:0,L:0,XL:0,other:0,over:0,overN:0}):null;
+  if(sumSizes&&!(sumSizes.S+sumSizes.M+sumSizes.L+sumSizes.XL))sumSizes=null;
   var tdc=function(v,ex){return '<td style="padding:5px 8px;text-align:right;font-family:monospace;background:'+totBg+';'+(ex||'')+'">'+v+'</td>';};
   var trow='<tr style="background:'+totBg+';font-weight:700;font-size:11px;border-bottom:3px solid var(--gold)">'
    +'<td style="padding:5px 8px;background:'+totBg+'"></td>'
@@ -4093,7 +4109,8 @@ function rFS(){
    +'<td style="padding:5px 8px;background:'+totBg+'"></td>'
    +'<td style="padding:5px 8px;background:'+totBg+';text-align:center;color:#bbb">—</td>'
    +tdc(sumSizes?(NF(sumSizes.S)+'/'+NF(sumSizes.M)+'/'+NF(sumSizes.L)+'/'+NF(sumSizes.XL)
-        +(sumSizes.other?'<span title="'+NF(sumSizes.other)+' pcs in other sizes (kids / XXL / Standard)" style="color:#c89a4a"> +'+NF(sumSizes.other)+'</span>':'')):'—',
+        +(sumSizes.other?'<span title="'+NF(sumSizes.other)+' pcs in other sizes (kids / XXL / Standard)" style="color:#c89a4a"> +'+NF(sumSizes.other)+'</span>':'')
+        +(sumSizes.overN?'<span title="'+sumSizes.overN+' product'+(sumSizes.overN>1?'s':'')+' where Shopify counts fewer units than the size split accounts for ('+NF(sumSizes.over)+' pcs in total) — marked ⚠ in the rows below" style="color:#c0392b;font-weight:800;cursor:help"> ⚠'+sumSizes.overN+'</span>':'')):'—',
         'background:#fdf6e0;color:'+(sumSizes?'#a07030':'#bbb')+';font-size:10px;font-weight:800')
    +tdc(NF(totUnits),'font-weight:800')
    +tdc(NF(Math.round(sumGross)),'background:'+GBG)+tdc('—','background:'+GBG+';color:#bbb')+tdc('—','background:'+GBG+';color:#bbb')
