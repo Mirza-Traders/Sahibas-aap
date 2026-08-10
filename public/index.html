@@ -494,7 +494,11 @@ var SHOP_IMG={};
 // Shopify product handle (the /products/<handle> slug), keyed by lowercase
 // title. Captured from the "Handle" column of a Shopify product export.
 var SHOP_HANDLE={};
-var SHOP_STORE='sahiba-clothing'; // <store>.myshopify.com — works even with a custom domain
+var SHOP_STORE='sahiba-clothing'; // <store>.myshopify.com — the admin URL still needs this
+// The storefront's real domain. The .myshopify.com address does redirect here,
+// but it bounces through Shopify first and flashes the wrong brand in the
+// address bar on the way, so link the customer-facing name directly.
+var SHOP_DOMAIN='www.sahibas.com';
 // Storefront URL for a product. Prefers the real handle from the last Shopify
 // export; falls back to Shopify's own default handle rule (lowercase, spaces
 // and punctuation to single hyphens) so links work before the next export.
@@ -506,7 +510,7 @@ function shopifyUrl(name){
     h=k.replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
     if(!h)return '';
   }
-  return 'https://'+SHOP_STORE+'.myshopify.com/products/'+h;
+  return 'https://'+SHOP_DOMAIN+'/products/'+h;
 }
 // Admin product search. Works for any product whatever its status, and needs
 // no numeric product id -- which we never receive in the CSV export.
@@ -4046,13 +4050,20 @@ function rFS(){
         +(z.other?'<span title="'+z.other+' pcs in other sizes (kids / XXL / Standard) — counted in Stock but not in S/M/L/XL" style="color:#c89a4a;font-weight:600"> +'+z.other+'</span>':'')
         +(z.over?'<span title="Shopify counts '+z.over+' fewer units than the S/M/L/XL split accounts for — the warehouse split and Shopify’s stock number disagree on this product" style="color:#c0392b;font-weight:800;cursor:help"> ⚠</span>':''))
       :'';
+    // Clicking the name opens the product, exactly as it does on the Summary
+    // Sheet -- same helper, same dotted underline, so gold means it opens on
+    // sahibas.com and grey means it is not live there and goes to admin instead.
+    var _pnh=phov(r.name),_pl=productLink(r.name);
+    var nameCell=_pl
+      ?'<a href="'+_pl.url+'" target="_blank" rel="noopener"'+_pnh+' style="color:inherit;text-decoration:none;border-bottom:1px dotted '+(_pl.live?'var(--gold)':'#c0c0c0')+';cursor:pointer" title="'+_pl.title+'">'+r.name+'</a>'
+      :'<span'+_pnh+'>'+r.name+'</span>';
     var _fbp=_fimg?imgBorrowedParent(r.name):'';
     if(_fbp)img='<div style="position:relative;width:52px">'+img+'<span title="Not this product\'s own photo — showing &quot;'+_fbp.replace(/"/g,'')+'&quot; (no photo exists for '+r.name.replace(/"/g,'')+')" style="position:absolute;top:2px;right:2px;background:rgba(30,30,30,.78);color:#ffd76e;font-size:11px;font-weight:700;border-radius:4px;padding:0 4px;line-height:15px;cursor:help">≈</span></div>';
     var td=function(v,st){return '<td style="padding:5px 8px;text-align:right;white-space:nowrap;font-family:monospace;'+(st||'')+'">'+v+'</td>';};
     return '<tr style="border-bottom:1px solid #f2efe9;'+(bg?'background:'+bg+';':'')+'">'
       +'<td style="padding:5px 8px;text-align:center"><input type="checkbox" '+(sel?'checked':'')+' onchange="fsToggle(\''+r.key.replace(/'/g,"\\'")+'\')" style="cursor:pointer;accent-color:var(--gold)"></td>'
       +'<td style="padding:4px 6px;text-align:center;font-size:10px;color:#888;white-space:nowrap">'+fmtCDate(r.createdAt)+'</td>'
-      +'<td style="padding:5px 8px;font-weight:700;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis"'+phov(r.name)+'>'+r.name+'</td>'
+      +'<td style="padding:5px 8px;font-weight:700;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis">'+nameCell+'</td>'
       +'<td style="padding:4px 6px;text-align:center">'+img+'</td>'
       +'<td style="padding:4px 6px;text-align:center;white-space:nowrap">'+(ratingChip(r.name)||'<span style="color:#ccc;font-size:9px">—</span>')+'</td>'
       +td(szTxt||'—','background:#fff8e0;color:'+(szTxt?'#a07030':'#ccc')+';font-size:10px;font-weight:700')
