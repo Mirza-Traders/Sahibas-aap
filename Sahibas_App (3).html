@@ -1254,6 +1254,11 @@ function doST(id){
   document.querySelector('.sb-item[data-id="'+id+'"]').classList.add('on');
   document.getElementById('p'+id).classList.add('on');
   if(!rendered[id]){rendered[id]=true;document.getElementById('p'+id).innerHTML='<div class="spin">Rendering...</div>';setTimeout(()=>{try{doR(id);}catch(e){document.getElementById('p'+id).innerHTML='<div class="spin" style="color:var(--red)">Error: '+e.message+'</div>';}},15);}
+  // Tickets are the one panel whose contents other people change while you sit
+  // on the app, so re-read the cloud every time it is opened. It has to hang
+  // off opening rather than off rendering: a panel renders once and is then
+  // cached, so the second visit would otherwise never ask the server again.
+  if(id==='rx'&&typeof rxRefresh==='function')rxRefresh();
 }
 function doR(id){var M={ov:rOV,pl:rPL,sz:rSZ,vl:rVL,st:rST,sk:rSK,dp:rDP,cs:rCS,ec:rEC,al:rAL,dr:rDR,us:rUS,in:rIN,pr:rPR,pp:rPP,rf:rRF,po:rPO,co:rCO,dc:rDC,fs:rFS,ml:rML,ac:rAC,rx:rRX,pb:rPB};M[id]&&M[id]();}
 
@@ -6222,7 +6227,48 @@ async function rxSaveAll(touchedIds){
       });
     }
   }catch(e){}
+  rxSortTickets();
   cloudSave('tickets',window.TICKETS||[]);
+}
+// Newest first, by the timestamp the ticket was raised. Creation unshifts to
+// the top but the cloud merge below appends, so without an explicit sort a
+// ticket someone else raised this morning could sit below last year's closed
+// ones -- present, but nowhere anyone would look.
+function rxSortTickets(){
+  (window.TICKETS||[]).sort(function(a,b){
+    return String(b.createdAt||'').localeCompare(String(a.createdAt||''));
+  });
+}
+// Tickets were read from the cloud exactly once, at login. A tab left open all
+// day therefore never saw anything the rest of the team raised afterwards --
+// those tickets saved fine, they just had no way of reaching this screen short
+// of a reload, or of this tab saving something itself and merging them in as a
+// side effect. Re-read whenever the panel is opened.
+window._rxSyncing=false;
+async function rxRefresh(){
+  if(window._rxSyncing)return;
+  window._rxSyncing=true;
+  try{
+    var r=await apiGet('/tickets');
+    var server=await r.json();
+    if(Array.isArray(server)){
+      var sig=function(){return (window.TICKETS||[]).map(function(t){return t.id+':'+(t.status||'');}).join('|');};
+      var before=sig();
+      var serverIds={};server.forEach(function(t){serverIds[t.id]=true;});
+      // The server is authoritative for anything it has heard of. Tickets that
+      // exist only here are ones this tab just created and has not finished
+      // saving, so they are kept rather than wiped mid-flight.
+      var localOnly=(window.TICKETS||[]).filter(function(t){return !serverIds[t.id]&&!window._rxDeletedIds[t.id];});
+      window.TICKETS=server.filter(function(t){return !window._rxDeletedIds[t.id];}).concat(localOnly);
+      rxSortTickets();
+      var panel=document.getElementById('prx');
+      // Only redraw on a real change, so opening the panel doesn't flicker.
+      if(before!==sig()&&panel&&panel.classList.contains('on')){rendered.rx=false;doR('rx');}
+    }
+  }catch(e){}
+  // Cleared only after any redraw, so the rRX call it triggers sees the guard
+  // still set and doesn't start this all over again.
+  window._rxSyncing=false;
 }
 // Which stage transitions may the current user perform on this ticket?
 // "manager" gets the same full stage-advance rights as "admin" (every
