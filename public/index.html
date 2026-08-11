@@ -6763,8 +6763,16 @@ function showToast(msg){
 }
 
 // close modals on backdrop click
-['cpw-modal','fpw-modal'].forEach(function(id){
-  document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+// Both modals are declared further down the document than this script, so they
+// do not exist yet at this point -- binding straight away threw, and because
+// this runs at the top level the throw abandoned the rest of the file, leaving
+// every var below it unassigned. Wait for the parse to finish instead, which
+// also means the backdrop click actually works now.
+document.addEventListener('DOMContentLoaded',function(){
+  ['cpw-modal','fpw-modal'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+  });
 });
 
 // show data freshness on the login screen when this file carries baked data
