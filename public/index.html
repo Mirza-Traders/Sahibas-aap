@@ -2721,9 +2721,28 @@ function drHFSet(key,val){
 }
 
 // Multi-select product dropdown
+// The filter row lives inside two scrollers (overflow hidden, then auto), which
+// crop an absolutely-positioned panel down to about one row. Same answer the
+// header filters already use: hand the panel to <body> and pin it to the button
+// with position:fixed, where no ancestor can crop it. It goes back into the
+// wrapper on close so the markup stays where the rest of the code expects it.
 function drProdPanel(){
-  var p=document.getElementById('dr-prd-panel');
-  if(p)p.classList.toggle('open');
+  var p=document.getElementById('dr-prd-panel');if(!p)return;
+  if(p.classList.contains('open')){drProdClose();return;}
+  var btn=document.getElementById('dr-prd-btn');if(!btn)return;
+  var rect=btn.getBoundingClientRect();
+  document.body.appendChild(p);
+  p.style.position='fixed';
+  p.style.top=rect.bottom+'px';
+  p.style.left=rect.left+'px';
+  p.style.minWidth=Math.max(rect.width,220)+'px';
+  p.classList.add('open');
+}
+function drProdClose(){
+  var p=document.getElementById('dr-prd-panel');if(!p)return;
+  p.classList.remove('open');
+  var wrap=document.getElementById('dr-prd-wrap');
+  if(wrap&&p.parentElement!==wrap)wrap.appendChild(p);
 }
 function drProdToggle(name,cb){
   if(cb.checked)_drSelProds.add(name);else _drSelProds.delete(name);
@@ -2738,7 +2757,7 @@ function drProdClear(){
   var btn=document.getElementById('dr-prd-btn');
   if(btn)btn.textContent='All Products ▾';
   applyDrFilters();
-  document.getElementById('dr-prd-panel').classList.remove('open');
+  drProdClose();
 }
 function drProdFilter(val){
   var q=(val||'').toLowerCase().trim();
@@ -2749,7 +2768,11 @@ function drProdFilter(val){
 }
 document.addEventListener('click',function(e){
   var wrap=document.getElementById('dr-prd-wrap');
-  if(wrap&&!wrap.contains(e.target)){var p=document.getElementById('dr-prd-panel');if(p)p.classList.remove('open');}
+  var p=document.getElementById('dr-prd-panel');
+  // While open the panel is parented to <body>, so "inside the wrapper" is no
+  // longer enough to recognise a click on the list itself -- check the panel too,
+  // or ticking a product would close the dropdown under your cursor.
+  if(wrap&&!wrap.contains(e.target)&&!(p&&p.contains(e.target)))drProdClose();
   drHFCloseAll();
 });
 
@@ -2800,7 +2823,6 @@ function rDR(){
     +'</div>'
     +'</div></div>';
   // Fix open/close toggle
-  prdDropdown = prdDropdown.replace("display:none;position", "display:none").replace("display:none", "position:absolute").replace("position:absolute", "display:none;position:absolute");
 
   // Subtotals
   function stc(w,id,val,clr){return '<td id="'+id+'" style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:5px 6px;text-align:right;background:#f0ede8;font-weight:800;font-size:11px;border-bottom:2px solid var(--gold);color:'+(clr||'#1a1a1a')+'">'+NF(val)+'</td>';}
