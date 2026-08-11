@@ -630,7 +630,24 @@ async function initCloud(){
     }else{
       try{var lr=JSON.parse(localStorage.getItem('sbm_roles')||'{}');if(Object.keys(lr).length>0)cloudSave('roles',lr);}catch(e){}
     }
-  }catch(e){}})(),
+  }catch(e){}
+  // Refund/Exchange access is decided purely by REXROLES, so a roles call that
+  // fails or is slow used to read as "you have no role" and hand the whole team
+  // a Not authorized page. Fall back to the copy cached at last successful
+  // login, and mark roles as settled either way so the panel can tell "still
+  // checking" apart from "genuinely not allowed".
+  if(!window.REXROLES||!Object.keys(window.REXROLES).length){
+    try{
+      var cached=JSON.parse(localStorage.getItem('sbm_roles')||'{}');
+      if(cached&&typeof cached.__rex==='object')window.REXROLES=cached.__rex;
+    }catch(e){}
+  }
+  window._rolesLoaded=true;
+  // Someone sitting on the tickets page while this resolved saw the holding
+  // message; now that access is known, draw the real thing.
+  var rxp=document.getElementById('prx');
+  if(rxp&&rxp.classList.contains('on')){rendered.rx=false;doR('rx');}
+  })(),
 
   // Costs — product name -> cost map, editable from the Costs admin page
   (async function(){try{
@@ -650,9 +667,14 @@ async function initCloud(){
   }catch(e){window.FABRICS=window.FABRICS||[];}})(),
 
   // Refund & Exchange tickets — shared store, same pattern as orders
+  // _rxLoadOK records whether we ever actually got the list. An empty array is
+  // a real answer ("no tickets"); a failed call is NOT, and the difference
+  // matters enormously -- saving on top of a list we never managed to read
+  // replaces everyone's tickets with whatever this tab happens to hold.
   (async function(){try{
     var rt=await apiGet('/tickets');var dataT=await rt.json();
-    window.TICKETS=Array.isArray(dataT)?dataT:[];
+    if(Array.isArray(dataT)){window.TICKETS=dataT;window._rxLoadOK=true;}
+    else window.TICKETS=window.TICKETS||[];
   }catch(e){window.TICKETS=window.TICKETS||[];}})(),
 
   // Sales/Stock dataset — replaces the old "baked into HTML" approach so the
@@ -6232,6 +6254,11 @@ window._rxDeletedIds=window._rxDeletedIds||{};
 // (fresher) copy first, same read-then-merge-then-write pattern as savePO.
 async function rxSaveAll(touchedIds){
   var touched={};(touchedIds||[]).forEach(function(id){touched[id]=true;});
+  // Edits from a save that couldn't reach the server are still unsaved, so they
+  // count as touched here too -- otherwise this save would take the server's
+  // older copy of those tickets and quietly discard the work.
+  (window._rxPendingSave||[]).forEach(function(id){touched[id]=true;});
+  var merged=false;
   try{
     var r=await apiGet('/tickets');
     var serverTickets=await r.json();
@@ -6247,10 +6274,25 @@ async function rxSaveAll(touchedIds){
       serverTickets.forEach(function(st){
         if(!localIds[st.id]&&!window._rxDeletedIds[st.id])window.TICKETS.push(st);
       });
+      merged=true;window._rxLoadOK=true;
     }
   }catch(e){}
   rxSortTickets();
+  // The save is a whole-blob overwrite, so writing without a successful read
+  // first replaces every ticket on the server with this tab's copy. If the
+  // read failed -- offline for a moment, or the login fetch never landed and
+  // this tab is holding an empty list -- that silently destroys the team's
+  // tickets. Refuse to write instead, and say so out loud. The ticket stays on
+  // screen, so nothing typed is lost and the next save retries.
+  if(!merged){
+    window._rxPendingSave=(window._rxPendingSave||[]).concat(Object.keys(touched));
+    showToast('⚠ Could not reach the server — nothing was saved. Check your connection, then try again.');
+    return false;
+  }
+  // Anything a failed save left stranded is still ours, so keep those local.
+  if(window._rxPendingSave&&window._rxPendingSave.length)window._rxPendingSave=[];
   cloudSave('tickets',window.TICKETS||[]);
+  return true;
 }
 // Newest first, by the timestamp the ticket was raised. Creation unshifts to
 // the top but the cloud merge below appends, so without an explicit sort a
@@ -6283,6 +6325,7 @@ async function rxRefresh(){
       var localOnly=(window.TICKETS||[]).filter(function(t){return !serverIds[t.id]&&!window._rxDeletedIds[t.id];});
       window.TICKETS=server.filter(function(t){return !window._rxDeletedIds[t.id];}).concat(localOnly);
       rxSortTickets();
+      window._rxLoadOK=true;
       var panel=document.getElementById('prx');
       // Only redraw on a real change, so opening the panel doesn't flicker.
       if(before!==sig()&&panel&&panel.classList.contains('on')){rendered.rx=false;doR('rx');}
@@ -6314,7 +6357,19 @@ function rxNextStage(t){var i=RX_STAGES.indexOf(t.status);return i>=0&&i<RX_STAG
 
 function rRX(){
   var el=document.getElementById('prx');
-  if(!rexRole(CU)){el.innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Not authorized.</div>';return;}
+  if(!rexRole(CU)){
+    // "Not authorized" is only true once we know what the roles actually are.
+    // Said before the roles call lands, it is just a lie that sends people away.
+    if(!window._rolesLoaded){el.innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Checking your access…</div>';return;}
+    el.innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Not authorized.</div>';return;
+  }
+  // An empty list because the fetch failed looks exactly like an empty list
+  // because there are no tickets -- and the first reads as "everything is
+  // gone". Say which it is.
+  if(!window._rxLoadOK){
+    el.innerHTML='<div style="padding:40px;text-align:center;color:#c0392b;font-size:12px">Could not load tickets from the server.<div style="color:#888;font-size:11px;margin-top:8px">Nothing has been lost — this is a connection problem. Reload the page to try again.</div></div>';
+    rxRefresh();return;
+  }
   var T=window.TICKETS||[];
   if(!window._rxFlt)window._rxFlt={q:'',type:'',stage:'',mine:false};
   var f=window._rxFlt;
