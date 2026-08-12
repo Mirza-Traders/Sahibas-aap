@@ -794,7 +794,20 @@ async function generate(){
           for(var oj=0;oj<3;oj++)if(/^size$/i.test(lastOpt[oj])){szIdx=oj;break;}
           // No option is called Size (a one-size product, say) -- its pieces are
           // still real stock, so they land in "other" rather than vanishing.
-          var sv=szIdx>=0?String(r['Option'+(szIdx+1)+' Value']||r['option'+(szIdx+1)+' value']||'').trim().toUpperCase():'';
+          var sv='';
+          if(szIdx>=0){
+            sv=String(r['Option'+(szIdx+1)+' Value']||r['option'+(szIdx+1)+' value']||'').trim().toUpperCase();
+          }else{
+            // Some exports carry the option VALUES with no matching Name column
+            // at all, leaving no header to identify the size by. Recognise the
+            // value instead: the first option column holding a bare S/M/L/XL is
+            // the size. A colour or a fabric never looks like that, so this
+            // cannot mistake one for the other.
+            for(var ok=0;ok<3;ok++){
+              var vv=String(r['Option'+(ok+1)+' Value']||r['option'+(ok+1)+' value']||'').trim().toUpperCase();
+              if(vv==='S'||vv==='M'||vv==='L'||vv==='XL'){sv=vv;break;}
+            }
+          }
           if(!SHOP_SIZES[key])SHOP_SIZES[key]={S:0,M:0,L:0,XL:0,other:0};
           if(sv==='S'||sv==='M'||sv==='L'||sv==='XL')SHOP_SIZES[key][sv]+=qty;
           else SHOP_SIZES[key].other+=qty;
