@@ -5265,6 +5265,13 @@ function openPoReview(oid){
   if(!o)return;
   var k=(o.product||'').toLowerCase().trim();
   var cur={S:o.S||0,M:o.M||0,L:o.L||0,XL:o.XL||0};
+  // The quantity being approved. Same rule the rest of the app uses: the order's
+  // own total when it has one, otherwise the size split added up. Worth its own
+  // line at the top -- an order whose sizes aren't set yet shows 0/0/0/0 in the
+  // stock table below, which reads as "no pieces" when it is really "N pieces,
+  // split not decided". Approving is a commitment to the number, so show it.
+  var _szSum=cur.S+cur.M+cur.L+cur.XL;
+  var _poQty=o.total!=null?o.total:_szSum;
   var stockHtml=poStockPositionHtml(k,cur,'+ This Order ('+o.id+')');
   var _reviewImg=poImg(o);
   var thumb=(_reviewImg&&_reviewImg.startsWith('http'))?'<img src="'+_reviewImg+'" style="width:56px;height:70px;object-fit:cover;border-radius:6px;border:1px solid #3a3a3a">':'<div style="width:56px;height:70px;border-radius:6px;background:#252525;border:1px solid #3a3a3a"></div>';
@@ -5276,6 +5283,12 @@ function openPoReview(oid){
    +thumb
    +'<div style="flex:1">'
    +'<div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:4px">'+o.product+' '+ratingChip(o.product)+'</div>'
+   +'<div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:5px">Order Qty: '
+     +'<span style="font-size:16px;color:#fff">'+NF(_poQty)+'</span> pcs'
+     +(_szSum>0
+       ?' <span style="color:#888;font-weight:400">'+cur.S+' / '+cur.M+' / '+cur.L+' / '+cur.XL+'</span>'
+       :' <span style="color:#e0a030;font-size:10px">⚠ sizes not set</span>')
+   +'</div>'
    +'<div style="font-size:11px;color:#888;line-height:1.7">Fabric: <span style="color:#ccc">'+(o.fabric||'—')+'</span><br>'
    +'Customer: <span style="color:#ccc">'+(o.customer||'—')+'</span><br>'
    +'Requirement: <span style="color:#ccc">'+(o.urgency||'ROUTINE')+'</span> · Target: <span style="color:#ccc">'+(o.targetDate?fmtDMY(o.targetDate):'—')+'</span><br>'
@@ -5500,12 +5513,26 @@ function savePoEtaEdit(){
   savePO(orders,[oid]);rendered.po=false;doR('po');
   showToast('ETA updated: '+oldEta+' → '+val);
 }
+// Expands in place over whatever you were looking at, and closes back to it.
+// This used to open a second browser window, which loses your place in the
+// review you were halfway through -- and popup blockers silently swallow it, so
+// the chart simply never appeared. z-index clears the review modal's 9000 so it
+// works both from inside that modal and from the orders table behind it.
 function viewSizeChart(oid){
   var orders=loadPO();var o=orders.find(function(x){return x.id===oid;});
   if(!o||!o.sizeChart){showToast('No size chart attached.');return;}
-  var w=window.open('','_blank');
-  w.document.write('<html><head><title>Size Chart — '+o.id+'</title></head><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f5f5f5"><img src="'+o.sizeChart+'" style="max-width:95%;max-height:95vh;object-fit:contain"></body></html>');
-  w.document.close();
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:zoom-out;padding:24px';
+  ov.innerHTML='<div style="color:#ddd;font-size:12px;font-weight:700">'+(o.sizeChartName||'Size Chart')+' — '+o.id
+    +' <span style="color:#777;font-weight:400">· click anywhere or press Esc to close</span></div>'
+    +'<img src="'+o.sizeChart+'" style="max-width:94vw;max-height:86vh;object-fit:contain;border-radius:8px;background:#fff">';
+  // Esc has to be unbound when the overlay goes, or every later keypress keeps
+  // calling a handler for an element that is no longer in the document.
+  var onKey=function(e){if(e.key==='Escape')close();};
+  function close(){ov.remove();document.removeEventListener('keydown',onKey);}
+  ov.onclick=close;
+  document.addEventListener('keydown',onKey);
+  document.body.appendChild(ov);
 }
 function togglePoRemarks(oid){
   var el=document.getElementById('po-rmk-'+oid);
