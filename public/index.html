@@ -6440,6 +6440,7 @@ function rRX(){
     if(f.type&&t.type!==f.type)return false;
     if(f.stage&&t.status!==f.stage)return false;
     if(f.mine&&t.assignedTo!==(CU?CU.name:''))return false;
+    if(f.unver&&!rxSlipPending(t))return false;
     if(f.q){var q=f.q.toLowerCase();
       if(String(t.order||'').toLowerCase().indexOf(q)<0
        &&String(t.customer||'').toLowerCase().indexOf(q)<0
@@ -6448,6 +6449,7 @@ function rRX(){
     return true;
   });
   var open=T.filter(function(t){return t.status!=='closed';});
+  var unver=T.filter(rxSlipPending);
   var refOpen=open.filter(function(t){return t.type==='refund';});
   var exOpen=open.filter(function(t){return t.type==='exchange';});
   var refPKR=refOpen.reduce(function(a,t){return a+(t.amount||0);},0);
@@ -6491,6 +6493,12 @@ function rRX(){
    +'<input type="text" value="'+(f.q||'').replace(/"/g,'&quot;')+'" placeholder="Search ticket / order / customer / product…" oninput="window._rxFlt.q=this.value;clearTimeout(window._rxT);window._rxT=setTimeout(function(){rendered.rx=false;doR(\'rx\');var s=document.querySelector(\'#prx input[type=text]\');if(s){s.focus();s.selectionStart=s.selectionEnd=s.value.length;}},350)" style="border:1px solid #ddd;border-radius:6px;padding:5px 10px;font-size:11px;min-width:210px;background:#fff">'
    +(f.type||f.stage?'<button onclick="window._rxFlt.type=\'\';window._rxFlt.stage=\'\';rendered.rx=false;doR(\'rx\')" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">✕ Clear type/stage</button>':'')
    +'<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555;cursor:pointer"><input type="checkbox" '+(f.mine?'checked':'')+' onchange="window._rxFlt.mine=this.checked;rendered.rx=false;doR(\'rx\')" style="accent-color:var(--gold)">Assigned to me</label>'
+   // Refunds paid without anyone reading the slip against the beneficiary
+   // details. Shown as a count so "all slips checked" is a number you can
+   // watch reach zero, and clicking it filters down to exactly those tickets.
+   +(unver.length
+     ?'<button onclick="window._rxFlt.unver=!window._rxFlt.unver;rendered.rx=false;doR(\'rx\')" title="Refunds marked Paid whose slip has not been checked against the beneficiary details" style="border:1px solid #e0a83a;background:'+(f.unver?'#e0a83a':'#fdf6ea')+';color:'+(f.unver?'#fff':'#8a6420')+';border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">⚠ '+unver.length+' slip'+(unver.length!==1?'s':'')+' unverified</button>'
+     :'<span title="Every paid refund has had its slip checked against the beneficiary details" style="border:1px solid #cdecd9;background:#eafaf0;color:#1e6b45;border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;white-space:nowrap">✅ All slips verified</span>')
    +'<span style="font-size:10px;color:#888;font-weight:600;margin-left:10px">Columns:</span>'
    +rxColBtn('verif','Customer Profile','#2471a3')
    +rxColBtn('bank','Bank','#a07030')
@@ -6517,6 +6525,15 @@ function rRX(){
   if(!window._rxCols)window._rxCols=rxLoadCols();
   var showV=window._rxCols.verif,showB=window._rxCols.bank;
   var esc=function(s){return String(s).replace(/</g,'&lt;');};
+  // Tick / warning beside the stage badge, so you can see at a glance which
+  // refunds went out on a slip nobody checked.
+  var slipMark=function(t){
+    if(t.type!=='refund'||RX_STAGES.indexOf(t.status)<RX_STAGES.indexOf('paid'))return '';
+    var c=t.slipCheck;
+    return c
+      ?' <span title="Slip verified against the beneficiary details by '+rxEsc(c.by||'—')+(c.at?' on '+rxEsc(c.at):'')+'" style="cursor:help">✅</span>'
+      :' <span title="Payment slip not verified — open the ticket and check it against the beneficiary details" style="cursor:help">⚠️</span>';
+  };
   // Shows whatever profile links were pasted when the ticket was raised, all of
   // them, as the actual link rather than a badge -- the point is to click
   // through and look at the customer, not just be told a field was filled in.
@@ -6563,7 +6580,7 @@ function rRX(){
        :'<td style="'+TD2+BBG+'text-align:center" title="Bank details hidden — click + Bank to show">'+((t.bankName||t.accountNumber)?'<span style="color:var(--gold2);font-size:11px">🏦</span>':'<span style="color:#ddd;font-size:10px">—</span>')+'</td>')
      +'<td style="'+TD2+'font-size:10px;color:#666">'+(t.platform||'')+'</td>'
      +'<td style="'+TD2+'font-size:10px">'+(t.assignedTo||'')+'</td>'
-     +'<td style="'+TD2+'"><span style="'+(STC[t.status]||'')+';padding:2px 9px;border-radius:8px;font-size:9px;font-weight:700;white-space:nowrap">'+rxStageLabel(t.status,t.type)+'</span></td>'
+     +'<td style="'+TD2+'white-space:nowrap"><span style="'+(STC[t.status]||'')+';padding:2px 9px;border-radius:8px;font-size:9px;font-weight:700;white-space:nowrap">'+rxStageLabel(t.status,t.type)+'</span>'+slipMark(t)+'</td>'
      +'</tr>';
   }).join('');
   // No width cap -- with the bank and profile columns the table needs the whole
@@ -6591,9 +6608,11 @@ function rxExport(){
       its.map(function(it){return it.size||'';}).join('; '),
       its.map(function(it){return it.productToSend||'';}).join('; '),
       its.map(function(it){return it.sizeToSend||'';}).join('; '),
-      t.amount||0,t.platform||'',t.reason||'',t.assignedTo||'',rxStageLabel(t.status,t.type),t.createdBy||'',t.bankName||'',t.accountTitle||'',t.accountNumber||'',(t.history||[]).map(function(h){return h.stage+' by '+h.by+' at '+h.at;}).join(' | ')];
+      t.amount||0,t.platform||'',t.reason||'',t.assignedTo||'',rxStageLabel(t.status,t.type),t.createdBy||'',t.bankName||'',t.accountTitle||'',t.accountNumber||'',
+      (t.slipCheck?'Yes':(rxSlipPending(t)?'NO':'')),(t.slipCheck?t.slipCheck.by||'':''),(t.slipCheck?t.slipCheck.at||'':''),
+      (t.history||[]).map(function(h){return h.stage+' by '+h.by+' at '+h.at;}).join(' | ')];
   }),
-  ['Ticket','Type','Created','Order#','Customer','Mobile','Product(s)','Size(s)','Product(s) To Send','Size(s) To Send','Amount','Platform','Reason','Assigned To','Stage','Created By','Bank','Account Title','IBAN','History'],'refund_exchange_tickets.csv');
+  ['Ticket','Type','Created','Order#','Customer','Mobile','Product(s)','Size(s)','Product(s) To Send','Size(s) To Send','Amount','Platform','Reason','Assigned To','Stage','Created By','Bank','Account Title','IBAN','Slip Verified','Verified By','Verified At','History'],'refund_exchange_tickets.csv');
 }
 function rxProductOptions(){
   var names={};
@@ -6841,6 +6860,7 @@ function openRxDetail(id){
        }).join('')+'</div>';
      })()
    +(canBank&&(t.bankName||t.accountNumber)?'<div style="background:#faf8f3;border:1px solid #eee;border-radius:8px;padding:8px 12px;margin-top:10px">'+g('Bank',t.bankName)+g('Account Title',t.accountTitle)+g('IBAN',t.accountNumber)+'</div>':'')
+   +rxSlipStatusBlock(t)
    +'<div style="display:flex;gap:8px;margin:16px 0;flex-wrap:wrap">'+btns+'</div>'
    +'<div style="font-size:9px;color:#999;font-weight:700;text-transform:uppercase;margin-bottom:6px">History</div>'+hist
    +'<div style="display:flex;gap:6px;margin-top:10px"><input id="rx-note-inp" placeholder="Add a note…" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:11px" onkeydown="if(event.key===\'Enter\')rxAddNote(\''+t.id+'\')"><button onclick="rxAddNote(\''+t.id+'\')" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:8px 14px;font-size:11px;font-weight:700;cursor:pointer">Add</button></div>'
@@ -6861,6 +6881,11 @@ function rxAdvance(id){
   if(!next||!rxCanAdvance(t,next)){showToast('You do not have permission for this step.');return;}
   var req=RX_PHOTO_REQ[next];
   if(req&&!t[req.key]){showToast('Attach a photo of '+req.what(t)+' first.');return;}
+  // A refund can never slide into Paid on an old slip that nobody checked --
+  // e.g. after a send-back, where paidPhoto is still sitting on the ticket.
+  if(next==='paid'&&t.type==='refund'&&!t.slipCheck){
+    showToast('Use “📷 Attach photo & Mark Paid” — the slip has to be checked against the beneficiary details first.');return;
+  }
   t.status=next;
   t.history=t.history||[];
   t.history.push({stage:next,by:CU?CU.name:'',at:rxNow(),note:''});
@@ -6877,15 +6902,179 @@ function rxStagePhoto(id,input,stage){
   var reader=new FileReader();
   reader.onload=function(e){
     compressImg(e.target.result,1000,0.8,function(compressed){
-      t[req.key]=compressed;t[req.key+'By']=CU?CU.name:'';t[req.key+'At']=rxNow();
-      t.status=stage;
-      t.history=t.history||[];
-      t.history.push({stage:stage,by:CU?CU.name:'',at:rxNow(),note:'📷 '+req.done});
-      rxSaveAll([id]);rendered.rx=false;doR('rx');openRxDetail(id);
-      showToast(t.id+' → '+rxStageLabel(stage,t.type)+' (photo attached)');
+      // Refund payment slips go through the beneficiary check before anything is
+      // written. Everything else (received article, dispatch proof, customer
+      // chat) commits straight away as before.
+      var needsCheck=(stage==='paid'&&t.type==='refund');
+      var commit=function(chk,reject){
+        if(reject){
+          // Nothing is stored and the stage does not move -- the rejection is
+          // the record, so the next attempt starts from a clean slate.
+          t.history=t.history||[];
+          t.history.push({stage:t.status,by:CU?CU.name:'',at:rxNow(),noteOnly:true,
+            note:'⚠ Payment slip rejected at verification: '+reject});
+          rxSaveAll([id]);rendered.rx=false;doR('rx');openRxDetail(id);
+          showToast(t.id+' — slip rejected, still '+rxStageLabel(t.status,t.type)+'.');
+          return;
+        }
+        t[req.key]=compressed;t[req.key+'By']=CU?CU.name:'';t[req.key+'At']=rxNow();
+        if(chk)t.slipCheck=chk;
+        t.status=stage;
+        t.history=t.history||[];
+        t.history.push({stage:stage,by:CU?CU.name:'',at:rxNow(),
+          note:'📷 '+req.done+(chk?' · ✅ slip verified against beneficiary details'
+            +(chk.missing?' (not on file: '+chk.missing.join(', ')+')':''):'')});
+        rxSaveAll([id]);rendered.rx=false;doR('rx');openRxDetail(id);
+        showToast(t.id+' → '+rxStageLabel(stage,t.type)+(chk?' (slip verified)':' (photo attached)'));
+      };
+      if(needsCheck)rxOpenSlipCheck(t,compressed,commit); else commit(null,null);
     });
   };
   reader.readAsDataURL(file);
+  // Clear the picker so choosing the same file again still fires onchange
+  // (matters after a rejected slip is re-shot and re-uploaded).
+  input.value='';
+}
+// ── PAYMENT-SLIP VERIFICATION (refunds only) ──
+// A refund cannot reach Paid until somebody has read the uploaded bank slip
+// against the beneficiary details held on the ticket and ticked every field
+// off. The slip is held un-committed while they do it, so a slip that pays the
+// wrong account never lands on a paid ticket -- a rejection is written into the
+// ticket history and the stage does not move. Nothing here reads the image
+// itself; it is a forced human check with an audit trail, not OCR.
+function rxEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function rxSlipFields(t){
+  return[
+    {k:'bank',lbl:'Bank',val:t.bankName||'',ask:'Bank on the slip is'},
+    {k:'title',lbl:'Account Title',val:t.accountTitle||'',ask:'Account title on the slip is'},
+    {k:'iban',lbl:'Account / IBAN',val:t.accountNumber||'',ask:'Account number on the slip is'},
+    {k:'amount',lbl:'Amount',val:t.amount?'PKR '+NF(t.amount):'',ask:'Amount transferred is'}
+  ];
+}
+// A refund that reached Paid without anyone reading the slip against the
+// beneficiary details. Exchanges have no slip, so they are never pending.
+function rxSlipPending(t){
+  return !!t&&t.type==='refund'&&RX_STAGES.indexOf(t.status)>=RX_STAGES.indexOf('paid')&&!t.slipCheck;
+}
+// Banner on a refund ticket: green once the slip has been read against the
+// beneficiary details, amber while it has not -- which is every ticket that was
+// paid before this check existed, hence the "Verify now" catch-up button.
+function rxSlipStatusBlock(t){
+  if(!t||t.type!=='refund')return '';
+  if(RX_STAGES.indexOf(t.status)<RX_STAGES.indexOf('paid')&&!t.slipCheck)return '';
+  var c=t.slipCheck;
+  if(c){
+    return '<div style="background:#eafaf0;border:1px solid #cdecd9;border-radius:8px;padding:9px 12px;margin-top:10px;font-size:11px;color:#1e6b45">'
+     +'<b>✅ Payment slip verified</b> against the beneficiary details on file'
+     +' <span style="color:#7ba892">— by '+rxEsc(c.by||'—')+(c.at?' · '+rxEsc(c.at):'')+'</span>'
+     +(c.missing&&c.missing.length?'<div style="color:#b06a1e;margin-top:3px">⚠ Not on file at the time: '+rxEsc(c.missing.join(', '))+'</div>':'')
+     +'</div>';
+  }
+  return '<div style="background:#fdf6ea;border:1px solid #f0e2c4;border-radius:8px;padding:9px 12px;margin-top:10px;font-size:11px;color:#8a6420;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+   +'<span style="flex:1;min-width:200px"><b>⚠ Payment slip not verified.</b> Nobody has checked this slip against the beneficiary details yet.</span>'
+   +(t.paidPhoto
+      ?(rxCanAdvance(t,'paid')?'<button onclick="rxVerifyExisting(\''+t.id+'\')" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:7px 13px;font-size:11px;font-weight:700;cursor:pointer;flex:none">Verify now</button>':'')
+      :'<span style="color:#c0392b;flex:none">No slip attached.</span>')
+   +'</div>';
+}
+// Catch-up path for refunds already sitting at Paid or beyond: run the same
+// check against the slip that is already on the ticket, without moving stage.
+function rxVerifyExisting(id){
+  var t=(window.TICKETS||[]).find(function(x){return x.id===id;});if(!t||t.type!=='refund')return;
+  if(!rxCanAdvance(t,'paid')){showToast('You do not have permission to verify payment slips.');return;}
+  if(!t.paidPhoto){showToast('No payment slip is attached to this ticket.');return;}
+  rxOpenSlipCheck(t,t.paidPhoto,function(chk,reject){
+    t.history=t.history||[];
+    if(reject){
+      t.history.push({stage:t.status,by:CU?CU.name:'',at:rxNow(),noteOnly:true,
+        note:'⚠ Payment slip rejected at verification: '+reject});
+    }else{
+      t.slipCheck=chk;
+      t.history.push({stage:t.status,by:CU?CU.name:'',at:rxNow(),noteOnly:true,
+        note:'✅ Payment slip verified against beneficiary details'+(chk.missing?' (not on file: '+chk.missing.join(', ')+')':'')});
+    }
+    rxSaveAll([id]);rendered.rx=false;doR('rx');openRxDetail(id);
+    showToast(reject?(t.id+' — slip marked as not matching.'):(t.id+' — slip verified.'));
+  });
+}
+function rxOpenSlipCheck(t,slip,commit){
+  var fields=rxSlipFields(t);
+  var missing=fields.filter(function(f){return !f.val;}).map(function(f){return f.lbl;});
+  var ben=fields.map(function(f){
+    return '<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid #f2efe9">'
+      +'<span style="width:96px;flex:none;font-size:9px;color:#999;font-weight:700;text-transform:uppercase;padding-top:2px">'+f.lbl+'</span>'
+      +'<span style="font-size:12px;font-weight:600'+(f.k==='iban'?';font-family:monospace;font-size:11px':'')+'">'
+        +(f.val?rxEsc(f.val):'<span style="color:#c0392b;font-weight:400;font-family:inherit;font-size:11px">— not on file</span>')+'</span></div>';
+  }).join('');
+  var ticks=fields.map(function(f){
+    return '<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 9px;border:1px solid #e8e4dc;border-radius:7px;margin-bottom:6px;cursor:pointer;font-size:12px;line-height:1.45;background:#fff">'
+      +'<input type="checkbox" data-k="'+f.k+'" style="margin-top:2px;flex:none;width:16px;height:16px;cursor:pointer">'
+      +'<span>'+(f.val
+         ? f.ask+' <b>'+rxEsc(f.val)+'</b>'
+         : '<b>'+f.lbl+'</b> is not on file — I checked the slip against the customer chat instead')
+      +'</span></label>';
+  }).join('');
+  var ov=document.createElement('div');
+  ov.id='rx-slipcheck';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:9300;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:20px;width:min(760px,96vw);max-height:94vh;overflow-y:auto">'
+   +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+     +'<b style="font-size:15px">Verify the payment slip · '+rxEsc(t.id)+'</b>'
+     +'<button data-act="x" style="background:none;border:none;font-size:20px;cursor:pointer;color:#999">✕</button></div>'
+   +'<div style="font-size:11px;color:#888;margin-bottom:14px">Read the slip against the beneficiary details on file. '
+     +'The ticket only moves to <b>Paid</b> once every line is ticked, and your name is recorded against it.</div>'
+   +(missing.length?'<div style="background:#fdf3f3;border:1px solid #f0d8d8;color:#c0392b;border-radius:8px;padding:8px 12px;font-size:11px;margin-bottom:12px">⚠ '
+     +rxEsc(missing.join(', '))+' '+(missing.length>1?'are':'is')+' not on this ticket — there is nothing on file to check the slip against.</div>':'')
+   +'<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">'
+     +'<div style="flex:none"><div style="font-size:9px;color:#999;font-weight:700;text-transform:uppercase;margin-bottom:5px">📷 Uploaded slip</div>'
+       +'<img data-act="zoom" style="width:230px;max-height:330px;object-fit:contain;background:#f6f4f0;border-radius:8px;border:1px solid #e5e2db;cursor:zoom-in" title="Click to enlarge"></div>'
+     +'<div style="flex:1;min-width:260px">'
+       +'<div style="font-size:9px;color:var(--gold2);font-weight:700;text-transform:uppercase;margin-bottom:5px">Beneficiary on file</div>'
+       +'<div style="background:#faf8f3;border:1px solid #eee;border-radius:8px;padding:6px 12px;margin-bottom:14px">'+ben+'</div>'
+       +'<div style="font-size:9px;color:#999;font-weight:700;text-transform:uppercase;margin-bottom:6px">Tick each line only after reading it off the slip</div>'
+       +ticks
+     +'</div></div>'
+   +'<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;align-items:center">'
+     +'<button data-act="ok" disabled style="background:#ccc;color:#fff;border:none;border-radius:6px;padding:10px 18px;font-size:12px;font-weight:700;cursor:not-allowed">✓ Slip verified — mark Paid</button>'
+     +'<button data-act="no" style="background:#fff;border:1px solid #c0392b;color:#c0392b;border-radius:6px;padding:10px 16px;font-size:12px;font-weight:600;cursor:pointer">✕ Does not match</button>'
+     +'<span data-act="count" style="font-size:11px;color:#999">0 of '+fields.length+' checked</span>'
+   +'</div></div>';
+  ov.querySelector('img[data-act=zoom]').src=slip;
+  document.body.appendChild(ov);
+
+  var boxes=[].slice.call(ov.querySelectorAll('input[type=checkbox]'));
+  var okBtn=ov.querySelector('button[data-act=ok]'),cnt=ov.querySelector('span[data-act=count]');
+  function close(){ov.remove();document.removeEventListener('keydown',onKey);}
+  function onKey(e){if(e.key==='Escape')close();}
+  document.addEventListener('keydown',onKey);
+  ov.addEventListener('click',function(e){if(e.target===ov)close();});
+  ov.querySelector('button[data-act=x]').onclick=close;
+  ov.querySelector('img[data-act=zoom]').onclick=function(){rxViewPhoto(slip);};
+  boxes.forEach(function(b){
+    b.onchange=function(){
+      var n=boxes.filter(function(x){return x.checked;}).length;
+      cnt.textContent=n+' of '+boxes.length+' checked';
+      var all=n===boxes.length;
+      okBtn.disabled=!all;
+      okBtn.style.background=all?'#0F6E56':'#ccc';
+      okBtn.style.cursor=all?'pointer':'not-allowed';
+    };
+  });
+  okBtn.onclick=function(){
+    if(okBtn.disabled)return;
+    var chk={by:CU?CU.name:'',at:rxNow()};
+    boxes.forEach(function(b){chk[b.getAttribute('data-k')]=true;});
+    if(missing.length)chk.missing=missing;
+    close();
+    commit(chk,null);
+  };
+  ov.querySelector('button[data-act=no]').onclick=function(){
+    var why=prompt('What does not match on the slip? (recorded on the ticket)','');
+    if(why===null)return;
+    if(!why.trim()){showToast('A reason is required to reject the slip.');return;}
+    close();
+    commit(null,why.trim());
+  };
 }
 function rxViewPhoto(src){
   var ov=document.createElement('div');
@@ -6907,6 +7096,9 @@ function rxSendBack(id){
   var reason=prompt('Reason for sending back (required):','');
   if(!reason||!reason.trim()){showToast('A reason is required to send back.');return;}
   t.status=target;
+  // Going back past Paid re-opens the payment step, so the old slip check no
+  // longer stands -- the next slip has to be verified again.
+  if(RX_STAGES.indexOf(target)<=RX_STAGES.indexOf('paid'))delete t.slipCheck;
   t.history=t.history||[];
   t.history.push({stage:target,by:CU?CU.name:'',at:rxNow(),note:reason.trim(),sendBack:true});
   rxSaveAll([id]);rendered.rx=false;doR('rx');openRxDetail(id);
