@@ -6261,6 +6261,29 @@ function rPO(){
 // -> paid/dispatched -> informed -> closed, plus admin-only Send Back with a
 // mandatory reason. Per-stage permissions follow the refund role, not the
 // main app role.
+// Which of the wide column groups are showing. Both default ON -- the reason
+// they were added was to stop people opening each ticket to read them. The
+// choice is remembered per browser so someone working on a narrow screen isn't
+// re-collapsing them on every visit.
+function rxLoadCols(){
+  var d={verif:true,bank:true};
+  try{
+    var s=JSON.parse(localStorage.getItem('sbm_rx_cols')||'null');
+    if(s&&typeof s==='object')return {verif:s.verif!==false,bank:s.bank!==false};
+  }catch(e){}
+  return d;
+}
+function rxToggleCol(g){
+  if(!window._rxCols)window._rxCols=rxLoadCols();
+  window._rxCols[g]=!window._rxCols[g];
+  try{localStorage.setItem('sbm_rx_cols',JSON.stringify(window._rxCols));}catch(e){}
+  rendered.rx=false;doR('rx');
+}
+function rxColBtn(g,lbl,color){
+  if(!window._rxCols)window._rxCols=rxLoadCols();
+  var on=window._rxCols[g];
+  return '<button onclick="rxToggleCol(\''+g+'\')" title="'+(on?'Collapse ':'Expand ')+lbl+'" style="border:1px solid '+color+';background:'+(on?color:'#fff')+';color:'+(on?'#fff':color)+';border-radius:3px;padding:2px 9px;font-size:10px;cursor:pointer;font-weight:700;margin-left:3px">'+(on?'−':'+')+'&nbsp;'+lbl+'</button>';
+}
 var RX_STAGES=['initiated','received','approved','paid','informed','closed'];
 function rxStageLabel(st,type){
   if(st==='paid')return type==='exchange'?'Dispatched':'Paid';
@@ -6468,6 +6491,9 @@ function rRX(){
    +'<input type="text" value="'+(f.q||'').replace(/"/g,'&quot;')+'" placeholder="Search ticket / order / customer / product…" oninput="window._rxFlt.q=this.value;clearTimeout(window._rxT);window._rxT=setTimeout(function(){rendered.rx=false;doR(\'rx\');var s=document.querySelector(\'#prx input[type=text]\');if(s){s.focus();s.selectionStart=s.selectionEnd=s.value.length;}},350)" style="border:1px solid #ddd;border-radius:6px;padding:5px 10px;font-size:11px;min-width:210px;background:#fff">'
    +(f.type||f.stage?'<button onclick="window._rxFlt.type=\'\';window._rxFlt.stage=\'\';rendered.rx=false;doR(\'rx\')" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600">✕ Clear type/stage</button>':'')
    +'<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555;cursor:pointer"><input type="checkbox" '+(f.mine?'checked':'')+' onchange="window._rxFlt.mine=this.checked;rendered.rx=false;doR(\'rx\')" style="accent-color:var(--gold)">Assigned to me</label>'
+   +'<span style="font-size:10px;color:#888;font-weight:600;margin-left:10px">Columns:</span>'
+   +rxColBtn('verif','Verification','#2471a3')
+   +rxColBtn('bank','Bank','#a07030')
    +'<div style="margin-left:auto;display:flex;gap:6px">'
    +'<button onclick="rxExport()" style="background:#fff;border:1px solid #27ae60;color:#27ae60;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer">⬇ CSV</button>'
    +'<button onclick="openRxNew(\'exchange\')" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">⇄ New Exchange</button>'
@@ -6484,6 +6510,12 @@ function rRX(){
   // action refunds already need the number from, same as the ticket detail view.
   var VBG='background:#eef5fc;';
   var BBG='background:#fdf8ec;';
+  // Both groups default to shown -- the whole point was not having to open a
+  // ticket to read them. Collapsing is for when the extra width gets in the way
+  // on a narrow screen, so the preference sticks per browser rather than
+  // resetting every render.
+  if(!window._rxCols)window._rxCols=rxLoadCols();
+  var showV=window._rxCols.verif,showB=window._rxCols.bank;
   var esc=function(s){return String(s).replace(/</g,'&lt;');};
   function verifCell(t){
     var v=t.instagramProfile?['Instagram',t.instagramProfile]:t.facebookProfile?['Facebook',t.facebookProfile]:t.whatsappProfile?['WhatsApp',t.whatsappProfile]:null;
@@ -6502,12 +6534,13 @@ function rRX(){
      +'<td style="'+TD2+'"><span style="'+(t.type==='refund'?'background:#fde8e8;color:#c0392b':'background:#e8f8ee;color:#0F6E56')+';padding:2px 8px;border-radius:3px;font-size:8px;font-weight:800">'+(t.type==='refund'?'REFUND':'EXCHANGE')+'</span></td>'
      +'<td style="'+TD2+'font-family:monospace;font-size:10px">#'+(t.order||'')+'</td>'
      +'<td style="'+TD2+'font-weight:600">'+(t.customer||'')+'</td>'
-     +'<td style="'+TD2+VBG+'">'+verifCell(t)+'</td>'
+     +(showV?'<td style="'+TD2+VBG+'">'+verifCell(t)+'</td>':'')
      +'<td style="'+TD2+'">'+thumb+(first.product||'')+' '+ratingChip(first.product)+moreBadge+(first.productToSend?'<br><span style="color:#0F6E56;font-size:10px">→ '+first.productToSend+(first.sizeToSend?' ('+first.sizeToSend+')':'')+'</span>':'')+'</td>'
      +'<td style="'+TD2+'text-align:right;font-weight:700">'+(t.amount?NF(t.amount):'—')+'</td>'
-     +'<td style="'+TD2+BBG+'">'+(t.bankName?esc(t.bankName):'<span style="color:#ccc">—</span>')+'</td>'
-     +'<td style="'+TD2+BBG+'">'+(t.accountTitle?esc(t.accountTitle):'<span style="color:#ccc">—</span>')+'</td>'
-     +'<td style="'+TD2+BBG+'font-family:monospace;font-size:10px">'+(t.accountNumber?esc(t.accountNumber):'<span style="color:#ccc;font-family:inherit">—</span>')+'</td>'
+     +(showB?'<td style="'+TD2+BBG+'">'+(t.bankName?esc(t.bankName):'<span style="color:#ccc">—</span>')+'</td>'
+       +'<td style="'+TD2+BBG+'">'+(t.accountTitle?esc(t.accountTitle):'<span style="color:#ccc">—</span>')+'</td>'
+       +'<td style="'+TD2+BBG+'font-family:monospace;font-size:10px">'+(t.accountNumber?esc(t.accountNumber):'<span style="color:#ccc;font-family:inherit">—</span>')+'</td>'
+       :'<td style="'+TD2+BBG+'text-align:center" title="Bank details hidden — click + Bank to show">'+((t.bankName||t.accountNumber)?'<span style="color:var(--gold2);font-size:11px">🏦</span>':'<span style="color:#ddd;font-size:10px">—</span>')+'</td>')
      +'<td style="'+TD2+'font-size:10px;color:#666">'+(t.platform||'')+'</td>'
      +'<td style="'+TD2+'font-size:10px">'+(t.assignedTo||'')+'</td>'
      +'<td style="'+TD2+'"><span style="'+(STC[t.status]||'')+';padding:2px 9px;border-radius:8px;font-size:9px;font-weight:700;white-space:nowrap">'+rxStageLabel(t.status,t.type)+'</span></td>'
@@ -6515,15 +6548,16 @@ function rRX(){
   }).join('');
   el.innerHTML='<div style="max-width:1150px">'+kh+stageTabs+toolbar
    +'<div style="border:1px solid #e8e4dc;border-radius:8px;overflow:hidden;background:#fff"><div style="max-height:62vh;overflow-y:auto;overflow-x:auto">'
-   +'<table style="width:100%;border-collapse:collapse;min-width:1380px">'
+   +'<table style="width:100%;border-collapse:collapse;min-width:'+(980+(showV?110:0)+(showB?290:40))+'px">'
    +'<thead><tr><th style="'+TH2+'">Date</th><th style="'+TH2+'">Ticket</th><th style="'+TH2+'">Type</th><th style="'+TH2+'">Order#</th><th style="'+TH2+'">Customer</th>'
-     +'<th style="'+TH2+VBG+'color:#2471a3;border-left:2px solid #b8d0f0">Verification</th>'
+     +(showV?'<th style="'+TH2+VBG+'color:#2471a3;border-left:2px solid #b8d0f0">Verification</th>':'')
      +'<th style="'+TH2+'">Product</th><th style="'+TH2+'text-align:right">Amount</th>'
-     +'<th style="'+TH2+BBG+'color:var(--gold2);border-left:2px solid #e0c890">Bank</th>'
-     +'<th style="'+TH2+BBG+'color:var(--gold2)">Account Title</th>'
-     +'<th style="'+TH2+BBG+'color:var(--gold2)">IBAN</th>'
+     +(showB?'<th style="'+TH2+BBG+'color:var(--gold2);border-left:2px solid #e0c890">Bank</th>'
+       +'<th style="'+TH2+BBG+'color:var(--gold2)">Account Title</th>'
+       +'<th style="'+TH2+BBG+'color:var(--gold2)">IBAN</th>'
+       :'<th style="'+TH2+BBG+'color:var(--gold2);border-left:2px solid #e0c890;text-align:center" title="Bank details collapsed">🏦</th>')
      +'<th style="'+TH2+'">Platform</th><th style="'+TH2+'">Assigned</th><th style="'+TH2+'">Stage</th></tr></thead>'
-   +'<tbody>'+(body||'<tr><td colspan="13" style="padding:36px;text-align:center;color:#bbb;font-size:12px">No tickets yet — create the first one with + New Refund or ⇄ New Exchange</td></tr>')+'</tbody></table>'
+   +'<tbody>'+(body||'<tr><td colspan="'+(9+(showV?1:0)+(showB?3:1))+'" style="padding:36px;text-align:center;color:#bbb;font-size:12px">No tickets yet — create the first one with + New Refund or ⇄ New Exchange</td></tr>')+'</tbody></table>'
    +'</div></div></div>';
 }
 function rxExport(){
