@@ -6566,7 +6566,10 @@ function rRX(){
      +'<td style="'+TD2+'"><span style="'+(STC[t.status]||'')+';padding:2px 9px;border-radius:8px;font-size:9px;font-weight:700;white-space:nowrap">'+rxStageLabel(t.status,t.type)+'</span></td>'
      +'</tr>';
   }).join('');
-  el.innerHTML='<div style="max-width:1150px">'+kh+stageTabs+toolbar
+  // No width cap -- with the bank and profile columns the table needs the whole
+  // window, and capping it left dead space to the right of Stage on any wide
+  // screen. Matches the Flash Sale Planner and Summary Sheet, which never capped.
+  el.innerHTML='<div>'+kh+stageTabs+toolbar
    +'<div style="border:1px solid #e8e4dc;border-radius:8px;overflow:hidden;background:#fff"><div style="max-height:62vh;overflow-y:auto;overflow-x:auto">'
    +'<table style="width:100%;border-collapse:collapse;min-width:'+(980+(showV?190:0)+(showB?290:40))+'px">'
    +'<thead><tr><th style="'+TH2+'">Date</th><th style="'+TH2+'">Ticket</th><th style="'+TH2+'">Type</th><th style="'+TH2+'">Order#</th><th style="'+TH2+'">Customer</th>'
