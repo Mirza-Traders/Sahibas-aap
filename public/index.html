@@ -1267,7 +1267,7 @@ function getStats(){var cbs=Array.from(document.querySelectorAll('#ddp .dd-item:
 // ─── FILTERS ───
 function getF(){return{from:document.getElementById('f-from').value,to:document.getElementById('f-to').value,stats:getStats(),pf:document.getElementById('f-pf').value,dst:document.getElementById('f-dst').value};}
 function applyF(){filters=getF();pages={detail:1,alloc:1,excess:1,sz:1,sk:1};Object.keys(rendered).forEach(k=>delete rendered[k]);var t=document.querySelector('.sb-item.on');if(t)doST(t.dataset.id);}
-function resetF(){document.getElementById('f-from').value=META.min_date;document.getElementById('f-to').value=META.max_date;document.querySelectorAll('#ddp input').forEach(c=>c.checked=true);updDD();document.getElementById('f-pf').value='';document.getElementById('f-dst').value='';applyF();}
+function resetF(){window._drWipe=true;document.getElementById('f-from').value=META.min_date;document.getElementById('f-to').value=META.max_date;document.querySelectorAll('#ddp input').forEach(c=>c.checked=true);updDD();document.getElementById('f-pf').value='';document.getElementById('f-dst').value='';applyF();}
 function fRows(rows){
   var f=filters;
   return rows.filter(r=>{
@@ -2615,6 +2615,24 @@ var _drRows=[], _drFiltered=[], _drRH=34, _drVis=0;
 var _drSel=new Set(), _drSelProds=new Set();
 var _drSortAsc=true; // date sort direction
 var _drFilters={stat:'',pf:'',dst:'',pay:'',sz:'',cpct:'',ordSearch:''};
+// Number columns: which row index each one reads, and how it formats. Every one
+// of these gets a click-the-heading panel with sort + a min/max range, the same
+// way Status/Platform already get a value list.
+var DR_NUMCOLS={
+  days  :{i:8, lbl:'Days'},
+  ret   :{i:9, lbl:'Retail'},
+  cost  :{i:10,lbl:'Cost'},
+  cpct  :{i:11,lbl:'Comm%',pct:true},
+  comm  :{i:12,lbl:'Comm'},
+  taxpct:{i:24,lbl:'Tax%', pct:true},
+  tax   :{i:13,lbl:'Tax'},
+  gp    :{i:14,lbl:'GP',   signed:true},
+  pat   :{i:15,lbl:'PAT',  signed:true},
+  exc   :{i:17,lbl:'Excess'}
+};
+var _drNum={};        // key -> {min:Number|null, max:Number|null}
+var _drSortCol='';    // '' = sort by date (the original behaviour)
+var _drSortDesc=true; // for a number column: true = largest first
 var DR_W={chk:34,conum:100,onum:88,date:95,prd:160,sz:46,stat:86,pf:96,dst:86,pay:115,days:50,ret:70,cost:78,cpct:60,comm:70,taxpct:48,tax:60,gp:68,pat:68,exc:72};
 var DR_TOT=Object.values(DR_W).reduce(function(a,b){return a+b;},0);
 
@@ -2638,6 +2656,12 @@ function applyDrFilters(){
     if(f.pay&&r[7]!==f.pay)return false;
     if(f.sz&&r[3]!==f.sz)return false;
     if(f.cpct&&String(r[11])+'%'!==f.cpct)return false;
+    for(var nk in _drNum){
+      var nf=_drNum[nk],col=DR_NUMCOLS[nk];if(!col||!nf)continue;
+      var v=Number(r[col.i]);if(!isFinite(v))v=0;
+      if(nf.min!=null&&v<nf.min)return false;
+      if(nf.max!=null&&v>nf.max)return false;
+    }
     if(ordTokens.length){
       var onum=String(r[18]||'').toLowerCase(),conum=String(r[23]||'').toLowerCase();
       var hit=ordTokens.some(function(t){return onum.indexOf(t)>=0||conum.indexOf(t)>=0;});
@@ -2650,6 +2674,7 @@ function applyDrFilters(){
   _drSel.clear(); updDrSelBtn();
   renderDrVirtual();
   updDrSubtotals();
+  drRenderChips();
   var cnt=document.getElementById('dr-cnt');
   if(cnt)cnt.textContent=_drFiltered.length.toLocaleString()+' rows shown';
 }
@@ -2662,16 +2687,33 @@ function updDrSubtotals(){
   u('dr-sz-total',_drFiltered.length);
 }
 
+// One sort key at a time. Ties fall back to newest date first -- without that,
+// the dozens of rows sharing an identical GP would come out in whatever order
+// the filter happened to leave them in, and reshuffle on every keystroke.
 function drSortRows(){
+  var col=DR_NUMCOLS[_drSortCol];
+  if(col){
+    var i=col.i,dir=_drSortDesc?-1:1;
+    _drFiltered.sort(function(a,b){
+      var x=Number(a[i]),y=Number(b[i]);
+      if(!isFinite(x))x=0;if(!isFinite(y))y=0;
+      if(x!==y)return (x<y?-1:1)*dir;
+      return String(b[0]).localeCompare(String(a[0]));
+    });
+    return;
+  }
   _drFiltered.sort(function(a,b){
     return _drSortAsc?a[0].localeCompare(b[0]):b[0].localeCompare(a[0]);
   });
 }
 
 function drToggleSort(){
+  // Clicking Date takes the sort back off whichever number column had it.
+  _drSortCol='';
   _drSortAsc=!_drSortAsc;
   drSortRows();
   renderDrVirtual();
+  drSyncNumHeads();
   var btn=document.getElementById('dr-date-sort');
   if(btn)btn.textContent=_drSortAsc?'Date ↑':'Date ↓';
 }
@@ -2755,6 +2797,154 @@ function drHFSet(key,val){
   applyDrFilters();
 }
 
+// ── NUMBER-COLUMN SORT + RANGE FILTER ──
+// Same portal trick as drHFToggle: the panel goes onto <body> so the header
+// row's horizontal clipping can't cut it off.
+function drNFFmt(key,v){
+  var col=DR_NUMCOLS[key];
+  return col&&col.pct?(v+'%'):NF(v);
+}
+function drNFLabel(key){
+  var nf=_drNum[key];if(!nf)return '';
+  // The "below 0"/"above 0" shortcuts sit a hair either side of zero so the
+  // comparison is strict; spell that out rather than showing "≤ -0".
+  if(nf.lbl)return nf.lbl;
+  if(nf.min!=null&&nf.max!=null)return nf.min===nf.max?('= '+drNFFmt(key,nf.min)):(drNFFmt(key,nf.min)+' – '+drNFFmt(key,nf.max));
+  if(nf.min!=null)return '≥ '+drNFFmt(key,nf.min);
+  if(nf.max!=null)return '≤ '+drNFFmt(key,nf.max);
+  return '';
+}
+function drNFCloseAll(){document.querySelectorAll('.dr-nf-panel').forEach(function(p){p.remove();});}
+function drNFToggle(key,e){
+  if(e)e.stopPropagation();
+  var was=document.getElementById('dr-nf-panel-'+key);
+  drHFCloseAll();drNFCloseAll();
+  if(was)return;
+  var col=DR_NUMCOLS[key];if(!col)return;
+  var btn=document.getElementById('dr-nf-btn-'+key);if(!btn)return;
+  var rect=btn.getBoundingClientRect();
+  var nf=_drNum[key]||{min:null,max:null};
+  var sorted=_drSortCol===key;
+  // Quick buttons: for a percentage column the shortcuts are the rates actually
+  // present in the data; for a column that can go negative, the losses.
+  var quick='';
+  if(col.pct){
+    var vals=[...new Set(_drRows.map(function(r){return Number(r[col.i]);}))].filter(function(v){return isFinite(v);}).sort(function(a,b){return a-b;}).slice(0,8);
+    quick=vals.map(function(v){return '<button onclick="drNFQuick(\''+key+'\','+v+','+v+')">'+v+'%</button>';}).join('');
+  }else if(col.signed){
+    quick='<button onclick="drNFQuick(\''+key+'\',null,-0.0001,\'below 0\')">Below 0</button>'
+         +'<button onclick="drNFQuick(\''+key+'\',0,0)">= 0</button>'
+         +'<button onclick="drNFQuick(\''+key+'\',0.0001,null,\'above 0\')">Above 0</button>';
+  }else{
+    quick='<button onclick="drNFQuick(\''+key+'\',0,0)">= 0</button>'
+         +'<button onclick="drNFQuick(\''+key+'\',0.0001,null,\'above 0\')">Above 0</button>';
+  }
+  var opt=function(desc,lbl){
+    var on=sorted&&_drSortDesc===desc;
+    return '<div onclick="drNFSort(\''+key+'\','+desc+')" class="dr-nf-opt" style="padding:6px 11px;cursor:pointer;display:flex;gap:8px;align-items:center;font-size:11px;'
+      +(on?'color:var(--gold2);font-weight:800;background:#fdf6e6':'color:#333')+'">'+lbl+'</div>';
+  };
+  var p=document.createElement('div');
+  p.id='dr-nf-panel-'+key;p.className='dr-nf-panel';
+  var left=Math.min(rect.left,Math.max(4,window.innerWidth-224));
+  p.style.cssText='position:fixed;top:'+rect.bottom+'px;left:'+left+'px;z-index:9999;background:#fff;border:1px solid #e0dcd4;'
+    +'border-radius:7px;box-shadow:0 6px 22px rgba(0,0,0,.17);width:212px;text-align:left;font-size:11px';
+  p.onclick=function(ev){ev.stopPropagation();};
+  p.innerHTML='<div style="font-size:8.5px;color:#bbb;text-transform:uppercase;letter-spacing:.05em;padding:7px 11px 3px;font-weight:700">Sort</div>'
+    +opt(true,'↓&nbsp; Largest first')+opt(false,'↑&nbsp; Smallest first')
+    +'<div style="height:1px;background:#f0ede8;margin:4px 0"></div>'
+    +'<div style="font-size:8.5px;color:#bbb;text-transform:uppercase;letter-spacing:.05em;padding:0 11px 3px;font-weight:700">Only show rows where '+col.lbl+' is</div>'
+    +'<div style="display:flex;gap:6px;padding:2px 11px 8px;align-items:center">'
+      +'<input id="dr-nf-min-'+key+'" placeholder="Min" value="'+(nf.min!=null?nf.min:'')+'" style="width:100%;min-width:0;border:1px solid #e0dcd4;border-radius:4px;padding:4px 6px;font-size:11px;outline:none">'
+      +'<span style="color:#ccc;font-size:10px">to</span>'
+      +'<input id="dr-nf-max-'+key+'" placeholder="Max" value="'+(nf.max!=null?nf.max:'')+'" style="width:100%;min-width:0;border:1px solid #e0dcd4;border-radius:4px;padding:4px 6px;font-size:11px;outline:none">'
+    +'</div>'
+    +'<div style="display:flex;gap:5px;padding:0 11px 9px;flex-wrap:wrap">'+quick+'</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;border-top:1px solid #f0ede8;background:#fcfbf9;border-radius:0 0 7px 7px">'
+      +'<button onclick="drNFClear(\''+key+'\')" style="background:none;border:none;color:#c0392b;font-size:10px;cursor:pointer;font-weight:600">Clear</button>'
+      +'<button onclick="drNFApply(\''+key+'\')" style="background:var(--gold);border:none;color:#111;font-weight:800;font-size:10px;border-radius:5px;padding:5px 14px;cursor:pointer">Apply</button>'
+    +'</div>';
+  document.body.appendChild(p);
+  ['dr-nf-min-'+key,'dr-nf-max-'+key].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)el.onkeydown=function(ev){if(ev.key==='Enter')drNFApply(key);};
+  });
+  var q=p.querySelectorAll('div[style*="flex-wrap"] button');
+  q.forEach(function(b){b.style.cssText='border:1px solid #e0dcd4;background:#fff;border-radius:11px;padding:3px 9px;font-size:9.5px;cursor:pointer;color:#666';});
+}
+function drNFSort(key,desc){
+  _drSortCol=key;_drSortDesc=!!desc;
+  drNFCloseAll();
+  drSortRows();renderDrVirtual();drSyncNumHeads();drRenderChips();
+  var db=document.getElementById('dr-date-sort');if(db)db.textContent='Date';
+}
+function drNFApply(key){
+  var mn=parseFloat((document.getElementById('dr-nf-min-'+key)||{}).value);
+  var mx=parseFloat((document.getElementById('dr-nf-max-'+key)||{}).value);
+  drNFSet(key,isFinite(mn)?mn:null,isFinite(mx)?mx:null);
+}
+function drNFQuick(key,mn,mx,lbl){drNFSet(key,mn,mx,lbl);}
+function drNFSet(key,mn,mx,lbl){
+  if(mn==null&&mx==null)delete _drNum[key];
+  else _drNum[key]={min:mn,max:mx,lbl:lbl||''};
+  drNFCloseAll();drSyncNumHeads();applyDrFilters();
+}
+function drNFClear(key){drNFSet(key,null,null);}
+// Repaint the headings: gold + ● while a range is set, ↓/↑ while it holds the sort.
+function drSyncNumHeads(){
+  Object.keys(DR_NUMCOLS).forEach(function(k){
+    var btn=document.getElementById('dr-nf-btn-'+k);if(!btn)return;
+    var col=DR_NUMCOLS[k],filtered=!!_drNum[k],sorted=_drSortCol===k;
+    var caret=sorted?(_drSortDesc?'↓':'↑'):'▾';
+    btn.innerHTML=(col.lbl||'')+(k==='cost'?' 🟠':k==='exc'?' 🔴':'')
+      +' <span style="font-size:'+(sorted?'9px':'7px')+'">'+caret+'</span>'
+      +(filtered?'<span style="color:var(--gold2)">●</span>':'');
+    btn.style.color=(filtered||sorted)?'var(--gold2)':'#aaa';
+    btn.style.fontWeight=(filtered||sorted)?'800':'400';
+    btn.parentElement.style.background=(filtered||sorted)?'#fdf6e6':'#f8f6f2';
+  });
+}
+// Everything currently narrowing the sheet, in one strip you can clear from.
+function drRenderChips(){
+  var bar=document.getElementById('dr-chips');if(!bar)return;
+  var out=[];
+  var chip=function(txt,onx){
+    return '<span style="display:inline-flex;align-items:center;gap:5px;background:#fdf6e6;border:1px solid var(--gold);color:var(--gold2);border-radius:12px;padding:3px 10px;font-size:10px;font-weight:700;white-space:nowrap">'
+      +txt+(onx?'<span onclick="'+onx+'" style="cursor:pointer;color:#c0392b;font-weight:800">✕</span>':'')+'</span>';
+  };
+  if(_drSortCol&&DR_NUMCOLS[_drSortCol])
+    out.push(chip(DR_NUMCOLS[_drSortCol].lbl+' '+(_drSortDesc?'↓ largest first':'↑ smallest first'),'drToggleSort()'));
+  if(_drSelProds.size)out.push(chip(_drSelProds.size+' product'+(_drSelProds.size>1?'s':''),'drProdClear()'));
+  [['stat','Status'],['pf','Platform'],['dst','Dest'],['pay','Payment'],['sz','Size'],['cpct','Comm%']].forEach(function(p){
+    var v=_drFilters[p[0]];
+    if(v)out.push(chip(p[1]+': '+String(v).replace(/</g,'&lt;'),"drFlt('"+p[0]+"','')"));
+  });
+  if(_drFilters.ordSearch)out.push(chip('Order# search','drClearOrdSearch()'));
+  Object.keys(_drNum).forEach(function(k){
+    out.push(chip(DR_NUMCOLS[k].lbl+' '+drNFLabel(k),"drNFClear('"+k+"')"));
+  });
+  if(!out.length){bar.innerHTML='';bar.style.display='none';return;}
+  bar.style.display='flex';
+  // A filter that matches nothing in a newly-picked date range would otherwise
+  // just look like missing data -- say why the sheet is empty, and offer the way out.
+  var zero=_drFiltered.length===0
+    ? '<span style="color:#c0392b;font-weight:700;font-size:10px;margin-left:4px">0 rows — '+out.length+' filter'+(out.length>1?'s':'')+' active</span>'
+    : '';
+  bar.innerHTML='<span style="font-size:9px;color:#aaa;text-transform:uppercase;font-weight:700">Active</span>'
+    +out.join('')+zero
+    +'<button onclick="drClearAllFilters()" style="background:none;border:none;color:#c0392b;font-size:10px;cursor:pointer;font-weight:700">Clear all</button>';
+}
+function drClearOrdSearch(){
+  _drFilters.ordSearch='';
+  var inp=document.querySelector('#pdr input[placeholder^="Order#"]');if(inp)inp.value='';
+  applyDrFilters();
+}
+function drClearAllFilters(){
+  _drFilters={stat:'',pf:'',dst:'',pay:'',sz:'',cpct:'',ordSearch:''};
+  _drNum={};_drSelProds.clear();_drSortCol='';
+  rendered.dr=false;doR('dr');
+}
+
 // Multi-select product dropdown
 // The filter row lives inside two scrollers (overflow hidden, then auto), which
 // crop an absolutely-positioned panel down to about one row. Same answer the
@@ -2808,15 +2998,25 @@ document.addEventListener('click',function(e){
   // longer enough to recognise a click on the list itself -- check the panel too,
   // or ticking a product would close the dropdown under your cursor.
   if(wrap&&!wrap.contains(e.target)&&!(p&&p.contains(e.target)))drProdClose();
-  drHFCloseAll();
+  drHFCloseAll();drNFCloseAll();
 });
 
 function rDR(){
   _drRows=fRows(DETAIL);
   _drFiltered=[..._drRows];
-  _drSortAsc=true;
-  _drSel.clear();_drSelProds.clear();
-  _drFilters={stat:'',pf:'',dst:'',pay:'',sz:'',cpct:'',ordSearch:''};
+  _drSel.clear();
+  // Column filters survive a date-range change on purpose -- it's nearly always
+  // the same question about a different month, and re-typing them each time is
+  // friction for nothing. Reset is the thing that clears them (resetF sets the
+  // flag), and a filter that matches nothing in the new range announces itself
+  // through the "0 rows — N filters active" line rather than looking like a
+  // hole in the data.
+  if(window._drWipe){
+    _drSortAsc=true;_drSortCol='';_drSortDesc=true;
+    _drSelProds.clear();_drNum={};
+    _drFilters={stat:'',pf:'',dst:'',pay:'',sz:'',cpct:'',ordSearch:''};
+    window._drWipe=false;
+  }
   drSortRows();
 
   var prds=[...new Set(_drRows.map(function(r){return r[1];}))].filter(Boolean).sort();
@@ -2843,6 +3043,14 @@ function rDR(){
     return '<th style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:0;background:#f8f6f2;border-bottom:2px solid #e8e4dc">'
       +'<div onclick="drHFToggle(\''+key+'\',event)" id="dr-hf-btn-'+key+'" data-label="'+label+'" style="padding:7px 6px;text-align:'+(al||'center')+';font-size:9px;color:#aaa;text-transform:uppercase;white-space:nowrap;user-select:none;cursor:pointer;display:flex;align-items:center;justify-content:'+jc+';gap:3px">'+label+' <span style="font-size:7px">▾</span></div>'
       +'</th>';
+  }
+  // Number-column heading: click opens the sort + range panel (drNFToggle).
+  // drSyncNumHeads() fills in the caret / ● / colour once the table is live.
+  function thn(w,key){
+    var col=DR_NUMCOLS[key];
+    return '<th style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:0;background:#f8f6f2;border-bottom:2px solid #e8e4dc">'
+      +'<div onclick="drNFToggle(\''+key+'\',event)" id="dr-nf-btn-'+key+'" style="padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;white-space:nowrap;user-select:none;cursor:pointer;display:flex;align-items:center;justify-content:flex-end;gap:3px">'
+      +col.lbl+(key==='cost'?' 🟠':key==='exc'?' 🔴':'')+' <span style="font-size:7px">▾</span></div></th>';
   }
   function fempty(w){return '<td style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:3px 4px;background:#fafafa;border-bottom:1px solid #e8e4dc"></td>';}
   function fcell(w,content){return '<td style="width:'+w+'px;min-width:'+w+'px;max-width:'+w+'px;padding:3px 4px;background:#fafafa;border-bottom:1px solid #e8e4dc">'+content+'</td>';}
@@ -2883,11 +3091,8 @@ function rDR(){
     +'<th id="dr-date-sort" onclick="drToggleSort()" style="width:'+W.date+'px;min-width:'+W.date+'px;padding:7px 6px;text-align:left;font-size:9px;color:var(--gold2);text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc;white-space:nowrap;cursor:pointer;user-select:none">Date ↑</th>'
     +th(W.prd,'Product')+th(W.sz,'Sz','center')
     +thf(W.stat,'stat','Status')+thf(W.pf,'pf','Platform')+thf(W.dst,'dst','Dest')+thf(W.pay,'pay','Payment')
-    +th(W.days,'Days','right')+th(W.ret,'Retail','right')
-    +'<th style="width:'+W.cost+'px;min-width:'+W.cost+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Cost 🟠</th>'
-    +thf(W.cpct,'cpct','Comm%','right')
-    +th(W.comm,'Comm','right')+th(W.taxpct,'Tax%','right')+th(W.tax,'Tax','right')+th(W.gp,'GP','right')+th(W.pat,'PAT','right')
-    +'<th style="width:'+W.exc+'px;min-width:'+W.exc+'px;padding:7px 6px;text-align:right;font-size:9px;color:#aaa;text-transform:uppercase;background:#f8f6f2;border-bottom:2px solid #e8e4dc">Excess 🔴</th>'
+    +thn(W.days,'days')+thn(W.ret,'ret')+thn(W.cost,'cost')+thn(W.cpct,'cpct')
+    +thn(W.comm,'comm')+thn(W.taxpct,'taxpct')+thn(W.tax,'tax')+thn(W.gp,'gp')+thn(W.pat,'pat')+thn(W.exc,'exc')
     +'</tr>'
     +'<tr style="background:#fafafa">'
     +fempty(W.chk)
@@ -2918,8 +3123,9 @@ function rDR(){
     +'<button class="exp-btn" onclick="expDR()">⬇ Export All '+_drRows.length.toLocaleString()+' rows</button>'
     +'<button class="exp-btn" id="dr-exp-sel" style="display:none;background:#fff8e0;border-color:var(--gold);color:var(--gold2)" onclick="expDRSel()">⬇ Export Selected</button>'
     +'<span id="dr-cnt" style="font-size:10px;color:#bbb">'+_drFiltered.length.toLocaleString()+' rows shown</span>'
-    +'<span style="font-size:10px;color:#888">🟠 Missing Cost &nbsp;|&nbsp; 🔴 Excess Comm &nbsp;|&nbsp; Click rows to select &nbsp;|&nbsp; Date column clickable to sort</span>'
-    +'</div>';
+    +'<span style="font-size:10px;color:#888">🟠 Missing Cost &nbsp;|&nbsp; 🔴 Excess Comm &nbsp;|&nbsp; Click rows to select &nbsp;|&nbsp; Click any heading to sort / filter</span>'
+    +'</div>'
+    +'<div id="dr-chips" style="display:none;gap:7px;align-items:center;flex-wrap:wrap;margin:0 0 8px"></div>';
 
   var outer=document.createElement('div');outer.style.cssText='overflow-x:auto;border:1px solid #e8e4dc;border-radius:6px';
   var hdrDiv=document.createElement('div');hdrDiv.style.cssText='overflow:hidden';hdrDiv.innerHTML=hdr;
@@ -2928,9 +3134,24 @@ function rDR(){
   var rv=document.createElement('div');rv.id='dr-rv';rv.style.cssText='position:absolute;left:0;right:0;top:0';
   sp.appendChild(rv);vs.appendChild(sp);outer.appendChild(hdrDiv);outer.appendChild(vs);container.appendChild(outer);
   _drVis=Math.ceil(500/_drRH)+20;
-  vs.addEventListener('scroll',function(){hdrDiv.scrollLeft=vs.scrollLeft;renderDrVirtual();drHFCloseAll();},{passive:true});
+  vs.addEventListener('scroll',function(){hdrDiv.scrollLeft=vs.scrollLeft;renderDrVirtual();drHFCloseAll();drNFCloseAll();},{passive:true});
   drFitHeight();
-  renderDrVirtual();
+  // Put back whatever was still applied before this re-render (a date-range
+  // change lands here), then let applyDrFilters do the filtering and painting.
+  var dbtn=document.getElementById('dr-date-sort');
+  if(dbtn)dbtn.textContent=_drSortCol?'Date':(_drSortAsc?'Date ↑':'Date ↓');
+  Object.keys(_drFilters).forEach(function(k){
+    var v=_drFilters[k];if(!v)return;
+    var b=document.getElementById('dr-hf-btn-'+k);
+    if(b)b.innerHTML=v+' <span style="font-size:7px">▾</span>';
+  });
+  if(_drFilters.sz){var szs=document.querySelector('#pdr select');if(szs)szs.value=_drFilters.sz;}
+  if(_drSelProds.size){
+    document.querySelectorAll('#dr-prd-panel input[type=checkbox]').forEach(function(c){c.checked=_drSelProds.has(c.value);});
+    var pb=document.getElementById('dr-prd-btn');if(pb)pb.textContent=_drSelProds.size+' selected ▾';
+  }
+  drSyncNumHeads();
+  applyDrFilters();
 }
 // Fill whatever space is actually left below the toolbar (not a fixed 60vh)
 // so the table's own scrollbar sits at the true bottom of the screen instead
