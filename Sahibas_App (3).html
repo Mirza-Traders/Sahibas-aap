@@ -673,7 +673,7 @@ async function initCloud(){
   // replaces everyone's tickets with whatever this tab happens to hold.
   (async function(){try{
     var rt=await apiGet('/tickets');var dataT=await rt.json();
-    if(Array.isArray(dataT)){window.TICKETS=dataT;window._rxLoadOK=true;}
+    if(Array.isArray(dataT)){window.TICKETS=rxEnsureUids(dataT);window._rxLoadOK=true;}
     else window.TICKETS=window.TICKETS||[];
   }catch(e){window.TICKETS=window.TICKETS||[];}})(),
 
@@ -6528,6 +6528,47 @@ function rxAutoAssign(type){
 // we explicitly deleted it ourselves this session. Doesn't require callers
 // to await it -- the local optimistic render still happens instantly.
 window._rxDeletedIds=window._rxDeletedIds||{};
+// ── WHY TICKETS KEPT VANISHING ──
+// The ticket number was worked out from whatever list the tab happened to be
+// holding ("highest RX- number I can see, plus one"). Two people raising a
+// ticket within the same few minutes therefore BOTH got, say, RX-066 -- and the
+// merge below keyed everything off that number, so the second save quietly
+// replaced the first person's ticket instead of adding to it. One ticket, gone,
+// with nothing in the log to show it ever existed.
+//
+// The number can no longer be the identity. Every ticket now carries a `uid`
+// that is unique by construction, the merge keys off that, and RX-066 is
+// demoted to a human label -- if two tickets ever land on the same label,
+// rxDedupeIds renumbers the later one and writes a line into its history saying
+// so. Losing a ticket to a clash is now impossible; the worst case is a number
+// changing, which is visible and recorded.
+function rxUid(){return 'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
+// Tickets raised before this change have no uid. Seeding it from the ticket
+// number is deterministic, so every tab and the server agree on the same value
+// without anyone having to migrate anything.
+function rxEnsureUids(list){(list||[]).forEach(function(t){if(t&&!t.uid)t.uid=t.id;});return list;}
+function rxTicketNo(t){var n=parseInt(String((t&&t.id)||'').replace(/\D/g,''),10);return isFinite(n)?n:0;}
+// Guarantees every ticket has its own number. Oldest keeps the number it was
+// raised with; a later clash is pushed to the end of the range.
+function rxDedupeIds(){
+  var all=window.TICKETS||[],max=0,renamed=[];
+  all.forEach(function(t){var n=rxTicketNo(t);if(n>max)max=n;});
+  var seen={};
+  all.slice().sort(function(a,b){return String(a.createdAt||'').localeCompare(String(b.createdAt||''));})
+    .forEach(function(t){
+      if(!t.uid)t.uid=t.id;
+      if(!t.id){t.id='RX-'+String(++max).padStart(3,'0');seen[t.id]=t.uid;return;}
+      if(seen[t.id]&&seen[t.id]!==t.uid){
+        var old=t.id;
+        t.id='RX-'+String(++max).padStart(3,'0');
+        t.history=(t.history||[]).concat([{stage:t.status,by:'system',at:rxNow(),noteOnly:true,
+          note:'⚠ '+old+' was taken by another ticket raised at the same time. This one was renumbered to '+t.id+' — nothing was lost.'}]);
+        renamed.push(old+' → '+t.id);
+      }
+      seen[t.id]=t.uid;
+    });
+  return renamed;
+}
 // Same class of bug as the earlier orders race fix (savePO): this used to
 // only ADD tickets missing locally, but for any ticket present in BOTH
 // local and server it always kept the LOCAL copy -- so a browser tab open
@@ -6547,20 +6588,24 @@ async function rxSaveAll(touchedIds){
     var r=await apiGet('/tickets');
     var serverTickets=await r.json();
     if(Array.isArray(serverTickets)){
-      var serverById={};
-      serverTickets.forEach(function(st){serverById[st.id]=st;});
-      var localIds={};
+      rxEnsureUids(serverTickets);rxEnsureUids(window.TICKETS);
+      // Keyed by uid, never by ticket number -- see the note above rxUid.
+      var serverByUid={};
+      serverTickets.forEach(function(st){serverByUid[st.uid]=st;});
+      var localUids={};
       window.TICKETS=(window.TICKETS||[]).map(function(t){
-        localIds[t.id]=true;
-        if(touched[t.id])return t;
-        return serverById[t.id]||t;
+        localUids[t.uid]=true;
+        if(touched[t.uid]||touched[t.id])return t;
+        return serverByUid[t.uid]||t;
       });
       serverTickets.forEach(function(st){
-        if(!localIds[st.id]&&!window._rxDeletedIds[st.id])window.TICKETS.push(st);
+        if(!localUids[st.uid]&&!window._rxDeletedIds[st.uid])window.TICKETS.push(st);
       });
       merged=true;window._rxLoadOK=true;
     }
   }catch(e){}
+  var _renamed=rxDedupeIds();
+  if(_renamed.length)showToast('Ticket number clash resolved: '+_renamed.join(', '));
   rxSortTickets();
   // The save is a whole-blob overwrite, so writing without a successful read
   // first replaces every ticket on the server with this tab's copy. If the
@@ -6569,7 +6614,8 @@ async function rxSaveAll(touchedIds){
   // tickets. Refuse to write instead, and say so out loud. The ticket stays on
   // screen, so nothing typed is lost and the next save retries.
   if(!merged){
-    window._rxPendingSave=(window._rxPendingSave||[]).concat(Object.keys(touched));
+    window._rxPendingSave=(window._rxPendingSave||[]).concat(
+      (window.TICKETS||[]).filter(function(t){return touched[t.uid]||touched[t.id];}).map(function(t){return t.uid;}));
     showToast('⚠ Could not reach the server — nothing was saved. Check your connection, then try again.');
     return false;
   }
@@ -6600,14 +6646,18 @@ async function rxRefresh(){
     var r=await apiGet('/tickets');
     var server=await r.json();
     if(Array.isArray(server)){
-      var sig=function(){return (window.TICKETS||[]).map(function(t){return t.id+':'+(t.status||'');}).join('|');};
+      rxEnsureUids(server);rxEnsureUids(window.TICKETS);
+      var sig=function(){return (window.TICKETS||[]).map(function(t){return t.uid+':'+(t.status||'');}).join('|');};
       var before=sig();
-      var serverIds={};server.forEach(function(t){serverIds[t.id]=true;});
+      var serverUids={};server.forEach(function(t){serverUids[t.uid]=true;});
       // The server is authoritative for anything it has heard of. Tickets that
       // exist only here are ones this tab just created and has not finished
-      // saving, so they are kept rather than wiped mid-flight.
-      var localOnly=(window.TICKETS||[]).filter(function(t){return !serverIds[t.id]&&!window._rxDeletedIds[t.id];});
-      window.TICKETS=server.filter(function(t){return !window._rxDeletedIds[t.id];}).concat(localOnly);
+      // saving, so they are kept rather than wiped mid-flight. Matching on uid
+      // means a ticket someone else raised under the same number no longer
+      // knocks this tab's unsaved one out of the list.
+      var localOnly=(window.TICKETS||[]).filter(function(t){return !serverUids[t.uid]&&!window._rxDeletedIds[t.uid];});
+      window.TICKETS=server.filter(function(t){return !window._rxDeletedIds[t.uid];}).concat(localOnly);
+      rxDedupeIds();
       rxSortTickets();
       window._rxLoadOK=true;
       var panel=document.getElementById('prx');
@@ -6963,7 +7013,7 @@ function submitRx(type){
   if(!ig&&!fb&&!wa){showToast('Paste at least one of Instagram, Facebook or WhatsApp profile — required to verify the customer.');return;}
   var T=window.TICKETS||[];
   var mx=0;T.forEach(function(t){var n=parseInt(String(t.id||'').replace('RX-',''))||0;if(n>mx)mx=n;});
-  var t={id:'RX-'+String(mx+1).padStart(3,'0'),type:type,status:'initiated',
+  var t={id:'RX-'+String(mx+1).padStart(3,'0'),uid:rxUid(),type:type,status:'initiated',
     order:order,customer:customer,customerMobile:v('rxn-mobile'),customerAddress:v('rxn-address'),
     items:items,
     // Mirror the first item onto the flat fields too, so anything that still
@@ -6976,7 +7026,7 @@ function submitRx(type){
     bankName:v('rxn-bank'),accountTitle:v('rxn-acctitle'),accountNumber:v('rxn-accnum'),
     createdBy:CU?CU.name:'',createdAt:rxNow(),
     history:[{stage:'initiated',by:CU?CU.name:'',at:rxNow(),note:v('rxn-notes')||'Ticket created'}]};
-  T.unshift(t);window.TICKETS=T;rxSaveAll([t.id]);
+  T.unshift(t);window.TICKETS=T;rxSaveAll([t.uid]);
   var m=document.getElementById('rx-new');if(m)m.remove();
   rendered.rx=false;doR('rx');
   showToast('Ticket '+t.id+' created — assigned to '+t.assignedTo);
@@ -7143,8 +7193,11 @@ function rxAddNote(id){
 function rxDelete(id){
   if(rexRole(CU)!=='admin'){showToast('Only Admin can delete tickets.');return;}
   if(!confirm('Delete ticket '+id+'? This cannot be undone.'))return;
+  var doomed=(window.TICKETS||[]).find(function(x){return x.id===id;});
   window.TICKETS=(window.TICKETS||[]).filter(function(x){return x.id!==id;});
-  window._rxDeletedIds[id]=true;
+  // Tombstone the uid: ticket numbers get reused, uids never do, so this can no
+  // longer suppress a different ticket that happens to share the number.
+  window._rxDeletedIds[(doomed&&doomed.uid)||id]=true;
   rxSaveAll();
   var d=document.getElementById('rx-detail');if(d)d.remove();
   rendered.rx=false;doR('rx');
