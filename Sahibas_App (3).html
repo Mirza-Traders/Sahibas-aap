@@ -3168,7 +3168,13 @@ if(!window._drResizeBound){
 }
 
 // Add CSS for product panel open state
-(function(){var s=document.createElement('style');s.textContent='#dr-prd-panel.open{display:block!important}.dr-hf-opt:hover{background:#f8f6f2}';document.head.appendChild(s);})();
+(function(){var s=document.createElement('style');s.textContent='#dr-prd-panel.open{display:block!important}.dr-hf-opt:hover{background:#f8f6f2}'
+  // Every Insights row needs an opaque background of its own, so the pinned
+  // Product cells (background:inherit) have something to sit on -- without it
+  // the scrolling columns show straight through them. Rows that set their own
+  // tint inline still win over this.
+  +'#pac tbody tr{background:#fff}';
+  document.head.appendChild(s);})();
 
 // ── USERS ──
 function rUS(){
@@ -4547,6 +4553,85 @@ function acSetCfg(k,v){
 // Shopify Stock (Status Mismatch) stays a plain total: that export has no size
 // column, and showing a warehouse split beside a Shopify number would invite
 // reading one as the other.
+// ── SOLD, SPLIT BY CHANNEL ──
+// The toolbar already carries Platform and Destination filters, so answering
+// "where did this actually sell?" meant setting them four times and writing the
+// numbers down. The two dimensions in the data are MARKETPLACE / OCTANE and
+// LOCAL / INTERNATIONAL -- not "Laam vs our own store": Shopify sales are not
+// in this dataset at all, they live in the Shopify export.
+// Anything that is not one of the four known combinations lands in `oth` and is
+// surfaced as a "+n" on the total rather than being folded into a bucket it
+// does not belong to, so the four columns can always be trusted to sum.
+var AC_CH=['mktL','mktI','octL','octI'];
+var AC_CHLBL={mktL:'MP Local',mktI:'MP Int\u2019l',octL:'OC Local',octI:'OC Int\u2019l'};
+var AC_CHBG={mktL:'background:#fdf8ec;',mktI:'background:#fdf8ec;',octL:'background:#eef4f2;',octI:'background:#eef4f2;'};
+// The pinned Product column has to start exactly where the thumbnail column
+// ends, and that width depends on cell padding and the browser's own table
+// layout -- guessing it leaves the name half-overlapping the numbers. Measure
+// after render instead. getBoundingClientRect is post-zoom while a CSS `left`
+// is pre-zoom, hence the zoomScale divide.
+function acPinOffsets(){
+  var z=(typeof zoomScale==='function')?zoomScale():1;
+  document.querySelectorAll('#pac table').forEach(function(t){
+    var h=t.querySelector('thead tr th:first-child');if(!h)return;
+    var w=Math.round(h.getBoundingClientRect().width/z);
+    t.querySelectorAll('tr > *:nth-child(2)').forEach(function(c){
+      if(c.style.position==='sticky')c.style.left=w+'px';
+    });
+  });
+}
+function acChBucket(r){
+  var pf=String(r[5]||'').toUpperCase().trim(),ds=String(r[6]||'').toUpperCase().trim();
+  var p=pf==='OCTANE'?'oct':(pf==='MARKETPLACE'?'mkt':'');
+  var d=ds==='INTERNATIONAL'?'I':(ds==='LOCAL'?'L':'');
+  return (p&&d)?(p+d):'oth';
+}
+function acChZero(){return {mktL:0,mktI:0,octL:0,octI:0,oth:0};}
+function acChOpen(){
+  if(window._acChOpen===undefined){
+    try{window._acChOpen=localStorage.getItem('sbm_ac_ch')!=='0';}catch(e){window._acChOpen=true;}
+  }
+  return window._acChOpen;
+}
+function acChToggle(){
+  window._acChOpen=!acChOpen();
+  try{localStorage.setItem('sbm_ac_ch',window._acChOpen?'1':'0');}catch(e){}
+  rendered.ac=false;doR('ac');
+}
+function acChBtn(){
+  return '<span onclick="event.stopPropagation();acChToggle()" title="'+(acChOpen()?'Collapse to the total only':'Split by platform and destination')
+    +'" style="display:inline-block;margin-left:5px;border:1px solid var(--gold);border-radius:4px;width:15px;height:15px;line-height:12px;text-align:center;font-size:11px;font-weight:800;color:var(--gold2);background:#fff;cursor:pointer;vertical-align:middle">'
+    +(acChOpen()?'\u2212':'+')+'</span>';
+}
+// The four headers sit immediately before the total they add up to.
+function acChTh(TH){
+  if(!acChOpen())return '';
+  return AC_CH.map(function(k,i){
+    return '<th style="'+TH+AC_CHBG[k]+(k==='mktL'?'border-left:2px solid #e0c890;':k==='octL'?'border-left:2px solid #cfe0d9;':'')
+      +'color:'+(k.indexOf('mkt')===0?'#8a6a24':'#2c6152')+'">'+AC_CHLBL[k]+(i===0?acChBtn():'')+'</th>';
+  }).join('');
+}
+function acChTd(ch,TD){
+  if(!acChOpen())return '';
+  var c=ch||acChZero();
+  return AC_CH.map(function(k){
+    return '<td style="'+TD+AC_CHBG[k]+(k==='mktL'?'border-left:2px solid #e0c890;':k==='octL'?'border-left:2px solid #cfe0d9;':'')+'">'
+      +(c[k]?c[k]:'<span style="color:#d8d2c6">0</span>')+'</td>';
+  }).join('');
+}
+// Marker for rows carrying pieces from a platform/destination we do not know,
+// so the total never silently disagrees with the four columns beside it.
+function acChOther(ch){
+  return (ch&&ch.oth)?' <span title="'+ch.oth+' pcs on a platform or destination outside the four columns" style="color:#c89a4a;font-weight:700;font-size:9px">+'+ch.oth+'</span>':'';
+}
+function acChLegend(){
+  if(!acChOpen())return '';
+  return '<div style="display:flex;gap:16px;flex-wrap:wrap;padding:7px 12px;font-size:10px;color:#888;border-top:1px solid #f0ede8;background:#fcfbf9">'
+    +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#f3e6c8;vertical-align:middle"></span> <b style="color:#8a6a24">MP</b> Marketplace</span>'
+    +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#cfe0d9;vertical-align:middle"></span> <b style="color:#2c6152">OC</b> Octane</span>'
+    +'<span>Local = shipped inside Pakistan \u00b7 Int\u2019l = shipped abroad</span>'
+    +'<span style="color:#bbb">The four columns sum to the total beside them.</span></div>';
+}
 function acSzOpen(){
   if(window._acSzOpen===undefined){
     try{window._acSzOpen=localStorage.getItem('sbm_ac_sz')==='1';}catch(e){window._acSzOpen=false;}
@@ -4612,7 +4697,7 @@ function rAC(){
   // reorder/ageing decisions should always see the whole picture)
   var pm={};
   DETAIL.forEach(function(r){
-    var n=r[1];if(!pm[n])pm[n]={name:n,v30:0,v7:0,vP:0,rev30:0,vPr:0,revPr:0,lastSale:'',sS:0,sM:0,sL:0,sXL:0,tot:0,can:0,del:0,revDel:0,refD:0,refBase:0,exc:0};
+    var n=r[1];if(!pm[n])pm[n]={name:n,v30:0,v7:0,ch7:acChZero(),vP:0,rev30:0,vPr:0,revPr:0,lastSale:'',sS:0,sM:0,sL:0,sXL:0,tot:0,can:0,del:0,revDel:0,refD:0,refBase:0,exc:0};
     var p=pm[n];
     p.tot++;
     if(r[4]==='cancelled')p.can++;
@@ -4625,7 +4710,7 @@ function rAC(){
         p.v30++;p.rev30+=r[9];
         var sz=r[3];if(sz==='S')p.sS++;else if(sz==='M')p.sM++;else if(sz==='L')p.sL++;else if(sz==='XL')p.sXL++;
       }else if(r[0]>=s90){p.vPr++;p.revPr+=r[9];}
-      if(r[0]>=s7)p.v7++;
+      if(r[0]>=s7){p.v7++;p.ch7[acChBucket(r)]++;}
       else if(r[0]>=s28)p.vP++;
     }
   });
@@ -4634,7 +4719,7 @@ function rAC(){
     var sp=STOCK_PRODS[k];
     var found=false;
     Object.keys(pm).forEach(function(n){if(n.toLowerCase().trim()===k)found=true;});
-    if(!found&&(sp.total||0)>0)pm[sp.title]={name:sp.title,v30:0,v7:0,vP:0,rev30:0,vPr:0,revPr:0,lastSale:'',sS:0,sM:0,sL:0,sXL:0,tot:0,can:0,del:0,revDel:0,refD:0,refBase:0,exc:0};
+    if(!found&&(sp.total||0)>0)pm[sp.title]={name:sp.title,v30:0,v7:0,ch7:acChZero(),vP:0,rev30:0,vPr:0,revPr:0,lastSale:'',sS:0,sM:0,sL:0,sXL:0,tot:0,can:0,del:0,revDel:0,refD:0,refBase:0,exc:0};
   });
   // Incoming qty from open Production Orders
   var poIn={};
@@ -4659,13 +4744,13 @@ function rAC(){
     var sp=STOCK_PRODS[k];if(!sp.createdAt)return;
     var cd=new Date(sp.createdAt);if(isNaN(cd.getTime()))return;
     var dl=Math.floor((new Date(ref)-cd)/864e5);
-    if(dl>=0&&dl<=cfg.newDays)newProds[k]={title:sp.title,launch:cd,daysLive:Math.max(1,dl),sold:0,first14:0,rev:0};
+    if(dl>=0&&dl<=cfg.newDays)newProds[k]={title:sp.title,launch:cd,daysLive:Math.max(1,dl),sold:0,first14:0,rev:0,ch:acChZero()};
   });
   DETAIL.forEach(function(r){
     var np=newProds[String(r[1]).toLowerCase().trim()];
     if(!np||r[4]==='cancelled'||!r[0])return;
     var d=new Date(r[0]);
-    if(d>=np.launch){np.sold++;np.rev+=r[9];if((d-np.launch)/864e5<14)np.first14++;}
+    if(d>=np.launch){np.sold++;np.rev+=r[9];np.ch[acChBucket(r)]++;if((d-np.launch)/864e5<14)np.first14++;}
   });
   var priceRows=[],statusRows=[],reorderRows=[],ageRows=[],lossRows=[],sizeRows=[];
   Object.values(pm).forEach(function(p){
@@ -4776,7 +4861,7 @@ function rAC(){
       else verdict=(sellThrough>=0.7&&cover<cfg.lead)?'THINOUT':'THIN';
     }else if(rate<0.15&&np.daysLive>=14)verdict='SLOW';
     else verdict='OK';
-    return {name:np.title,img:(sp&&sp.img)?sp.img:findImg(k),launch:np.launch,daysLive:np.daysLive,first14:np.first14,sold:np.sold,rate:rate,sellThrough:sellThrough,stk:stk,sa:sa,inc:inc.qty,eta:inc.eta,price:price,rev:np.rev,net:net,verdict:verdict};
+    return {name:np.title,img:(sp&&sp.img)?sp.img:findImg(k),launch:np.launch,daysLive:np.daysLive,first14:np.first14,sold:np.sold,ch:np.ch,rate:rate,sellThrough:sellThrough,stk:stk,sa:sa,inc:inc.qty,eta:inc.eta,price:price,rev:np.rev,net:net,verdict:verdict};
   });
   newRows.sort(function(a,b){return b.rate-a.rate;});
   var nBest=newRows.filter(function(r){return r.verdict==='BEST'||r.verdict==='SELLOUT';}).length;
@@ -4794,7 +4879,7 @@ function rAC(){
     var chg=rP>0?Math.round((r7/rP-1)*100):null;
     var mPrice=sp?sp.price:0,mCost=window._costIdx[k]||0;
     var mNet=(mPrice>0&&mCost>0)?Math.round(mPrice-mCost-mPrice*0.25):null;
-    moverRows.push({name:p.name,img:(sp&&sp.img)?sp.img:findImg(k),dir:dir,v7:p.v7,prevWk:Math.round(rP*7*10)/10,r7:r7,rP:rP,chg:chg,
+    moverRows.push({name:p.name,img:(sp&&sp.img)?sp.img:findImg(k),dir:dir,v7:p.v7,ch:p.ch7,prevWk:Math.round(rP*7*10)/10,r7:r7,rP:rP,chg:chg,
       stk:sp?sp.total:0,coverNew:r7>0?Math.round((sp?sp.total:0)/r7):null,price:mPrice,net:mNet,laamStatus:sp?sp.status:''});
   });
   moverRows.sort(function(a,b){
@@ -4858,6 +4943,17 @@ function rAC(){
   var THL=TH+'text-align:left;';
   var TD='padding:6px 9px;font-size:11px;text-align:right;border-bottom:1px solid #f0ede8;white-space:nowrap;';
   var TDL=TD+'text-align:left;';
+  // Scrolling right used to leave you looking at a row of numbers with no idea
+  // which garment they belonged to. The thumbnail and the product name stay
+  // pinned to the left edge instead. background:inherit so a tinted row (the
+  // loss-making ones) keeps its tint across the pinned cells too -- the
+  // #pac tbody tr default that makes inherit safe is in the style block below.
+  var THP=TH+'left:0;z-index:4;';
+  var THN=THL+'left:40px;z-index:4;box-shadow:1px 0 0 #ece8e0;';
+  var TDP=TD+'position:sticky;left:0;z-index:1;background:inherit;';
+  // The edge matters once you scroll: without it the columns sliding underneath
+  // appear to run straight into the product name.
+  var TDN=TDL+'position:sticky;left:40px;z-index:1;background:inherit;box-shadow:1px 0 0 #f0ede8;';
   function thumb(r){return r.img?'<img src="'+r.img+(r.img.indexOf('?')>=0?'&':'?')+'width=60" loading="lazy" data-n="'+r.name.replace(/"/g,'')+'" onerror="imgFail(this)" style="width:30px;height:38px;object-fit:cover;object-position:top center;border-radius:4px;display:block">':prodPH(r.name).replace('width:52px;height:52px;font-size:14px','width:30px;height:38px;font-size:10px;border-radius:4px');}
   // Product name opens the full-size photo, same convention as the Summary Sheet
   function acName(r){
@@ -4882,32 +4978,32 @@ function rAC(){
 
   // Section 1 — Price mismatches
   var h1rows=priceRows.map(function(r){
-    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
+    return '<tr><td style="'+TDP+'width:40px">'+thumb(r)+'</td><td style="'+TDN+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'">'+NF(r.laam)+'</td><td style="'+TD+'">'+NF(r.shop)+'</td>'
      +'<td style="'+TD+'font-weight:700;color:'+(r.diff>0?'#c0392b':'#2980b9')+'">'+(r.diff>0?'+':'')+NF(r.diff)+'</td>'
      +'<td style="'+TD+'color:#888">'+(r.shop>0?Math.round(Math.abs(r.diff)/r.shop*100)+'%':'—')+'</td>'
      +acSzTd(r,TD)+'</tr>';
   }).join('');
   var sec1=box(secHead('💰','Price Mismatch — Laam vs Shopify',priceRows.length,'#c0392b','Same article, different selling price on the two platforms','acExpPrice')
-   +(priceRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Laam</th><th style="'+TH+'">Shopify</th><th style="'+TH+'">Diff (L−S)</th><th style="'+TH+'">Diff %</th>'+acSzTh(TH,'Stock in Hand')+'</tr></thead><tbody>'+h1rows+'</tbody></table>'):empty('All prices match across platforms')),'ac-sec-price');
+   +(priceRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Laam</th><th style="'+TH+'">Shopify</th><th style="'+TH+'">Diff (L−S)</th><th style="'+TH+'">Diff %</th>'+acSzTh(TH,'Stock in Hand')+'</tr></thead><tbody>'+h1rows+'</tbody></table>'):empty('All prices match across platforms')),'ac-sec-price');
 
   // Section 2 — Status mismatches
   var h2rows=statusRows.map(function(r){
     var badge=function(s,act){return '<span style="padding:2px 7px;border-radius:3px;font-size:8px;font-weight:700;'+(act?'background:#e8f8ee;color:#27ae60':'background:#fdeaea;color:#c0392b')+'">'+s+'</span>';};
-    return '<tr'+(r.blocked?' style="background:#fff8f0"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
+    return '<tr'+(r.blocked?' style="background:#fff8f0"':'')+'><td style="'+TDP+'width:40px">'+thumb(r)+'</td><td style="'+TDN+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'text-align:center">'+badge(r.laamStatus,r.laamStatus==='ACTIVE')+'</td>'
      +'<td style="'+TD+'text-align:center">'+badge(r.shopStatus,r.shopStatus==='ACTIVE')+'</td>'
      +acSzTd(r,TD)+'<td style="'+TD+'">'+(r.shopStk!=null?NF(r.shopStk):'—')+'</td>'
      +'<td style="'+TDL+'font-size:10px;color:'+(r.blocked?'#c0392b;font-weight:700':'#888')+'">'+(r.blocked?'⚠ Has stock but switched off — blocked revenue':'Check listing')+'</td></tr>';
   }).join('');
   var sec2=box(secHead('🔀','Status Mismatch — Active/Inactive differs',statusRows.length,'#d4780a','Live on one platform, switched off on the other','acExpStatus')
-   +(statusRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'text-align:center">Laam</th><th style="'+TH+'text-align:center">Shopify</th>'+acSzTh(TH,'Laam Stock')+'<th style="'+TH+'">Shopify Stock</th><th style="'+THL+'">Action</th></tr></thead><tbody>'+h2rows+'</tbody></table>'):empty('Statuses match across platforms')),'ac-sec-status');
+   +(statusRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'text-align:center">Laam</th><th style="'+TH+'text-align:center">Shopify</th>'+acSzTh(TH,'Laam Stock')+'<th style="'+TH+'">Shopify Stock</th><th style="'+THL+'">Action</th></tr></thead><tbody>'+h2rows+'</tbody></table>'):empty('Statuses match across platforms')),'ac-sec-status');
 
   // Section 3 — Reorder
   var h3rows=reorderRows.map(function(r){
     var cv=Math.round(r.cover);
     var cvColor=cv<cfg.lead?'#c0392b':cv<cfg.lead+cfg.safety?'#d4944a':'#27ae60';
-    return '<tr'+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' style="opacity:.55"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
+    return '<tr'+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' style="opacity:.55"':'')+'><td style="'+TDP+'width:40px">'+thumb(r)+'</td><td style="'+TDN+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
      +'<td style="'+TD+'">'+r.v30+'</td><td style="'+TD+'">'+(Math.round(r.rate*10)/10)+'/day</td>'
      +acSzTd(r,TD)
      +'<td style="'+TD+'">'+(r.inc>0?NF(r.inc)+(r.eta?' <span style="color:#888;font-size:9px">('+fmtDMY(r.eta)+')</span>':''):'—')+'</td>'
@@ -4919,24 +5015,24 @@ function rAC(){
         :'<td style="'+TD+'font-weight:800;color:var(--gold2);background:#fdf8f0">'+(r.sug>0?NF(r.sug)+' pcs':'—')+'</td>')+'</tr>';
   }).join('');
   var sec3=box(secHead('🏭','Reorder Now — will stock out within lead time',reorderRows.length,'#8e44ad','Cover = (stock + incoming PO) ÷ daily rate. Alert below '+(cfg.lead+cfg.safety)+' days; suggestion refills to '+(cfg.lead+cfg.cover)+' days','acExpReorder')
-   +(reorderRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Rate</th>'+acSzTh(TH)+'<th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Days Cover</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'">Suggested Order</th></tr></thead><tbody>'+h3rows+'</tbody></table>'):empty('Nothing needs reordering — all fast movers have enough cover')),'ac-sec-reorder');
+   +(reorderRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Rate</th>'+acSzTh(TH)+'<th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Days Cover</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'">Suggested Order</th></tr></thead><tbody>'+h3rows+'</tbody></table>'):empty('Nothing needs reordering — all fast movers have enough cover')),'ac-sec-reorder');
 
   // Section 4 — Ageing
   var h4rows=ageRows.map(function(r){
     var bucket=r.days===null?'Never sold':r.days>=90?'90+ days':r.days>=60?'60–90 days':r.days>=30?'30–60 days':r.days+' days';
     var bColor=r.days===null||r.days>=90?'#c0392b':r.days>=60?'#d4780a':r.days>=30?'#d4944a':'#888';
-    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
+    return '<tr><td style="'+TDP+'width:40px">'+thumb(r)+'</td><td style="'+TDN+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
      +'<td style="'+TD+'">'+(r.lastSale?fmtDMY(r.lastSale):'<span style="color:#c0392b;font-weight:700">never</span>')+'</td>'
      +'<td style="'+TD+'font-weight:800;color:'+bColor+'">'+(r.days===null?'∞':r.days)+'</td>'
      +'<td style="'+TD+'text-align:center"><span style="background:'+bColor+'18;color:'+bColor+';padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700">'+bucket+'</span></td>'
      +acSzTd(r,TD)+'<td style="'+TD+'font-weight:700;color:'+(r.val>0?'#c0392b':'#bbb')+'">'+(r.cost>0?'PKR '+NF(r.val):'<span style="color:#d4944a" title="No cost saved for this product">no cost</span>')+'</td></tr>';
   }).join('');
   var sec4=box(secHead('🐌','Stock Ageing — sitting unsold',ageRows.length,'#2980b9','Stock on hand with no sale in the last '+cfg.ageDays+'+ days · <b style="color:#c0392b">PKR '+NF(stuckVal)+' stuck at cost</b>','acExpAge')
-   +(ageRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Last Sale</th><th style="'+TH+'">Days Since</th><th style="'+TH+'text-align:center">Bucket</th>'+acSzTh(TH)+'<th style="'+TH+'">Value at Cost</th></tr></thead><tbody>'+h4rows+'</tbody></table>'):empty('Everything with stock has sold within '+cfg.ageDays+' days')),'ac-sec-age');
+   +(ageRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Last Sale</th><th style="'+TH+'">Days Since</th><th style="'+TH+'text-align:center">Bucket</th>'+acSzTh(TH)+'<th style="'+TH+'">Value at Cost</th></tr></thead><tbody>'+h4rows+'</tbody></table>'):empty('Everything with stock has sold within '+cfg.ageDays+' days')),'ac-sec-age');
 
   // Section 5 — Selling at a loss
   var h5rows=lossRows.map(function(r){
-    return '<tr'+(r.v30>0?' style="background:#fff5f5"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#888">('+r.laamStatus+')</span>':'')+'</td>'
+    return '<tr'+(r.v30>0?' style="background:#fff5f5"':'')+'><td style="'+TDP+'width:40px">'+thumb(r)+'</td><td style="'+TDN+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#888">('+r.laamStatus+')</span>':'')+'</td>'
      +'<td style="'+TD+'color:#888">'+(r.gross>0?NF(r.gross):'—')+'</td>'
      +'<td style="'+TD+'">'+(r.disc>0?'<span style="color:#c0392b;font-weight:700">'+r.disc+'%</span>':'—')+'</td>'
      +'<td style="'+TD+'font-weight:600">'+NF(r.retail)+'</td>'
@@ -4949,15 +5045,15 @@ function rAC(){
      +acSzTd(r,TD)+'</tr>';
   }).join('');
   var sec5=box(secHead('🔻','Selling at a Loss — GP below the 25% load',lossRows.length,'#e74c3c','Net loss per piece after commission + taxes · <b style="color:#c0392b">PKR '+NF(totBleed)+'/month bleeding at current sales rate</b> · Breakeven = minimum retail that stops the loss','acExpLoss')
-   +(lossRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Gross Price</th><th style="'+TH+'">Disc%</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Cost</th><th style="'+TH+'">GP/pc</th><th style="'+TH+'">Net Loss/pc</th><th style="'+TH+'">Breakeven Price</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Monthly Bleed</th>'+acSzTh(TH)+'</tr></thead><tbody>'+h5rows+'</tbody></table>'):empty('No product sells below the 25% load — every sale is profitable')),'ac-sec-loss');
+   +(lossRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Gross Price</th><th style="'+TH+'">Disc%</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Cost</th><th style="'+TH+'">GP/pc</th><th style="'+TH+'">Net Loss/pc</th><th style="'+TH+'">Breakeven Price</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Monthly Bleed</th>'+acSzTh(TH)+'</tr></thead><tbody>'+h5rows+'</tbody></table>'):empty('No product sells below the 25% load — every sale is profitable')),'ac-sec-loss');
 
   // Section 8 — Movers & Shakers
   var h8rows=moverRows.map(function(r){
     var up=r.dir==='RISING';
-    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
-     +'<td style="'+TDL+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
+    return '<tr><td style="'+TDP+'width:40px">'+thumb(r)+'</td>'
+     +'<td style="'+TDN+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
      +'<td style="'+TD+'text-align:center"><span style="background:'+(up?'#e8f8ee':'#eef2f8')+';color:'+(up?'#1e8449':'#5070a0')+';padding:2px 9px;border-radius:3px;font-size:9px;font-weight:800">'+(up?'▲ RISING':'▼ COOLING')+'</span></td>'
-     +'<td style="'+TD+'font-weight:700">'+r.v7+'</td>'
+     +acChTd(r.ch,TD)+'<td style="'+TD+'font-weight:700">'+r.v7+acChOther(r.ch)+'</td>'
      +'<td style="'+TD+'color:#888">'+r.prevWk+'/wk</td>'
      +'<td style="'+TD+'font-weight:800;color:'+(up?'#27ae60':'#c0392b')+'">'+(r.chg===null?'NEW':(r.chg>0?'+':'')+r.chg+'%')+'</td>'
      +acSzTd(r,TD)+'<td style="'+TD+'font-weight:700;color:'+(up&&r.coverNew!==null&&r.coverNew<45?'#c0392b':'#333')+'">'+(r.coverNew===null?'—':r.coverNew+' days')+(up&&r.coverNew!==null&&r.coverNew<45?' ⚠':'')+'</td>'
@@ -4965,12 +5061,12 @@ function rAC(){
      +'<td style="'+TD+'font-weight:700;color:'+(r.net===null?'#bbb':r.net<0?'#c0392b':r.net<cfg.minNet?'#b06000':'#27ae60')+'">'+(r.net===null?'no cost':NF(r.net))+'</td></tr>';
   }).join('');
   var sec8=box(secHead('⚡','Movers &amp; Shakers — momentum this week',moverRows.length,'#e67e22','Last 7 days\u2019 pace vs the previous 21 days \u00b7 '+nRise+' rising, '+nCool+' cooling \u00b7 Rising with short cover = order before the reorder alert even fires','acExpMov')
-   +(moverRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'text-align:center">Direction</th><th style="'+TH+'">Sold 7d</th><th style="'+TH+'">Prev Pace</th><th style="'+TH+'">Change</th>'+acSzTh(TH)+'<th style="'+TH+'">Cover at New Pace</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Net/pc</th></tr></thead><tbody>'+h8rows+'</tbody></table>'):empty('No significant acceleration or slowdown this week')),'ac-sec-mov');
+   +(moverRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'text-align:center">Direction</th>'+acChTh(TH)+'<th style="'+TH+'">Sold 7d</th><th style="'+TH+'">Prev Pace</th><th style="'+TH+'">Change</th>'+acSzTh(TH)+'<th style="'+TH+'">Cover at New Pace</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Net/pc</th></tr></thead><tbody>'+h8rows+'</tbody></table>')+acChLegend():empty('No significant acceleration or slowdown this week')),'ac-sec-mov');
 
   // Section 9 — Profit drains
   var h9rows=drainRows.slice(0,150).map(function(r){
-    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
-     +'<td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
+    return '<tr><td style="'+TDP+'width:40px">'+thumb(r)+'</td>'
+     +'<td style="'+TDN+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'">'+N(r.revDel)+'</td>'
      +'<td style="'+TD+'color:'+(r.exc>0?'#c0392b;font-weight:700':'#bbb')+'">'+(r.exc>0?NF(r.exc):'—')+'</td>'
      +'<td style="'+TD+'">'+(r.refD>0?r.refD+' <span style="color:#888;font-size:9px">('+r.refPct+'%)</span>':'—')+'</td>'
@@ -4980,13 +5076,13 @@ function rAC(){
      +'<td style="'+TD+'font-weight:800;color:#c0392b">PKR '+NF(r.total)+'</td></tr>';
   }).join('');
   var sec9=box(secHead('🩸','Profit Drains — where the rupees leak',drainRows.length,'#8e44ad','Excess commission (exact) + est. refund loss (25% load on refunded value) + monthly loss-pricing bleed \u00b7 drains \u2265 PKR 500 \u00b7 top 150 shown, CSV has all','acExpDrain')
-   +(drainRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Delivered Rev</th><th style="'+TH+'">Excess Comm</th><th style="'+TH+'">Refunds</th><th style="'+TH+'">Refund Loss est</th><th style="'+TH+'">Cancel%</th><th style="'+TH+'">Loss Bleed/mo</th><th style="'+TH+'">Total Drain</th></tr></thead><tbody>'+h9rows+'</tbody></table>'):empty('No product is leaking more than PKR 500')),'ac-sec-drain');
+   +(drainRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Delivered Rev</th><th style="'+TH+'">Excess Comm</th><th style="'+TH+'">Refunds</th><th style="'+TH+'">Refund Loss est</th><th style="'+TH+'">Cancel%</th><th style="'+TH+'">Loss Bleed/mo</th><th style="'+TH+'">Total Drain</th></tr></thead><tbody>'+h9rows+'</tbody></table>'):empty('No product is leaking more than PKR 500')),'ac-sec-drain');
   // Section 11 — Discount & Price Watch
   var PWT={RAISE:{bg:'#e8f8ee',fg:'#1e8449',lbl:'🟢 RAISE PRICE'},LEAK:{bg:'#fff3e0',fg:'#b06000',lbl:'🟠 EXTRA DISCOUNT LEAK'},SLIDE:{bg:'#fde8e8',fg:'#c0392b',lbl:'🔴 PRICE SLIDING'}};
   var h11rows=priceWatchRows.map(function(r){
     var badges=r.tags.map(function(t){var v=PWT[t];return '<span style="background:'+v.bg+';color:'+v.fg+';padding:2px 7px;border-radius:3px;font-size:8px;font-weight:800;white-space:nowrap;display:inline-block;margin:1px 0">'+v.lbl+'</span>';}).join('<br>');
-    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
-     +'<td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
+    return '<tr><td style="'+TDP+'width:40px">'+thumb(r)+'</td>'
+     +'<td style="'+TDN+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'color:#888">'+NF(r.gross)+'</td>'
      +'<td style="'+TD+'">'+NF(r.listed)+'</td>'
      +'<td style="'+TD+'">'+r.listedDisc+'%</td>'
@@ -5000,17 +5096,17 @@ function rAC(){
      +'<td style="'+TD+'text-align:center;line-height:1.3">'+badges+'</td></tr>';
   }).join('');
   var sec11=box(secHead('💸','Discount &amp; Price Watch',priceWatchRows.length,'#d4944a','Listed vs effective discount (what buyers really paid, last 30d) and price drift vs the prior 60d \u00b7 <b style="color:#c0392b">PKR '+NF(totGiven)+'/month given beyond listed prices</b> \u00b7 '+nRaise+' raise-price candidates','acExpPW')
-   +(priceWatchRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Original</th><th style="'+TH+'">Current</th><th style="'+TH+'">Listed Disc%</th><th style="'+TH+'">Effective Disc%</th><th style="'+TH+'">Extra Given</th><th style="'+TH+'">Avg Paid 30d</th><th style="'+TH+'">Price Drift</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'">Given Away/mo</th><th style="'+TH+'text-align:center">Verdict</th></tr></thead><tbody>'+h11rows+'</tbody></table>'):empty('No pricing exceptions — discounts are doing their job')),'ac-sec-pw');
+   +(priceWatchRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Original</th><th style="'+TH+'">Current</th><th style="'+TH+'">Listed Disc%</th><th style="'+TH+'">Effective Disc%</th><th style="'+TH+'">Extra Given</th><th style="'+TH+'">Avg Paid 30d</th><th style="'+TH+'">Price Drift</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'">Given Away/mo</th><th style="'+TH+'text-align:center">Verdict</th></tr></thead><tbody>'+h11rows+'</tbody></table>'):empty('No pricing exceptions — discounts are doing their job')),'ac-sec-pw');
 
   // Section 7 — New arrivals scorecard
   var NV={BEST:{bg:'#e8f8ee',fg:'#1e8449',lbl:'🌟 BESTSELLER'},SELLOUT:{bg:'#fde8e8',fg:'#c0392b',lbl:'🔥 SELLING OUT — reorder now'},THIN:{bg:'#fff3e0',fg:'#b06000',lbl:'⚠ FAST BUT THIN — raise price'},THINOUT:{bg:'#fff3e0',fg:'#b06000',lbl:'⚠ FIX PRICE BEFORE REORDER'},NOCOST:{bg:'#f5f5f5',fg:'#888',lbl:'ADD COST TO JUDGE'},OK:{bg:'#f8f6f2',fg:'#888',lbl:'⚖ OK'},SLOW:{bg:'#eef2f8',fg:'#5070a0',lbl:'💤 SLOW'}};
   var h7rows=newRows.map(function(r){
     var v=NV[r.verdict];
-    return '<tr'+(r.verdict==='SELLOUT'?' style="background:#fff8f0"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
-     +'<td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
+    return '<tr'+(r.verdict==='SELLOUT'?' style="background:#fff8f0"':'')+'><td style="'+TDP+'width:40px">'+thumb(r)+'</td>'
+     +'<td style="'+TDN+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'white-space:nowrap">'+fmtDMY(r.launch.toISOString().split('T')[0])+' <span style="color:#aaa;font-size:9px">('+r.daysLive+'d)</span></td>'
      +'<td style="'+TD+'">'+(r.first14||'-')+'</td>'
-     +'<td style="'+TD+'font-weight:700">'+r.sold+'</td>'
+     +acChTd(r.ch,TD)+'<td style="'+TD+'font-weight:700">'+r.sold+acChOther(r.ch)+'</td>'
      +'<td style="'+TD+'font-weight:700;color:'+(r.rate>=1?'#27ae60':r.rate<0.15?'#c0392b':'#333')+'">'+(Math.round(r.rate*10)/10)+'/day</td>'
      +'<td style="'+TD+'">'+Math.round(r.sellThrough*100)+'%</td>'
      +acSzTd(r,TD,(r.sa>0?' <span style="color:#5050b0;font-size:9px">+SA '+r.sa+'</span>':''))
@@ -5021,7 +5117,7 @@ function rAC(){
      +'<td style="'+TD+'text-align:center"><span style="background:'+v.bg+';color:'+v.fg+';padding:2px 8px;border-radius:3px;font-size:8px;font-weight:800;white-space:nowrap">'+v.lbl+'</span></td></tr>';
   }).join('');
   var sec7=box(secHead('🚀','New Arrivals Scorecard — launched in the last '+cfg.newDays+' days',newRows.length,'#c8a96e',nBest+' bestseller'+(nBest===1?'':'s')+' · '+nSlow+' slow · Bestseller = ≥1/day AND nets ≥PKR '+cfg.minNet+'/pc after the 25% load','acExpNew')
-   +(newRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Launched</th><th style="'+TH+'">First 14d</th><th style="'+TH+'">Sold</th><th style="'+TH+'">Rate</th><th style="'+TH+'">Sell-Through</th>'+acSzTh(TH)+'<th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Revenue</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'text-align:center">Verdict</th></tr></thead><tbody>'+h7rows+'</tbody></table>'):empty('No new arrivals in the last '+cfg.newDays+' days')),'ac-sec-new');
+   +(newRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Launched</th><th style="'+TH+'">First 14d</th>'+acChTh(TH)+'<th style="'+TH+'">Sold</th><th style="'+TH+'">Rate</th><th style="'+TH+'">Sell-Through</th>'+acSzTh(TH)+'<th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Revenue</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'text-align:center">Verdict</th></tr></thead><tbody>'+h7rows+'</tbody></table>')+acChLegend():empty('No new arrivals in the last '+cfg.newDays+' days')),'ac-sec-new');
 
   // Section 6 — Broken size runs
   var VC={BROKEN:{bg:'#fdeaea',bd:'#e74c3c',fg:'#c0392b',lbl:'BROKEN'},SELLAHEAD:{bg:'#fff3e0',bd:'#e8a030',fg:'#b06000',lbl:'SELL-AHEAD'},COVERED:{bg:'#e8f8ee',bd:'#27ae60',fg:'#1e8449',lbl:'PO INCOMING'},UNKNOWN:{bg:'#fff8e0',bd:'#d4b040',fg:'#8a6800',lbl:'CHECK PO'},OK:{bg:'#fafaf8',bd:'transparent',fg:'#999',lbl:''}};
@@ -5035,15 +5131,15 @@ function rAC(){
   }
   var h6rows=sizeRows.map(function(r){
     var note=r.unsized>0?'<div style="font-size:8px;color:#b06000;margin-top:2px">⚠ '+NF(r.unsized)+' pcs incoming without size split'+(r.eta?' (ETA '+fmtDMY(r.eta)+')':'')+' — confirm it covers '+(r.broken.length?r.broken.join('/'):'the weak sizes')+'</div>':'';
-    return '<tr><td style="'+TD+'width:40px">'+thumb(r)+'</td>'
-     +'<td style="'+TDL+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+note+'</td>'
+    return '<tr><td style="'+TDP+'width:40px">'+thumb(r)+'</td>'
+     +'<td style="'+TDN+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+note+'</td>'
      +'<td style="'+TD+'">'+(r.retail>0?NF(r.retail):'—')+'</td>'
      +'<td style="'+TD+'font-weight:700">'+r.v30+'</td>'
      +r.cells.map(szCell).join('')
      +'<td style="'+TD+'font-weight:800;color:'+(r.risk>0?'#c0392b':'#bbb')+'">'+(r.risk>0?'PKR '+NF(r.risk):'—')+'</td></tr>';
   }).join('');
   var sec6=box(secHead('📏','Broken Size Runs — demand sizes you cannot sell',sizeRows.length,'#16a085','Sizes with ≥'+cfg.sizeShare+'% of 30d sales vs their availability (stock + sell-ahead + incoming PO)','acExpSize')
-   +(sizeRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'text-align:center">S</th><th style="'+TH+'text-align:center">M</th><th style="'+TH+'text-align:center">L</th><th style="'+TH+'text-align:center">XL</th><th style="'+TH+'">Monthly Rev at Risk</th></tr></thead><tbody>'+h6rows+'</tbody></table>'):empty('Every demand size of every fast mover is available')),'ac-sec-size');
+   +(sizeRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'text-align:center">S</th><th style="'+TH+'text-align:center">M</th><th style="'+TH+'text-align:center">L</th><th style="'+TH+'text-align:center">XL</th><th style="'+TH+'">Monthly Rev at Risk</th></tr></thead><tbody>'+h6rows+'</tbody></table>'):empty('Every demand size of every fast mover is available')),'ac-sec-size');
 
   function cfgInp(k,lbl,title){return '<label title="'+title+'" style="display:flex;align-items:center;gap:5px;font-size:10px;color:#888;font-weight:600">'+lbl+' <input type="number" min="1" value="'+cfg[k]+'" onchange="acSetCfg(\''+k+'\',this.value)" style="width:52px;border:1px solid #e0dcd4;border-radius:4px;padding:4px 6px;font-size:11px;text-align:right"></label>';}
   // Morning-glance summary strip — each card jumps to its section
@@ -5067,7 +5163,10 @@ function rAC(){
    +'</div>';
   window._acData={priceRows:priceRows,statusRows:statusRows,reorderRows:reorderRows,ageRows:ageRows,lossRows:lossRows,sizeRows:sizeRows,newRows:newRows,moverRows:moverRows,drainRows:drainRows,priceWatchRows:priceWatchRows};
   document.getElementById('pac').innerHTML=
-    '<div style="max-width:1100px">'
+    // No width cap -- these tables carry 13-17 columns and the cap put
+    // everything past Net/pc behind a sideways scroll on a screen wide enough
+    // to show it. Same fix as the ticket list.
+    '<div>'
     +'<div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px">🚨 Insights — Action Center</div>'
     +'<div style="font-size:10px;color:#aaa;margin-bottom:12px">Only exceptions that need action are shown. Based on full history through '+fmtD(ref)+'.</div>'
     +kpis
@@ -5084,15 +5183,20 @@ function rAC(){
     +'</div>'
     +sec7+sec8+sec3+sec6+sec5+sec11+sec9+sec4+sec1+sec2
     +'</div>';
+  acPinOffsets();
+}
+if(!window._acPinBound){
+  window._acPinBound=true;
+  window.addEventListener('resize',function(){if(document.getElementById('pac'))acPinOffsets();});
 }
 function acExpPrice(){csvDL((window._acData.priceRows||[]).map(function(r){return[r.name,r.laam,r.shop,r.diff,r.stk];}),['Product','Laam Price','Shopify Price','Diff (Laam-Shopify)','Stock in Hand'],'price_mismatch.csv');}
 function acExpStatus(){csvDL((window._acData.statusRows||[]).map(function(r){return[r.name,r.laamStatus,r.shopStatus,r.stk,r.shopStk!=null?r.shopStk:'',r.blocked?'BLOCKED REVENUE':''];}),['Product','Laam Status','Shopify Status','Laam Stock','Shopify Stock','Flag'],'status_mismatch.csv');}
 function acExpReorder(){csvDL((window._acData.reorderRows||[]).map(function(r){return[r.name,r.v30,Math.round(r.rate*100)/100,r.stk,r.inc,r.eta,Math.round(r.cover),r.price||'',r.net===null?'':r.net,r.sug];}),['Product','Sold 30d','Daily Rate','Stock','Incoming PO','PO ETA','Days Cover','Retail Price','Net Per Piece','Suggested Order Qty'],'reorder_list.csv');}
 function acExpAge(){csvDL((window._acData.ageRows||[]).map(function(r){return[r.name,r.lastSale||'never',r.days===null?'':r.days,r.stk,r.cost,r.val];}),['Product','Last Sale','Days Since Sale','Stock','Unit Cost','Value at Cost'],'stock_ageing.csv');}
 function acExpPW(){csvDL((window._acData.priceWatchRows||[]).map(function(r){return[r.name,r.gross,r.listed,r.listedDisc+'%',r.effDisc+'%',r.extra+'pp',r.avg30,r.drift===null?'':r.drift+'%',r.v30,r.net===null?'':r.net,r.given,r.tags.join('+')];}),['Product','Original Price','Current Price','Listed Disc%','Effective Disc%','Extra Given pp','Avg Paid 30d','Price Drift%','Sold 30d','Net Per Piece','Given Away Per Month','Verdicts'],'discount_price_watch.csv');}
-function acExpMov(){csvDL((window._acData.moverRows||[]).map(function(r){return[r.name,r.dir,r.v7,r.prevWk,r.chg===null?'NEW':r.chg+'%',r.stk,r.coverNew===null?'':r.coverNew,r.price||'',r.net===null?'':r.net];}),['Product','Direction','Sold 7d','Prev Weekly Pace','Change','Stock','Days Cover at New Pace','Retail Price','Net Per Piece'],'movers_shakers.csv');}
+function acExpMov(){csvDL((window._acData.moverRows||[]).map(function(r){var c=r.ch||acChZero();return[r.name,r.dir,c.mktL,c.mktI,c.octL,c.octI,c.oth,r.v7,r.prevWk,r.chg===null?'NEW':r.chg+'%',r.stk,r.coverNew===null?'':r.coverNew,r.price||'',r.net===null?'':r.net];}),['Product','Direction','MP Local 7d','MP Intl 7d','OC Local 7d','OC Intl 7d','Other 7d','Sold 7d','Prev Weekly Pace','Change','Stock','Days Cover at New Pace','Retail Price','Net Per Piece'],'movers_shakers.csv');}
 function acExpDrain(){csvDL((window._acData.drainRows||[]).map(function(r){return[r.name,r.revDel,r.exc,r.refD,r.refLoss,r.canPct+'%',r.bleed,r.total];}),['Product','Delivered Revenue','Excess Commission','Refunded Orders','Refund Loss Est','Cancel%','Loss Bleed Per Month','Total Drain PKR'],'profit_drains.csv');}
-function acExpNew(){csvDL((window._acData.newRows||[]).map(function(r){return[r.name,r.launch.toISOString().split('T')[0],r.daysLive,r.first14,r.sold,Math.round(r.rate*100)/100,Math.round(r.sellThrough*100)+'%',r.stk,r.sa,r.inc,r.price||'',r.rev,r.net===null?'':r.net,r.verdict];}),['Product','Launched','Days Live','First 14d Sold','Total Sold','Daily Rate','Sell-Through','Stock','Sell-Ahead','Incoming PO','Retail Price','Revenue','Net Per Piece','Verdict'],'new_arrivals.csv');}
+function acExpNew(){csvDL((window._acData.newRows||[]).map(function(r){var c=r.ch||acChZero();return[r.name,r.launch.toISOString().split('T')[0],r.daysLive,r.first14,c.mktL,c.mktI,c.octL,c.octI,c.oth,r.sold,Math.round(r.rate*100)/100,Math.round(r.sellThrough*100)+'%',r.stk,r.sa,r.inc,r.price||'',r.rev,r.net===null?'':r.net,r.verdict];}),['Product','Launched','Days Live','First 14d Sold','MP Local','MP Intl','OC Local','OC Intl','Other','Total Sold','Daily Rate','Sell-Through','Stock','Sell-Ahead','Incoming PO','Retail Price','Revenue','Net Per Piece','Verdict'],'new_arrivals.csv');}
 function acExpSize(){csvDL((window._acData.sizeRows||[]).map(function(r){var f={};r.cells.forEach(function(c){f[c.sz]=c.share+'% | stk '+c.st+' | SA '+c.sa+' | PO '+(c.po||0)+' | '+c.verdict;});return[r.name,r.retail,r.v30,f.S,f.M,f.L,f.XL,r.broken.join('/'),r.unsized,r.risk];}),['Product','Retail','Sold 30d','S','M','L','XL','Broken Sizes','Unsized Incoming PO','Monthly Revenue at Risk'],'broken_size_runs.csv');}
 function acExpLoss(){csvDL((window._acData.lossRows||[]).map(function(r){return[r.name,r.gross,r.disc?r.disc+'%':'',r.retail,r.cost,r.gp,r.loss,r.breakeven,r.v30,r.bleed,r.stk];}),['Product','Gross Price','Discount%','Retail','Cost','GP/pc','Net Loss/pc','Breakeven Price','Sold 30d','Monthly Bleed PKR','Stock'],'selling_at_loss.csv');}
 
