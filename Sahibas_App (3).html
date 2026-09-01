@@ -4539,6 +4539,66 @@ function acSetCfg(k,v){
   try{var s=JSON.parse(localStorage.getItem('sbm_ac_cfg')||'{}');s[k]=parseInt(v)||0;localStorage.setItem('sbm_ac_cfg',JSON.stringify(s));}catch(e){}
   rendered.ac=false;doR('ac');
 }
+// ── SIZE SPLIT IN THE INSIGHTS TABLES ──
+// Same shape Pre-Booked already uses: one "S / M / L / XL" cell plus a Grand
+// Total, and a [+] that expands into four sortable-width columns. The stock
+// figure in every Insights section is the Laam warehouse file, which already
+// carries the per-size counts -- the sections just weren't reading them.
+// Shopify Stock (Status Mismatch) stays a plain total: that export has no size
+// column, and showing a warehouse split beside a Shopify number would invite
+// reading one as the other.
+function acSzOpen(){
+  if(window._acSzOpen===undefined){
+    try{window._acSzOpen=localStorage.getItem('sbm_ac_sz')==='1';}catch(e){window._acSzOpen=false;}
+  }
+  return window._acSzOpen;
+}
+function acSzToggle(){
+  window._acSzOpen=!acSzOpen();
+  try{localStorage.setItem('sbm_ac_sz',window._acSzOpen?'1':'0');}catch(e){}
+  rendered.ac=false;doR('ac');
+}
+function acSizes(name){
+  var sp=STOCK_PRODS[String(name||'').toLowerCase().trim()];
+  if(!sp)return null;
+  var S=+sp.S||0,M=+sp.M||0,L=+sp.L||0,XL=+sp.XL||0,tot=+sp.total||0,sum=S+M+L+XL;
+  // "other" = pieces outside S/M/L/XL (kids sizes, XXL, Standard). "over" is
+  // what arithmetic can't reconcile -- a split claiming more pieces than the
+  // total -- flagged rather than quietly clamped. Same treatment as the Flash
+  // Sale Planner, so the two screens never disagree.
+  return {S:S,M:M,L:L,XL:XL,total:tot,other:Math.max(0,tot-sum),over:sum>tot?sum-tot:0};
+}
+var AC_SZB='background:#fffdf7;color:#a07030;';
+function acSzBtn(){
+  return '<span onclick="event.stopPropagation();acSzToggle()" title="'+(acSzOpen()?'Collapse to one column':'Expand into S, M, L and XL')
+    +'" style="display:inline-block;margin-left:5px;border:1px solid var(--gold);border-radius:4px;width:15px;height:15px;line-height:12px;text-align:center;font-size:11px;font-weight:800;color:var(--gold2);background:#fff;cursor:pointer;vertical-align:middle">'
+    +(acSzOpen()?'−':'+')+'</span>';
+}
+function acSzTh(TH,label){
+  var h=TH+AC_SZB;
+  return acSzOpen()
+    ? '<th style="'+h+'">S'+acSzBtn()+'</th><th style="'+h+'">M</th><th style="'+h+'">L</th><th style="'+h+'">XL</th><th style="'+h+'">'+(label||'Grand Total')+'</th>'
+    : '<th style="'+h+'">S / M / L / XL'+acSzBtn()+'</th><th style="'+h+'">'+(label||'Grand Total')+'</th>';
+}
+// The size cells plus the total. `extra` rides on the total cell (the "+SA n"
+// suffix New Arrivals carries). A product absent from the stock file shows "—",
+// never 0/0/0/0 -- no data and zero stock are different answers.
+function acSzTd(r,TD,extra){
+  var d=TD+AC_SZB,z=acSizes(r.name),tot=r.stk||0;
+  var totCell='<td style="'+d+'font-weight:700;color:'+(tot===0?'#c0392b':'#333')+'">'+NF(tot)+(extra||'')+'</td>';
+  if(!z){
+    return (acSzOpen()
+      ?'<td style="'+d+'color:#ccc">—</td><td style="'+d+'color:#ccc">—</td><td style="'+d+'color:#ccc">—</td><td style="'+d+'color:#ccc">—</td>'
+      :'<td style="'+d+'color:#ccc;font-size:10px" title="This product is not in the last stock file">— not in stock file</td>')+totCell;
+  }
+  var n=function(v){return v?String(v):'<span style="color:#d8d2c6">0</span>';};
+  var flags=(z.other?'<span title="'+z.other+' pcs in other sizes (kids / XXL / Standard) — counted in the total but not in S/M/L/XL" style="color:#c89a4a;font-weight:700"> +'+z.other+'</span>':'')
+    +(z.over?'<span title="The size split accounts for '+z.over+' more pieces than the stock total" style="color:#c0392b;font-weight:800;cursor:help"> ⚠</span>':'');
+  if(acSzOpen()){
+    return '<td style="'+d+'">'+n(z.S)+'</td><td style="'+d+'">'+n(z.M)+'</td><td style="'+d+'">'+n(z.L)+'</td><td style="'+d+'">'+n(z.XL)+flags+'</td>'+totCell;
+  }
+  return '<td style="'+d+'white-space:nowrap">'+n(z.S)+'/'+n(z.M)+'/'+n(z.L)+'/'+n(z.XL)+flags+'</td>'+totCell;
+}
 function rAC(){
   var role=CU&&CU.role;
   if(role!=='Owner'&&role!=='Accountant'&&role!=='Editor'){document.getElementById('pac').innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">Not authorized.</div>';return;}
@@ -4826,10 +4886,10 @@ function rAC(){
      +'<td style="'+TD+'">'+NF(r.laam)+'</td><td style="'+TD+'">'+NF(r.shop)+'</td>'
      +'<td style="'+TD+'font-weight:700;color:'+(r.diff>0?'#c0392b':'#2980b9')+'">'+(r.diff>0?'+':'')+NF(r.diff)+'</td>'
      +'<td style="'+TD+'color:#888">'+(r.shop>0?Math.round(Math.abs(r.diff)/r.shop*100)+'%':'—')+'</td>'
-     +'<td style="'+TD+'font-weight:600;color:'+(r.stk===0?'#c0392b':'#333')+'">'+NF(r.stk)+'</td></tr>';
+     +acSzTd(r,TD)+'</tr>';
   }).join('');
   var sec1=box(secHead('💰','Price Mismatch — Laam vs Shopify',priceRows.length,'#c0392b','Same article, different selling price on the two platforms','acExpPrice')
-   +(priceRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Laam</th><th style="'+TH+'">Shopify</th><th style="'+TH+'">Diff (L−S)</th><th style="'+TH+'">Diff %</th><th style="'+TH+'">Stock in Hand</th></tr></thead><tbody>'+h1rows+'</tbody></table>'):empty('All prices match across platforms')),'ac-sec-price');
+   +(priceRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Laam</th><th style="'+TH+'">Shopify</th><th style="'+TH+'">Diff (L−S)</th><th style="'+TH+'">Diff %</th>'+acSzTh(TH,'Stock in Hand')+'</tr></thead><tbody>'+h1rows+'</tbody></table>'):empty('All prices match across platforms')),'ac-sec-price');
 
   // Section 2 — Status mismatches
   var h2rows=statusRows.map(function(r){
@@ -4837,11 +4897,11 @@ function rAC(){
     return '<tr'+(r.blocked?' style="background:#fff8f0"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+'</td>'
      +'<td style="'+TD+'text-align:center">'+badge(r.laamStatus,r.laamStatus==='ACTIVE')+'</td>'
      +'<td style="'+TD+'text-align:center">'+badge(r.shopStatus,r.shopStatus==='ACTIVE')+'</td>'
-     +'<td style="'+TD+'">'+NF(r.stk)+'</td><td style="'+TD+'">'+(r.shopStk!=null?NF(r.shopStk):'—')+'</td>'
+     +acSzTd(r,TD)+'<td style="'+TD+'">'+(r.shopStk!=null?NF(r.shopStk):'—')+'</td>'
      +'<td style="'+TDL+'font-size:10px;color:'+(r.blocked?'#c0392b;font-weight:700':'#888')+'">'+(r.blocked?'⚠ Has stock but switched off — blocked revenue':'Check listing')+'</td></tr>';
   }).join('');
   var sec2=box(secHead('🔀','Status Mismatch — Active/Inactive differs',statusRows.length,'#d4780a','Live on one platform, switched off on the other','acExpStatus')
-   +(statusRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'text-align:center">Laam</th><th style="'+TH+'text-align:center">Shopify</th><th style="'+TH+'">Laam Stock</th><th style="'+TH+'">Shopify Stock</th><th style="'+THL+'">Action</th></tr></thead><tbody>'+h2rows+'</tbody></table>'):empty('Statuses match across platforms')),'ac-sec-status');
+   +(statusRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'text-align:center">Laam</th><th style="'+TH+'text-align:center">Shopify</th>'+acSzTh(TH,'Laam Stock')+'<th style="'+TH+'">Shopify Stock</th><th style="'+THL+'">Action</th></tr></thead><tbody>'+h2rows+'</tbody></table>'):empty('Statuses match across platforms')),'ac-sec-status');
 
   // Section 3 — Reorder
   var h3rows=reorderRows.map(function(r){
@@ -4849,7 +4909,7 @@ function rAC(){
     var cvColor=cv<cfg.lead?'#c0392b':cv<cfg.lead+cfg.safety?'#d4944a':'#27ae60';
     return '<tr'+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' style="opacity:.55"':'')+'><td style="'+TD+'width:40px">'+thumb(r)+'</td><td style="'+TDL+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
      +'<td style="'+TD+'">'+r.v30+'</td><td style="'+TD+'">'+(Math.round(r.rate*10)/10)+'/day</td>'
-     +'<td style="'+TD+'font-weight:700;color:'+(r.stk===0?'#c0392b':'#333')+'">'+NF(r.stk)+'</td>'
+     +acSzTd(r,TD)
      +'<td style="'+TD+'">'+(r.inc>0?NF(r.inc)+(r.eta?' <span style="color:#888;font-size:9px">('+fmtDMY(r.eta)+')</span>':''):'—')+'</td>'
      +'<td style="'+TD+'font-weight:800;color:'+cvColor+'">'+cv+' days</td>'
      +'<td style="'+TD+'font-weight:600">'+(r.price>0?NF(r.price):'—')+'</td>'
@@ -4859,7 +4919,7 @@ function rAC(){
         :'<td style="'+TD+'font-weight:800;color:var(--gold2);background:#fdf8f0">'+(r.sug>0?NF(r.sug)+' pcs':'—')+'</td>')+'</tr>';
   }).join('');
   var sec3=box(secHead('🏭','Reorder Now — will stock out within lead time',reorderRows.length,'#8e44ad','Cover = (stock + incoming PO) ÷ daily rate. Alert below '+(cfg.lead+cfg.safety)+' days; suggestion refills to '+(cfg.lead+cfg.cover)+' days','acExpReorder')
-   +(reorderRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Rate</th><th style="'+TH+'">Stock</th><th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Days Cover</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'">Suggested Order</th></tr></thead><tbody>'+h3rows+'</tbody></table>'):empty('Nothing needs reordering — all fast movers have enough cover')),'ac-sec-reorder');
+   +(reorderRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Rate</th>'+acSzTh(TH)+'<th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Days Cover</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'">Suggested Order</th></tr></thead><tbody>'+h3rows+'</tbody></table>'):empty('Nothing needs reordering — all fast movers have enough cover')),'ac-sec-reorder');
 
   // Section 4 — Ageing
   var h4rows=ageRows.map(function(r){
@@ -4869,11 +4929,10 @@ function rAC(){
      +'<td style="'+TD+'">'+(r.lastSale?fmtDMY(r.lastSale):'<span style="color:#c0392b;font-weight:700">never</span>')+'</td>'
      +'<td style="'+TD+'font-weight:800;color:'+bColor+'">'+(r.days===null?'∞':r.days)+'</td>'
      +'<td style="'+TD+'text-align:center"><span style="background:'+bColor+'18;color:'+bColor+';padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700">'+bucket+'</span></td>'
-     +'<td style="'+TD+'">'+NF(r.stk)+'</td>'
-     +'<td style="'+TD+'font-weight:700;color:'+(r.val>0?'#c0392b':'#bbb')+'">'+(r.cost>0?'PKR '+NF(r.val):'<span style="color:#d4944a" title="No cost saved for this product">no cost</span>')+'</td></tr>';
+     +acSzTd(r,TD)+'<td style="'+TD+'font-weight:700;color:'+(r.val>0?'#c0392b':'#bbb')+'">'+(r.cost>0?'PKR '+NF(r.val):'<span style="color:#d4944a" title="No cost saved for this product">no cost</span>')+'</td></tr>';
   }).join('');
   var sec4=box(secHead('🐌','Stock Ageing — sitting unsold',ageRows.length,'#2980b9','Stock on hand with no sale in the last '+cfg.ageDays+'+ days · <b style="color:#c0392b">PKR '+NF(stuckVal)+' stuck at cost</b>','acExpAge')
-   +(ageRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Last Sale</th><th style="'+TH+'">Days Since</th><th style="'+TH+'text-align:center">Bucket</th><th style="'+TH+'">Stock</th><th style="'+TH+'">Value at Cost</th></tr></thead><tbody>'+h4rows+'</tbody></table>'):empty('Everything with stock has sold within '+cfg.ageDays+' days')),'ac-sec-age');
+   +(ageRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Last Sale</th><th style="'+TH+'">Days Since</th><th style="'+TH+'text-align:center">Bucket</th>'+acSzTh(TH)+'<th style="'+TH+'">Value at Cost</th></tr></thead><tbody>'+h4rows+'</tbody></table>'):empty('Everything with stock has sold within '+cfg.ageDays+' days')),'ac-sec-age');
 
   // Section 5 — Selling at a loss
   var h5rows=lossRows.map(function(r){
@@ -4887,10 +4946,10 @@ function rAC(){
      +'<td style="'+TD+'font-weight:800;color:#27ae60;background:#f0fff4">'+NF(r.breakeven)+'</td>'
      +'<td style="'+TD+'">'+(r.v30||'-')+'</td>'
      +'<td style="'+TD+'font-weight:800;color:'+(r.bleed>0?'#c0392b':'#bbb')+'">'+(r.bleed>0?'PKR '+NF(r.bleed):'—')+'</td>'
-     +'<td style="'+TD+'">'+NF(r.stk)+'</td></tr>';
+     +acSzTd(r,TD)+'</tr>';
   }).join('');
   var sec5=box(secHead('🔻','Selling at a Loss — GP below the 25% load',lossRows.length,'#e74c3c','Net loss per piece after commission + taxes · <b style="color:#c0392b">PKR '+NF(totBleed)+'/month bleeding at current sales rate</b> · Breakeven = minimum retail that stops the loss','acExpLoss')
-   +(lossRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Gross Price</th><th style="'+TH+'">Disc%</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Cost</th><th style="'+TH+'">GP/pc</th><th style="'+TH+'">Net Loss/pc</th><th style="'+TH+'">Breakeven Price</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Monthly Bleed</th><th style="'+TH+'">Stock</th></tr></thead><tbody>'+h5rows+'</tbody></table>'):empty('No product sells below the 25% load — every sale is profitable')),'ac-sec-loss');
+   +(lossRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Gross Price</th><th style="'+TH+'">Disc%</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Cost</th><th style="'+TH+'">GP/pc</th><th style="'+TH+'">Net Loss/pc</th><th style="'+TH+'">Breakeven Price</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Monthly Bleed</th>'+acSzTh(TH)+'</tr></thead><tbody>'+h5rows+'</tbody></table>'):empty('No product sells below the 25% load — every sale is profitable')),'ac-sec-loss');
 
   // Section 8 — Movers & Shakers
   var h8rows=moverRows.map(function(r){
@@ -4901,13 +4960,12 @@ function rAC(){
      +'<td style="'+TD+'font-weight:700">'+r.v7+'</td>'
      +'<td style="'+TD+'color:#888">'+r.prevWk+'/wk</td>'
      +'<td style="'+TD+'font-weight:800;color:'+(up?'#27ae60':'#c0392b')+'">'+(r.chg===null?'NEW':(r.chg>0?'+':'')+r.chg+'%')+'</td>'
-     +'<td style="'+TD+'">'+NF(r.stk)+'</td>'
-     +'<td style="'+TD+'font-weight:700;color:'+(up&&r.coverNew!==null&&r.coverNew<45?'#c0392b':'#333')+'">'+(r.coverNew===null?'—':r.coverNew+' days')+(up&&r.coverNew!==null&&r.coverNew<45?' ⚠':'')+'</td>'
+     +acSzTd(r,TD)+'<td style="'+TD+'font-weight:700;color:'+(up&&r.coverNew!==null&&r.coverNew<45?'#c0392b':'#333')+'">'+(r.coverNew===null?'—':r.coverNew+' days')+(up&&r.coverNew!==null&&r.coverNew<45?' ⚠':'')+'</td>'
      +'<td style="'+TD+'font-weight:600">'+(r.price>0?NF(r.price):'—')+'</td>'
      +'<td style="'+TD+'font-weight:700;color:'+(r.net===null?'#bbb':r.net<0?'#c0392b':r.net<cfg.minNet?'#b06000':'#27ae60')+'">'+(r.net===null?'no cost':NF(r.net))+'</td></tr>';
   }).join('');
   var sec8=box(secHead('⚡','Movers &amp; Shakers — momentum this week',moverRows.length,'#e67e22','Last 7 days\u2019 pace vs the previous 21 days \u00b7 '+nRise+' rising, '+nCool+' cooling \u00b7 Rising with short cover = order before the reorder alert even fires','acExpMov')
-   +(moverRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'text-align:center">Direction</th><th style="'+TH+'">Sold 7d</th><th style="'+TH+'">Prev Pace</th><th style="'+TH+'">Change</th><th style="'+TH+'">Stock</th><th style="'+TH+'">Cover at New Pace</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Net/pc</th></tr></thead><tbody>'+h8rows+'</tbody></table>'):empty('No significant acceleration or slowdown this week')),'ac-sec-mov');
+   +(moverRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'text-align:center">Direction</th><th style="'+TH+'">Sold 7d</th><th style="'+TH+'">Prev Pace</th><th style="'+TH+'">Change</th>'+acSzTh(TH)+'<th style="'+TH+'">Cover at New Pace</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Net/pc</th></tr></thead><tbody>'+h8rows+'</tbody></table>'):empty('No significant acceleration or slowdown this week')),'ac-sec-mov');
 
   // Section 9 — Profit drains
   var h9rows=drainRows.slice(0,150).map(function(r){
@@ -4955,7 +5013,7 @@ function rAC(){
      +'<td style="'+TD+'font-weight:700">'+r.sold+'</td>'
      +'<td style="'+TD+'font-weight:700;color:'+(r.rate>=1?'#27ae60':r.rate<0.15?'#c0392b':'#333')+'">'+(Math.round(r.rate*10)/10)+'/day</td>'
      +'<td style="'+TD+'">'+Math.round(r.sellThrough*100)+'%</td>'
-     +'<td style="'+TD+'">'+NF(r.stk)+(r.sa>0?' <span style="color:#5050b0;font-size:9px">+SA '+r.sa+'</span>':'')+'</td>'
+     +acSzTd(r,TD,(r.sa>0?' <span style="color:#5050b0;font-size:9px">+SA '+r.sa+'</span>':''))
      +'<td style="'+TD+'">'+(r.inc>0?NF(r.inc)+(r.eta?' <span style="color:#888;font-size:9px">('+fmtDMY(r.eta)+')</span>':''):'—')+'</td>'
      +'<td style="'+TD+'font-weight:600">'+(r.price>0?NF(r.price):'—')+'</td>'
      +'<td style="'+TD+'">'+N(r.rev)+'</td>'
@@ -4963,7 +5021,7 @@ function rAC(){
      +'<td style="'+TD+'text-align:center"><span style="background:'+v.bg+';color:'+v.fg+';padding:2px 8px;border-radius:3px;font-size:8px;font-weight:800;white-space:nowrap">'+v.lbl+'</span></td></tr>';
   }).join('');
   var sec7=box(secHead('🚀','New Arrivals Scorecard — launched in the last '+cfg.newDays+' days',newRows.length,'#c8a96e',nBest+' bestseller'+(nBest===1?'':'s')+' · '+nSlow+' slow · Bestseller = ≥1/day AND nets ≥PKR '+cfg.minNet+'/pc after the 25% load','acExpNew')
-   +(newRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Launched</th><th style="'+TH+'">First 14d</th><th style="'+TH+'">Sold</th><th style="'+TH+'">Rate</th><th style="'+TH+'">Sell-Through</th><th style="'+TH+'">Stock</th><th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Revenue</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'text-align:center">Verdict</th></tr></thead><tbody>'+h7rows+'</tbody></table>'):empty('No new arrivals in the last '+cfg.newDays+' days')),'ac-sec-new');
+   +(newRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+TH+'"></th><th style="'+THL+'">Product</th><th style="'+TH+'">Launched</th><th style="'+TH+'">First 14d</th><th style="'+TH+'">Sold</th><th style="'+TH+'">Rate</th><th style="'+TH+'">Sell-Through</th>'+acSzTh(TH)+'<th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Revenue</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'text-align:center">Verdict</th></tr></thead><tbody>'+h7rows+'</tbody></table>'):empty('No new arrivals in the last '+cfg.newDays+' days')),'ac-sec-new');
 
   // Section 6 — Broken size runs
   var VC={BROKEN:{bg:'#fdeaea',bd:'#e74c3c',fg:'#c0392b',lbl:'BROKEN'},SELLAHEAD:{bg:'#fff3e0',bd:'#e8a030',fg:'#b06000',lbl:'SELL-AHEAD'},COVERED:{bg:'#e8f8ee',bd:'#27ae60',fg:'#1e8449',lbl:'PO INCOMING'},UNKNOWN:{bg:'#fff8e0',bd:'#d4b040',fg:'#8a6800',lbl:'CHECK PO'},OK:{bg:'#fafaf8',bd:'transparent',fg:'#999',lbl:''}};
