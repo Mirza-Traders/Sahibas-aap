@@ -290,20 +290,29 @@ export default {
       // Old app tabs still POST the whole array. That is now an upsert of each
       // element, never a replacement, so an out-of-date tab can no longer erase
       // anything; the worst it can do is be told its copies were stale.
+      // Every KV operation counts against the per-request subrequest cap (50 on
+      // the free plan). So: bulk reads (one call per 100 keys), migration in
+      // batches of MIG_BATCH per request, and a save only writes what changed.
+      // Worst case per request stays around 40.
       if (path === '/tickets' && request.method === 'GET') {
-        await ensureTicketsMigrated(env);
+        const mig = await migrateStep(env);
         const all = await loadAllTickets(env);
+        const have = new Set(all.map(t => t.uid));
+        for (const t of mig.pending) {               // still only in the old blob
+          const u = ticketUid(t);
+          if (u && !have.has(u)) { if (!t.uid) t.uid = u; all.push(t); }
+        }
         return new Response(JSON.stringify(all), {
           headers: { ...cors, 'Content-Type': 'application/json', 'X-Tickets-Store': 'v2' },
         });
       }
 
       if (path === '/tickets' && request.method === 'POST') {
-        await ensureTicketsMigrated(env);
+        const mig = await migrateStep(env);
         const body = await request.text();
         let incoming = JSON.parse(body); // reject broken payloads
         if (!Array.isArray(incoming)) incoming = [incoming];
-        const result = await upsertTickets(env, incoming);
+        const result = await upsertTickets(env, incoming, mig.legacyByUid);
         return new Response(JSON.stringify({ ok: true, ...result }), {
           headers: { ...cors, 'Content-Type': 'application/json', 'X-Tickets-Store': 'v2' },
         });
@@ -312,7 +321,7 @@ export default {
       // POST /tickets/delete { uids: [...] } — the only way a ticket leaves.
       // Explicit, so a stale tab's whole-array save can never delete by omission.
       if (path === '/tickets/delete' && request.method === 'POST') {
-        await ensureTicketsMigrated(env);
+        await migrateStep(env);
         const req = JSON.parse(await request.text());
         const uids = Array.isArray(req && req.uids) ? req.uids : [];
         let deleted = 0;
@@ -501,51 +510,101 @@ function freshUid() {
   return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-// One-time split of the legacy blob into per-ticket keys. Idempotent via the
-// marker; the blob itself is never deleted, so nothing is unrecoverable.
-async function ensureTicketsMigrated(env) {
-  if (await env.PO_STORE.get(TK_MIGRATED)) return;
+const MIG_BATCH = 30;   // legacy tickets moved per request; keeps a request under the subrequest cap
+const PUT_CAP = 40;     // hard ceiling on writes per request, for the same reason
+
+// KV get() accepts up to 100 keys in one call and returns a Map -- one
+// operation instead of one per ticket.
+async function bulkGet(env, keys) {
+  const out = new Map();
+  for (let i = 0; i < keys.length; i += 100) {
+    const chunk = keys.slice(i, i + 100);
+    const m = await env.PO_STORE.get(chunk);
+    if (m && typeof m.forEach === 'function') m.forEach((v, k) => out.set(k, v));
+  }
+  return out;
+}
+async function readLegacy(env) {
   const raw = await env.PO_STORE.get(TK_LEGACY);
   let list = [];
   if (raw) { try { list = JSON.parse(raw); } catch (e) { list = []; } }
-  if (!Array.isArray(list)) list = [];
+  return Array.isArray(list) ? list : [];
+}
+// What a ticket "says", ignoring the bookkeeping the store adds. Used to tell
+// a genuine edit from a client echoing back an unchanged copy.
+function ticketSig(t) {
+  const c = Object.assign({}, t); delete c._srv; delete c._rev; delete c.uid;
+  return JSON.stringify(c, Object.keys(c).sort());
+}
+
+// Incremental migration of the legacy blob into per-ticket keys: at most
+// MIG_BATCH writes per call, tracked by a progress marker, never touching a key
+// that already exists (a ticket saved through the new path must not be
+// overwritten by its older legacy copy). Returns the legacy tickets not yet
+// moved, so reads can still serve them, and the whole legacy list keyed by uid,
+// so a save can tell "unchanged echo of an old ticket" from a real edit. The
+// blob itself is never deleted.
+async function migrateStep(env) {
+  const raw = await env.PO_STORE.get(TK_MIGRATED);
+  let st = { done: false, next: 0 };
+  if (raw) { try { st = JSON.parse(raw) || st; } catch (e) { st = { done: true }; } }
+  if (st.done) return { pending: [], legacyByUid: new Map() };
+  const legacy = await readLegacy(env);
+  const legacyByUid = new Map();
+  for (const t of legacy) { const u = ticketUid(t); if (u) legacyByUid.set(u, t); }
   const now = Date.now();
-  for (const t of list) {
-    const uid = ticketUid(t);
-    if (!uid) continue;
+  if (!legacy.length) {
+    await env.PO_STORE.put(TK_MIGRATED, JSON.stringify({ done: true, next: 0, count: 0, at: now }));
+    return { pending: [], legacyByUid };
+  }
+  const start = st.next || 0;
+  const batch = legacy.slice(start, start + MIG_BATCH);
+  const existing = await bulkGet(env, batch.map(ticketUid).filter(Boolean).map(u => TK + u));
+  for (const t of batch) {
+    const uid = ticketUid(t); if (!uid) continue;
+    if (existing.get(TK + uid)) continue;
     if (!t.uid) t.uid = uid;
     if (!t._srv) t._srv = now;
     if (!t._rev) t._rev = 1;
     await env.PO_STORE.put(TK + uid, JSON.stringify(t));
   }
-  await env.PO_STORE.put(TK_MIGRATED, JSON.stringify({ at: now, count: list.length }));
+  const next = start + batch.length, done = next >= legacy.length;
+  await env.PO_STORE.put(TK_MIGRATED, JSON.stringify({ done, next, count: legacy.length, at: now }));
+  return { pending: done ? [] : legacy.slice(next), legacyByUid };
 }
 
 async function loadAllTickets(env) {
-  const out = [];
+  const names = [];
   let cursor;
   do {
     const page = await env.PO_STORE.list({ prefix: TK, cursor });
-    for (const k of page.keys) {
-      const raw = await env.PO_STORE.get(k.name);
-      if (!raw) continue;
-      try { out.push(JSON.parse(raw)); } catch (e) { /* skip a corrupt key rather than fail the whole read */ }
-    }
+    for (const k of page.keys) names.push(k.name);
     cursor = page.list_complete ? undefined : page.cursor;
   } while (cursor);
+  const got = await bulkGet(env, names);
+  const out = [];
+  for (const name of names) {
+    const raw = got.get(name);
+    if (!raw) continue;
+    try { out.push(JSON.parse(raw)); } catch (e) { /* skip a corrupt key rather than fail the whole read */ }
+  }
   return out;
 }
 
-// Upsert each incoming ticket. Returns which were saved and which were skipped
-// because the stored copy is newer than the one the client was holding.
-async function upsertTickets(env, incoming) {
-  const saved = [], skipped = [], renamed = [];
+// Upsert each incoming ticket. Reads all of them in one bulk call, then writes
+// only the ones that actually changed. Returns which were saved, which were
+// skipped because the stored copy is newer, which were renamed because two
+// old-code tabs picked the same number, and which were deferred by the write
+// cap (the client keeps them queued and retries).
+async function upsertTickets(env, incoming, legacyByUid) {
+  const saved = [], skipped = [], renamed = [], deferred = [];
   const now = Date.now();
-  for (const t of incoming) {
-    if (!t || typeof t !== 'object') continue;
+  const items = incoming.filter(t => t && typeof t === 'object' && ticketUid(t));
+  const storedMap = await bulkGet(env, items.map(t => TK + ticketUid(t)));
+  let puts = 0;
+  for (const t of items) {
     let uid = ticketUid(t);
-    if (!uid) continue;
-    const storedRaw = await env.PO_STORE.get(TK + uid);
+    const storedRaw = storedMap.get(TK + uid);
     let stored = null;
     if (storedRaw) { try { stored = JSON.parse(storedRaw); } catch (e) { stored = null; } }
     if (stored) {
@@ -553,27 +612,28 @@ async function upsertTickets(env, incoming) {
       // on, someone wrote in between and this copy is stale: not applied, and
       // the client is told so it can reload. A revision counter, not a time
       // stamp -- two writes in the same millisecond would tie on time.
-      if (t._rev != null && stored._rev != null && Number(stored._rev) !== Number(t._rev)) {
-        skipped.push(uid);
-        continue;
-      }
+      if (t._rev != null && stored._rev != null && Number(stored._rev) !== Number(t._rev)) { skipped.push(uid); continue; }
+      if (ticketSig(stored) === ticketSig(t)) { saved.push(uid); continue; }   // unchanged echo: nothing to write
       if (t._rev == null && (stored.createdAt !== t.createdAt || stored.createdBy !== t.createdBy)) {
-        // A ticket claiming to be brand-new (never stamped) landing on a key
-        // that already holds a DIFFERENT ticket: two old-code tabs picked the
-        // same RX number. Keep both -- give this one its own key.
+        // A ticket claiming to be brand-new landing on a key that already holds
+        // a DIFFERENT ticket: two old-code tabs picked the same RX number. Keep
+        // both -- give this one its own key.
         const fresh = freshUid();
         renamed.push({ from: uid, to: fresh });
-        uid = fresh;
-        t.uid = fresh;
+        uid = fresh; t.uid = fresh; stored = null;
       }
+    } else if (legacyByUid && legacyByUid.has(uid) && ticketSig(legacyByUid.get(uid)) === ticketSig(t)) {
+      saved.push(uid); continue;   // unchanged copy of a not-yet-migrated ticket: the migration will move it
     }
+    if (puts >= PUT_CAP) { deferred.push(uid); continue; }
     if (!t.uid) t.uid = uid;
     t._srv = now;
     t._rev = (stored && Number(stored._rev) || 0) + 1;
     await env.PO_STORE.put(TK + uid, JSON.stringify(t));
+    puts++;
     saved.push(uid);
   }
-  return { saved, skipped, renamed };
+  return { saved, skipped, renamed, deferred };
 }
 
 // Writes JSON text to a path in the GitHub repo via the Contents API. Requires

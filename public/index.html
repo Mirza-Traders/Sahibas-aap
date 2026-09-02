@@ -6808,6 +6808,12 @@ async function rxSaveAll(touchedIds){
   // tab last read it -- pull the newer copy rather than pretend ours landed.
   var savedSet={};(res.saved||[]).forEach(function(u){savedSet[u]=true;});
   window._rxPendingSave=(window._rxPendingSave||[]).filter(function(u){return !savedSet[u];});
+  // The Worker caps writes per request; anything past the cap comes back as
+  // deferred and is simply queued for the next save -- never dropped.
+  if(res.deferred&&res.deferred.length){
+    window._rxPendingSave=Array.from(new Set(window._rxPendingSave.concat(res.deferred)));
+    rxScheduleRetry();
+  }
   if(res.renamed&&res.renamed.length){
     res.renamed.forEach(function(r){var t=(window.TICKETS||[]).find(function(x){return x.uid===r.from;});if(t)t.uid=r.to;});
   }

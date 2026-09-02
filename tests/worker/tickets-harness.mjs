@@ -19,13 +19,27 @@ const STALE_MS = 60_000;
 
 // One "global" store plus a per-edge view that lags it.
 class FakeKV {
-  constructor() { this.global = new Map(); this.edges = new Map(); this.now = 0; this.puts = 0; }
+  constructor() { this.global = new Map(); this.edges = new Map(); this.now = 0; this.puts = 0; this.ops = 0; this.maxOps = 0; }
+  // Every KV call is one subrequest against Cloudflare's per-request cap (50 free / 1000 paid).
+  // A bulk get() of up to 100 keys is ONE call. reset() marks a request boundary.
+  reset() { this.ops = 0; }
+  tick() { this.ops++; if (this.ops > this.maxOps) this.maxOps = this.ops; }
   edge(name) {
     const kv = this;
     if (!kv.edges.has(name)) kv.edges.set(name, new Map()); // key -> {val, seenAt}
     const view = kv.edges.get(name);
     return {
       async get(key) {
+        kv.tick();
+        if (Array.isArray(key)) {           // bulk form: Map of key -> value|null, one operation
+          if (key.length > 100) throw new Error('KV bulk get: max 100 keys');
+          const m = new Map();
+          for (const k of key) m.set(k, await this._one(k));
+          return m;
+        }
+        return this._one(key);
+      },
+      async _one(key) {
         // Serve from this edge's cache while it is younger than STALE_MS,
         // exactly as KV's minimum 60s edge cache does; otherwise fetch global.
         const c = view.get(key);
@@ -35,13 +49,14 @@ class FakeKV {
         return val;
       },
       async put(key, val) {
-        kv.puts++;
+        kv.tick(); kv.puts++;
         if (typeof val === 'string' && val.length > 25 * 1024 * 1024) throw new Error('KV PUT failed: value too large (max 25 MiB)');
         kv.global.set(key, val);
         view.set(key, { val, seenAt: kv.now }); // writer sees its own write at once
       },
-      async delete(key) { kv.global.delete(key); view.set(key, { val: null, seenAt: kv.now }); },
+      async delete(key) { kv.tick(); kv.global.delete(key); view.set(key, { val: null, seenAt: kv.now }); },
       async list({ prefix, cursor }) {
+        kv.tick();
         // list() is served from global here; the per-key get() still lags, which
         // is the realistic shape: a new key may be listed before its value is
         // fresh at this edge. Never a loss, only a delay.
@@ -64,9 +79,9 @@ function client(worker, kv, edge, token) {
   const env = { AUTH_SECRET: 'test-secret', PO_STORE: kv.edge(edge) };
   const H = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
   return {
-    async get() { const r = await worker.fetch(new Request('https://w/tickets', { headers: H }), env); return { status: r.status, hdr: r.headers.get('X-Tickets-Store'), body: await r.json() }; },
-    async post(list) { const r = await worker.fetch(new Request('https://w/tickets', { method: 'POST', headers: H, body: JSON.stringify(list) }), env); return { status: r.status, body: await r.json().catch(() => null) }; },
-    async del(uids) { const r = await worker.fetch(new Request('https://w/tickets/delete', { method: 'POST', headers: H, body: JSON.stringify({ uids }) }), env); return { status: r.status, body: await r.json().catch(() => null) }; },
+    async get() { kv.reset(); const r = await worker.fetch(new Request('https://w/tickets', { headers: H }), env); return { status: r.status, hdr: r.headers.get('X-Tickets-Store'), body: await r.json() }; },
+    async post(list) { kv.reset(); const r = await worker.fetch(new Request('https://w/tickets', { method: 'POST', headers: H, body: JSON.stringify(list) }), env); return { status: r.status, body: await r.json().catch(() => null) }; },
+    async del(uids) { kv.reset(); const r = await worker.fetch(new Request('https://w/tickets/delete', { method: 'POST', headers: H, body: JSON.stringify({ uids }) }), env); return { status: r.status, body: await r.json().catch(() => null) }; },
   };
 }
 const T = (id, uid, customer, extra) => Object.assign({ id, uid, type: 'refund', status: 'initiated', customer, amount: 3000,
@@ -173,6 +188,31 @@ async function main() {
     kv.now = 120_000;
     const fin = (await client(NEW, kv, 'e3', tok).get()).body.map(t => t.customer).sort();
     console.log('  second save renamed: ' + JSON.stringify(rb.body.renamed) + ' · server has: ' + JSON.stringify(fin) + ' (both kept: ' + (fin.length === 2) + ')');
+  }
+
+  console.log('\n=== 7. Subrequests per request stay under the free-plan cap (50) ===');
+  {
+    const kv = new FakeKV();
+    const legacy = Array.from({ length: 79 }, (_, i) => T('RX-' + (100 + i), undefined, 'C' + i));
+    kv.global.set('tickets', JSON.stringify(legacy));
+    const tok = await login(NEW, kv, 'e1');
+    const c = client(NEW, kv, 'e1', tok);
+    const counts = [];
+    let g;
+    for (let i = 0; i < 5; i++) { g = await c.get(); counts.push(kv.ops); }   // migration runs in batches across these
+    const st = JSON.parse(kv.global.get('tk_migrated'));
+    console.log('  GET ops per request during migration: ' + JSON.stringify(counts) + ' · migration done after ' + (counts.findIndex((_, i) => i >= 2) + 1) + '+ reads: ' + st.done + ' · all 79 served every time: ' + (g.body.length === 79));
+    // an OLD tab echoes the whole array back with one new ticket added
+    const echo = g.body.concat([{ id: 'RX-200', type: 'refund', status: 'initiated', customer: 'New From Old Tab', createdAt: '2026-09-02 12:00', createdBy: 'Bano Hussain', history: [] }]);
+    const r = await c.post(echo);
+    console.log('  old-tab whole-array POST (80 tickets, 1 new): ops=' + kv.ops + ' · saved=' + r.body.saved.length + ' deferred=' + r.body.deferred.length + ' · only the new one written: ' + (kv.global.has('tk:RX-200')));
+    // a new client's delta save
+    const one = g.body[0]; one.status = 'received';
+    await c.post([one]);
+    console.log('  new-client delta POST (1 ticket): ops=' + kv.ops);
+    await c.get();
+    console.log('  steady-state GET (79 tickets): ops=' + kv.ops);
+    console.log('  max ops seen in any single request: ' + kv.maxOps + '  (under 50: ' + (kv.maxOps < 50) + ')');
   }
 
   console.log('\n=== 6. Size ceiling ===');
