@@ -672,7 +672,9 @@ async function initCloud(){
   // matters enormously -- saving on top of a list we never managed to read
   // replaces everyone's tickets with whatever this tab happens to hold.
   (async function(){try{
-    var rt=await apiGet('/tickets');var dataT=await rt.json();
+    var rt=await apiGet('/tickets');
+    if(rt.headers.get('X-Tickets-Store')==='v2')window._rxStoreV2=true;
+    var dataT=await rt.json();
     if(Array.isArray(dataT)){window.TICKETS=rxEnsureUids(dataT);window._rxLoadOK=true;}
     else window.TICKETS=window.TICKETS||[];
   }catch(e){window.TICKETS=window.TICKETS||[];}})(),
@@ -6748,6 +6750,7 @@ async function rxSaveAll(touchedIds){
   var merged=false;
   try{
     var r=await apiGet('/tickets');
+    if(r.headers.get('X-Tickets-Store')==='v2')window._rxStoreV2=true;
     var serverTickets=await r.json();
     if(Array.isArray(serverTickets)){
       rxEnsureUids(serverTickets);rxEnsureUids(window.TICKETS);
@@ -6781,10 +6784,81 @@ async function rxSaveAll(touchedIds){
     showToast('⚠ Could not reach the server — nothing was saved. Check your connection, then try again.');
     return false;
   }
-  // Anything a failed save left stranded is still ours, so keep those local.
-  if(window._rxPendingSave&&window._rxPendingSave.length)window._rxPendingSave=[];
-  cloudSave('tickets',window.TICKETS||[]);
+  // What actually gets sent depends on the Worker in front of us. The new
+  // store (X-Tickets-Store: v2, one KV key per ticket) takes only the tickets
+  // this save touched -- nobody else's ticket is in the request, so nobody
+  // else's ticket can be lost by it. The old store takes the whole array; that
+  // path stays exactly as it was so this file is safe to deploy before the
+  // Worker is, and switches over on its own the moment the Worker catches up.
+  var touchedList=(window.TICKETS||[]).filter(function(t){return touched[t.uid]||touched[t.id];});
+  var body=window._rxStoreV2?touchedList:(window.TICKETS||[]);
+  if(window._rxStoreV2&&!touchedList.length){return true;} // nothing changed, nothing to send
+  var res=await rxPostTickets(body);
+  if(!res.ok){
+    // The POST is the step that used to fail in silence: the retry list had
+    // already been cleared, the toast said "created", and the ticket existed in
+    // one tab until that tab closed. Now the uids stay queued, a banner says so,
+    // and the retry loop keeps going until the server has them.
+    window._rxPendingSave=Array.from(new Set((window._rxPendingSave||[]).concat(touchedList.map(function(t){return t.uid;}))));
+    rxShowUnsaved();rxScheduleRetry();
+    showToast('⚠ Save failed — '+(res.error||'server error')+'. Will keep retrying.');
+    return false;
+  }
+  // Server accepted. Anything it SKIPPED was changed by someone else after this
+  // tab last read it -- pull the newer copy rather than pretend ours landed.
+  var savedSet={};(res.saved||[]).forEach(function(u){savedSet[u]=true;});
+  window._rxPendingSave=(window._rxPendingSave||[]).filter(function(u){return !savedSet[u];});
+  if(res.renamed&&res.renamed.length){
+    res.renamed.forEach(function(r){var t=(window.TICKETS||[]).find(function(x){return x.uid===r.from;});if(t)t.uid=r.to;});
+  }
+  if(res.skipped&&res.skipped.length){
+    var names=res.skipped.map(function(u){var t=(window.TICKETS||[]).find(function(x){return x.uid===u;});return t?t.id:u;});
+    showToast('⚠ '+names.join(', ')+' was changed by someone else first — reloading their version.');
+    window._rxSyncing=false;rxRefresh();
+  }
+  rxShowUnsaved();
   return true;
+}
+// POST tickets and report the outcome honestly. Never throws; never swallows.
+async function rxPostTickets(list){
+  try{
+    var r=await fetch(CLOUD_API+'/tickets',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify(list)});
+    if(handleAuthFail(r))return {ok:false,error:'signed out'};
+    var j=null;try{j=await r.json();}catch(e){}
+    if(!r.ok)return {ok:false,error:(j&&j.error)||('HTTP '+r.status)};
+    if(r.headers.get('X-Tickets-Store')==='v2')window._rxStoreV2=true;
+    return Object.assign({ok:true},j||{});
+  }catch(e){return {ok:false,error:'no connection'};}
+}
+// Persistent banner while anything is unsaved. A toast disappears; this doesn't.
+function rxShowUnsaved(){
+  var n=(window._rxPendingSave||[]).length;
+  var el=document.getElementById('rx-unsaved');
+  if(!n){if(el)el.remove();return;}
+  if(!el){el=document.createElement('div');el.id='rx-unsaved';document.body.appendChild(el);}
+  el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9800;background:#c0392b;color:#fff;padding:9px 16px;font-size:12px;font-weight:700;display:flex;gap:12px;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.25)';
+  el.innerHTML='⚠ '+n+' ticket'+(n>1?'s':'')+' NOT saved to the server yet — do not close this tab. Retrying…'
+    +'<button onclick="rxRetryNow()" style="background:#fff;color:#c0392b;border:none;border-radius:5px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer">Retry now</button>';
+}
+function rxScheduleRetry(){
+  if(window._rxRetryT)return;
+  var wait=Math.min(60000,15000*Math.pow(2,window._rxRetryN||0));
+  window._rxRetryT=setTimeout(function(){window._rxRetryT=null;rxRetryNow();},wait);
+}
+async function rxRetryNow(){
+  if(window._rxRetryT){clearTimeout(window._rxRetryT);window._rxRetryT=null;}
+  if(!(window._rxPendingSave||[]).length){rxShowUnsaved();return;}
+  window._rxRetryN=(window._rxRetryN||0)+1;
+  var ok=await rxSaveAll([]);
+  if(ok){window._rxRetryN=0;showToast('✓ Saved to the server.');}
+}
+// Closing the tab with unsaved tickets is the one thing that can still lose
+// them, so the browser asks first.
+if(!window._rxUnloadBound){
+  window._rxUnloadBound=true;
+  window.addEventListener('beforeunload',function(e){
+    if((window._rxPendingSave||[]).length){e.preventDefault();e.returnValue='Tickets are still being saved.';return e.returnValue;}
+  });
 }
 // Newest first, by the timestamp the ticket was raised. Creation unshifts to
 // the top but the cloud merge below appends, so without an explicit sort a
@@ -6806,6 +6880,7 @@ async function rxRefresh(){
   window._rxSyncing=true;
   try{
     var r=await apiGet('/tickets');
+    if(r.headers.get('X-Tickets-Store')==='v2')window._rxStoreV2=true;
     var server=await r.json();
     if(Array.isArray(server)){
       rxEnsureUids(server);rxEnsureUids(window.TICKETS);
@@ -7546,7 +7621,13 @@ function rxDelete(id){
   // Tombstone the uid: ticket numbers get reused, uids never do, so this can no
   // longer suppress a different ticket that happens to share the number.
   window._rxDeletedIds[(doomed&&doomed.uid)||id]=true;
-  rxSaveAll();
+  if(window._rxStoreV2&&doomed&&doomed.uid){
+    fetch(CLOUD_API+'/tickets/delete',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({uids:[doomed.uid]})})
+      .then(function(r){handleAuthFail(r);if(!r.ok)showToast('⚠ Delete did not reach the server — it will come back on refresh.');})
+      .catch(function(){showToast('⚠ Delete did not reach the server — it will come back on refresh.');});
+  }else{
+    rxSaveAll();
+  }
   var d=document.getElementById('rx-detail');if(d)d.remove();
   rendered.rx=false;doR('rx');
   showToast(id+' deleted.');

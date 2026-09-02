@@ -263,21 +263,66 @@ export default {
         });
       }
 
-      // GET /tickets — read all refund/exchange tickets
+      // ── TICKETS: one KV key per ticket ─────────────────────────────────
+      // Tickets used to live in ONE blob under 'tickets', and every save was
+      // GET-blob → merge → POST-blob. That design loses tickets by construction:
+      //   • KV is eventually consistent. A save from Karachi ten seconds after a
+      //     save from Lahore reads Lahore's PREVIOUS blob from its own edge,
+      //     merges into that, and overwrites — Lahore's ticket is gone. No
+      //     client-side merge can fix this, because the merge is fed stale input.
+      //   • 79 tickets × up to four base64 photos was heading for KV's 25 MiB
+      //     value ceiling, after which every put() would throw and every save
+      //     would fail — silently, because the client never checked.
+      // Now each ticket is its own key, tk:<uid>. A save touches only the
+      // tickets it changed. Nobody can overwrite a ticket they never read, and
+      // the size limit applies per ticket instead of to everyone at once.
+      //
+      // _rev: every stored ticket carries a revision counter. A save must present
+      // the revision it read; if the store has moved on, the copy is skipped and
+      // the client is told, so it reloads instead of rolling back someone else's
+      // edit. HONEST LIMIT: the Worker's own read-before-compare goes through the
+      // same edge cache, so two people editing the SAME ticket within ~60s from
+      // different cities can still race on that one ticket's fields. That is a
+      // far smaller problem than the one this replaces (whole tickets vanishing),
+      // and it is fully closed only by moving the store to a Durable Object --
+      // the upgrade path if same-ticket conflicts ever show up in practice.
+      //
+      // Old app tabs still POST the whole array. That is now an upsert of each
+      // element, never a replacement, so an out-of-date tab can no longer erase
+      // anything; the worst it can do is be told its copies were stale.
       if (path === '/tickets' && request.method === 'GET') {
-        const data = await env.PO_STORE.get('tickets');
-        return new Response(data || '[]', {
-          headers: { ...cors, 'Content-Type': 'application/json' },
+        await ensureTicketsMigrated(env);
+        const all = await loadAllTickets(env);
+        return new Response(JSON.stringify(all), {
+          headers: { ...cors, 'Content-Type': 'application/json', 'X-Tickets-Store': 'v2' },
         });
       }
 
-      // POST /tickets — save all refund/exchange tickets
       if (path === '/tickets' && request.method === 'POST') {
+        await ensureTicketsMigrated(env);
         const body = await request.text();
-        JSON.parse(body); // reject broken payloads
-        await env.PO_STORE.put('tickets', body);
-        return new Response(JSON.stringify({ ok: true }), {
-          headers: { ...cors, 'Content-Type': 'application/json' },
+        let incoming = JSON.parse(body); // reject broken payloads
+        if (!Array.isArray(incoming)) incoming = [incoming];
+        const result = await upsertTickets(env, incoming);
+        return new Response(JSON.stringify({ ok: true, ...result }), {
+          headers: { ...cors, 'Content-Type': 'application/json', 'X-Tickets-Store': 'v2' },
+        });
+      }
+
+      // POST /tickets/delete { uids: [...] } — the only way a ticket leaves.
+      // Explicit, so a stale tab's whole-array save can never delete by omission.
+      if (path === '/tickets/delete' && request.method === 'POST') {
+        await ensureTicketsMigrated(env);
+        const req = JSON.parse(await request.text());
+        const uids = Array.isArray(req && req.uids) ? req.uids : [];
+        let deleted = 0;
+        for (const uid of uids) {
+          if (typeof uid !== 'string' || !uid) continue;
+          await env.PO_STORE.delete(TK + uid);
+          deleted++;
+        }
+        return new Response(JSON.stringify({ ok: true, deleted }), {
+          headers: { ...cors, 'Content-Type': 'application/json', 'X-Tickets-Store': 'v2' },
         });
       }
 
@@ -441,6 +486,95 @@ export default {
     }
   },
 };
+
+// ── TICKET STORE (per-key) ───────────────────────────────────────────────
+const TK = 'tk:';            // one key per ticket: tk:<uid>
+const TK_MIGRATED = 'tk_migrated';
+const TK_LEGACY = 'tickets'; // the old single blob; kept untouched as a backup
+
+function ticketUid(t) {
+  if (t && typeof t.uid === 'string' && t.uid) return t.uid;
+  if (t && typeof t.id === 'string' && t.id) return t.id; // legacy: uid seeded from RX-###
+  return null;
+}
+function freshUid() {
+  return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// One-time split of the legacy blob into per-ticket keys. Idempotent via the
+// marker; the blob itself is never deleted, so nothing is unrecoverable.
+async function ensureTicketsMigrated(env) {
+  if (await env.PO_STORE.get(TK_MIGRATED)) return;
+  const raw = await env.PO_STORE.get(TK_LEGACY);
+  let list = [];
+  if (raw) { try { list = JSON.parse(raw); } catch (e) { list = []; } }
+  if (!Array.isArray(list)) list = [];
+  const now = Date.now();
+  for (const t of list) {
+    const uid = ticketUid(t);
+    if (!uid) continue;
+    if (!t.uid) t.uid = uid;
+    if (!t._srv) t._srv = now;
+    if (!t._rev) t._rev = 1;
+    await env.PO_STORE.put(TK + uid, JSON.stringify(t));
+  }
+  await env.PO_STORE.put(TK_MIGRATED, JSON.stringify({ at: now, count: list.length }));
+}
+
+async function loadAllTickets(env) {
+  const out = [];
+  let cursor;
+  do {
+    const page = await env.PO_STORE.list({ prefix: TK, cursor });
+    for (const k of page.keys) {
+      const raw = await env.PO_STORE.get(k.name);
+      if (!raw) continue;
+      try { out.push(JSON.parse(raw)); } catch (e) { /* skip a corrupt key rather than fail the whole read */ }
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return out;
+}
+
+// Upsert each incoming ticket. Returns which were saved and which were skipped
+// because the stored copy is newer than the one the client was holding.
+async function upsertTickets(env, incoming) {
+  const saved = [], skipped = [], renamed = [];
+  const now = Date.now();
+  for (const t of incoming) {
+    if (!t || typeof t !== 'object') continue;
+    let uid = ticketUid(t);
+    if (!uid) continue;
+    const storedRaw = await env.PO_STORE.get(TK + uid);
+    let stored = null;
+    if (storedRaw) { try { stored = JSON.parse(storedRaw); } catch (e) { stored = null; } }
+    if (stored) {
+      // _rev is the revision the client READ. If the stored revision has moved
+      // on, someone wrote in between and this copy is stale: not applied, and
+      // the client is told so it can reload. A revision counter, not a time
+      // stamp -- two writes in the same millisecond would tie on time.
+      if (t._rev != null && stored._rev != null && Number(stored._rev) !== Number(t._rev)) {
+        skipped.push(uid);
+        continue;
+      }
+      if (t._rev == null && (stored.createdAt !== t.createdAt || stored.createdBy !== t.createdBy)) {
+        // A ticket claiming to be brand-new (never stamped) landing on a key
+        // that already holds a DIFFERENT ticket: two old-code tabs picked the
+        // same RX number. Keep both -- give this one its own key.
+        const fresh = freshUid();
+        renamed.push({ from: uid, to: fresh });
+        uid = fresh;
+        t.uid = fresh;
+      }
+    }
+    if (!t.uid) t.uid = uid;
+    t._srv = now;
+    t._rev = (stored && Number(stored._rev) || 0) + 1;
+    await env.PO_STORE.put(TK + uid, JSON.stringify(t));
+    saved.push(uid);
+  }
+  return { saved, skipped, renamed };
+}
 
 // Writes JSON text to a path in the GitHub repo via the Contents API. Requires
 // a fine-scoped PAT (Contents: read/write on this repo only) stored as the
