@@ -580,6 +580,20 @@ var CLOUD_API='https://sahibas-po-api.junaidsarwar82.workers.dev';
 // refresh doesn't force re-login. Attached to every Worker request.
 var AUTH_TOKEN='';try{AUTH_TOKEN=localStorage.getItem('sbm_tok')||'';}catch(e){}
 function authHeaders(extra){var h=extra?Object.assign({},extra):{};if(AUTH_TOKEN)h['Authorization']='Bearer '+AUTH_TOKEN;return h;}
+// Which ticket store is the Worker running? The per-ticket store ("v2")
+// announces itself with an X-Tickets-Store header -- but a browser only lets
+// page JS read a cross-origin header the server explicitly exposes, and the
+// first v2 deploy didn't expose it, so the header alone silently read as null
+// in production and every tab fell back to the old whole-array path (where
+// deletes can't work). So recognise the store by its data as well: only the
+// v2 Worker stamps a numeric _rev on tickets, and only it answers a POST with
+// a `saved` array.
+function rxDetectStore(r,list,j){
+  try{if(r&&r.headers&&r.headers.get('X-Tickets-Store')==='v2'){window._rxStoreV2=true;return true;}}catch(e){}
+  if(Array.isArray(list)&&list.some(function(t){return t&&typeof t._rev==='number';})){window._rxStoreV2=true;return true;}
+  if(j&&Array.isArray(j.saved)){window._rxStoreV2=true;return true;}
+  return !!window._rxStoreV2;
+}
 function apiGet(path){return fetch(CLOUD_API+path,{headers:authHeaders()});}
 // If the token ever expires or is rejected mid-session, drop it and bounce to login.
 function handleAuthFail(res){if(res&&res.status===401){try{localStorage.removeItem('sbm_tok');}catch(e){}AUTH_TOKEN='';if(CU){CU=null;var ls=document.getElementById('lscreen');if(ls){document.getElementById('dash').style.display='none';document.getElementById('uscreen').style.display='none';ls.style.display='flex';var er=document.getElementById('l-err');if(er)er.textContent='Session expired — please sign in again.';}}return true;}return false;}
@@ -673,8 +687,8 @@ async function initCloud(){
   // replaces everyone's tickets with whatever this tab happens to hold.
   (async function(){try{
     var rt=await apiGet('/tickets');
-    if(rt.headers.get('X-Tickets-Store')==='v2')window._rxStoreV2=true;
     var dataT=await rt.json();
+    rxDetectStore(rt,dataT);
     if(Array.isArray(dataT)){
       window.TICKETS=rxEnsureUids(dataT);window._rxLoadOK=true;
       var _unsaved=rxStashMerge(window.TICKETS);
@@ -6754,8 +6768,8 @@ async function rxSaveAll(touchedIds){
   var merged=false;
   try{
     var r=await apiGet('/tickets');
-    if(r.headers.get('X-Tickets-Store')==='v2')window._rxStoreV2=true;
     var serverTickets=await r.json();
+    rxDetectStore(r,serverTickets);
     if(Array.isArray(serverTickets)){
       rxEnsureUids(serverTickets);rxEnsureUids(window.TICKETS);
       // Keyed by uid, never by ticket number -- see the note above rxUid.
@@ -6876,7 +6890,7 @@ async function rxPostTickets(list){
     if(handleAuthFail(r))return {ok:false,error:'signed out'};
     var j=null;try{j=await r.json();}catch(e){}
     if(!r.ok)return {ok:false,error:(j&&j.error)||('HTTP '+r.status)};
-    if(r.headers.get('X-Tickets-Store')==='v2')window._rxStoreV2=true;
+    rxDetectStore(r,null,j);
     return Object.assign({ok:true},j||{});
   }catch(e){return {ok:false,error:'no connection'};}
 }
@@ -6930,8 +6944,8 @@ async function rxRefresh(){
   window._rxSyncing=true;
   try{
     var r=await apiGet('/tickets');
-    if(r.headers.get('X-Tickets-Store')==='v2')window._rxStoreV2=true;
     var server=await r.json();
+    rxDetectStore(r,server);
     if(Array.isArray(server)){
       rxEnsureUids(server);rxEnsureUids(window.TICKETS);
       var sig=function(){return (window.TICKETS||[]).map(function(t){return t.uid+':'+(t.status||'');}).join('|');};

@@ -111,6 +111,8 @@ export default {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      // Without this the browser hides X-Tickets-Store from the app's JS.
+      'Access-Control-Expose-Headers': 'X-Tickets-Store',
     };
 
     if (request.method === 'OPTIONS') {
@@ -479,7 +481,9 @@ export default {
 
       // Health check
       if (path === '/' || path === '/ping') {
-        return new Response(JSON.stringify({ status: 'ok', time: new Date().toISOString() }), {
+        // `store` lets anyone confirm which ticket store is live by opening
+        // /ping in a browser -- no login needed, no headers to inspect.
+        return new Response(JSON.stringify({ status: 'ok', store: 'v2', time: new Date().toISOString() }), {
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
       }

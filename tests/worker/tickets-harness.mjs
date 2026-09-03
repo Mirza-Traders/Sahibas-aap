@@ -83,7 +83,8 @@ function client(worker, kv, edge, token) {
   const env = { AUTH_SECRET: 'test-secret', PO_STORE: kv.edge(edge) };
   const H = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
   return {
-    async get() { kv.reset(); const r = await worker.fetch(new Request('https://w/tickets', { headers: H }), env); return { status: r.status, hdr: r.headers.get('X-Tickets-Store'), body: await r.json() }; },
+    async get() { kv.reset(); const r = await worker.fetch(new Request('https://w/tickets', { headers: H }), env); return { status: r.status, hdr: r.headers.get('X-Tickets-Store'), expose: r.headers.get('Access-Control-Expose-Headers'), body: await r.json() }; },
+    async ping() { const r = await worker.fetch(new Request('https://w/ping'), env); return await r.json(); },
     async post(list) { kv.reset(); const r = await worker.fetch(new Request('https://w/tickets', { method: 'POST', headers: H, body: JSON.stringify(list) }), env); return { status: r.status, body: await r.json().catch(() => null) }; },
     async del(uids) { kv.reset(); const r = await worker.fetch(new Request('https://w/tickets/delete', { method: 'POST', headers: H, body: JSON.stringify({ uids }) }), env); return { status: r.status, body: await r.json().catch(() => null) }; },
   };
@@ -141,6 +142,9 @@ async function main() {
     const g = await c.get();
     const keys = [...kv.global.keys()].filter(k => k.startsWith('tk:')).sort();
     console.log('  header: ' + g.hdr + ' · returned ' + g.body.length + ' · keys: ' + JSON.stringify(keys));
+    // A browser only lets page JS read a cross-origin header the server exposes.
+    const exposed = /X-Tickets-Store/i.test(g.expose || '');
+    console.log('  header readable by the browser (Access-Control-Expose-Headers): ' + exposed + ' · /ping store: ' + (await c.ping()).store);
     console.log('  legacy blob still present as backup: ' + kv.global.has('tickets') + ' · uids backfilled: ' + g.body.every(t => t.uid) + ' · _srv stamped: ' + g.body.every(t => t._srv));
     const before = kv.puts; await c.get();
     console.log('  second GET does not re-migrate (no new puts): ' + (kv.puts === before) + ' · _rev seeded: ' + g.body.every(t => t._rev === 1));
