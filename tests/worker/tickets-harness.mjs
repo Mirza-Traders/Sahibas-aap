@@ -57,10 +57,14 @@ class FakeKV {
       async delete(key) { kv.tick(); kv.global.delete(key); view.set(key, { val: null, seenAt: kv.now }); },
       async list({ prefix, cursor }) {
         kv.tick();
-        // list() is served from global here; the per-key get() still lags, which
-        // is the realistic shape: a new key may be listed before its value is
-        // fresh at this edge. Never a loss, only a delay.
+        // list() is eventually consistent like everything else: a key written
+        // seconds ago can be missing from this edge's view of the listing for
+        // STALE_MS. Modelled as a cached snapshot per edge, refreshed when stale.
+        const ck = '\u0000list:' + prefix;
+        const c = view.get(ck);
+        if (c && kv.now - c.seenAt < STALE_MS && !kv.listFresh) return { keys: c.val, list_complete: true, cursor: undefined };
         const keys = [...kv.global.keys()].filter(k => k.startsWith(prefix)).sort().map(name => ({ name }));
+        view.set(ck, { val: keys, seenAt: kv.now });
         return { keys, list_complete: true, cursor: undefined };
       },
     };
@@ -213,6 +217,23 @@ async function main() {
     await c.get();
     console.log('  steady-state GET (79 tickets): ops=' + kv.ops);
     console.log('  max ops seen in any single request: ' + kv.maxOps + '  (under 50: ' + (kv.maxOps < 50) + ')');
+  }
+
+  console.log('\n=== 8. Raise a ticket, press F5 within a minute ===');
+  {
+    const kv = new FakeKV();
+    kv.global.set('tickets', JSON.stringify([T('RX-079', 'RX-079', 'Old One')]));
+    const tok = await login(NEW, kv, 'lahore');
+    const me = client(NEW, kv, 'lahore', tok), other = client(NEW, kv, 'karachi', tok);
+    kv.now = 0;  await me.get(); await other.get();               // both edges now hold a listing snapshot WITHOUT the new key
+    kv.now = 5_000;  await me.post([T('RX-082', 'u-new', 'Just Raised')]);
+    kv.now = 10_000; const mine = (await me.get()).body.map(t => t.customer);
+    const theirs = (await other.get()).body.map(t => t.customer);
+    kv.now = 90_000; const later = (await other.get()).body.map(t => t.customer);
+    console.log('  creator refreshes 5s later  -> sees it: ' + mine.includes('Just Raised') + '  (index carried it past the stale listing)');
+    console.log('  colleague, other city, 5s   -> sees it: ' + theirs.includes('Just Raised') + '  (may lag up to a minute -- KV limit, not a loss)');
+    console.log('  colleague, 85s later        -> sees it: ' + later.includes('Just Raised'));
+    console.log('  index self-heals from listing: ' + JSON.parse(kv.global.get('tk_index')).includes('u-new'));
   }
 
   console.log('\n=== 6. Size ceiling ===');

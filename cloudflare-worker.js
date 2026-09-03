@@ -330,6 +330,7 @@ export default {
           await env.PO_STORE.delete(TK + uid);
           deleted++;
         }
+        await removeFromIndex(env, uids.filter(u => typeof u === 'string' && u));
         return new Response(JSON.stringify({ ok: true, deleted }), {
           headers: { ...cors, 'Content-Type': 'application/json', 'X-Tickets-Store': 'v2' },
         });
@@ -510,6 +511,7 @@ function freshUid() {
   return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+const TK_INDEX = 'tk_index';   // JSON array of uids -- see loadAllTickets for why list() alone is not enough
 const MIG_BATCH = 30;   // legacy tickets moved per request; keeps a request under the subrequest cap
 const PUT_CAP = 40;     // hard ceiling on writes per request, for the same reason
 
@@ -560,6 +562,7 @@ async function migrateStep(env) {
   const start = st.next || 0;
   const batch = legacy.slice(start, start + MIG_BATCH);
   const existing = await bulkGet(env, batch.map(ticketUid).filter(Boolean).map(u => TK + u));
+  const moved = [];
   for (const t of batch) {
     const uid = ticketUid(t); if (!uid) continue;
     if (existing.get(TK + uid)) continue;
@@ -567,27 +570,62 @@ async function migrateStep(env) {
     if (!t._srv) t._srv = now;
     if (!t._rev) t._rev = 1;
     await env.PO_STORE.put(TK + uid, JSON.stringify(t));
+    moved.push(uid);
   }
+  await addToIndex(env, moved);
   const next = start + batch.length, done = next >= legacy.length;
   await env.PO_STORE.put(TK_MIGRATED, JSON.stringify({ done, next, count: legacy.length, at: now }));
   return { pending: done ? [] : legacy.slice(next), legacyByUid };
 }
 
+// KV's list() is eventually consistent: a key written seconds ago can be absent
+// from the listing for up to a minute -- so a ticket someone just raised would
+// vanish on refresh and reappear later. Not a loss, but indistinguishable from
+// one to the person looking. So the store also keeps its own index of uids,
+// which a save updates in the same request; the writer's edge sees that write
+// at once. Reads take the UNION of index and listing: a uid missing from the
+// index (a lost race between two savers) is caught by the listing, and one
+// missing from the listing (lag) is caught by the index. Whenever the two
+// disagree the index is rewritten to the union, so it heals itself.
+async function readIndex(env) {
+  const raw = await env.PO_STORE.get(TK_INDEX);
+  if (!raw) return [];
+  try { const a = JSON.parse(raw); return Array.isArray(a) ? a.filter(u => typeof u === 'string') : []; } catch (e) { return []; }
+}
+async function addToIndex(env, uids) {
+  if (!uids.length) return;
+  const cur = await readIndex(env);
+  const set = new Set(cur);
+  let changed = false;
+  for (const u of uids) if (!set.has(u)) { set.add(u); changed = true; }
+  if (changed) await env.PO_STORE.put(TK_INDEX, JSON.stringify([...set]));
+}
+async function removeFromIndex(env, uids) {
+  const cur = await readIndex(env);
+  const drop = new Set(uids);
+  const next = cur.filter(u => !drop.has(u));
+  if (next.length !== cur.length) await env.PO_STORE.put(TK_INDEX, JSON.stringify(next));
+}
 async function loadAllTickets(env) {
-  const names = [];
+  const listed = [];
   let cursor;
   do {
     const page = await env.PO_STORE.list({ prefix: TK, cursor });
-    for (const k of page.keys) names.push(k.name);
+    for (const k of page.keys) listed.push(k.name.slice(TK.length));
     cursor = page.list_complete ? undefined : page.cursor;
   } while (cursor);
-  const got = await bulkGet(env, names);
-  const out = [];
-  for (const name of names) {
-    const raw = got.get(name);
-    if (!raw) continue;
-    try { out.push(JSON.parse(raw)); } catch (e) { /* skip a corrupt key rather than fail the whole read */ }
+  const indexed = await readIndex(env);
+  const uids = [...new Set(indexed.concat(listed))];
+  const got = await bulkGet(env, uids.map(u => TK + u));
+  const out = [], present = [];
+  for (const u of uids) {
+    const raw = got.get(TK + u);
+    if (!raw) continue;                       // indexed but deleted, or not yet visible at this edge
+    try { out.push(JSON.parse(raw)); present.push(u); } catch (e) { /* skip a corrupt key rather than fail the whole read */ }
   }
+  // Heal: anything the listing knows that the index does not.
+  const idxSet = new Set(indexed);
+  if (present.some(u => !idxSet.has(u))) await env.PO_STORE.put(TK_INDEX, JSON.stringify([...new Set(indexed.concat(present))]));
   return out;
 }
 
@@ -597,7 +635,7 @@ async function loadAllTickets(env) {
 // old-code tabs picked the same number, and which were deferred by the write
 // cap (the client keeps them queued and retries).
 async function upsertTickets(env, incoming, legacyByUid) {
-  const saved = [], skipped = [], renamed = [], deferred = [];
+  const saved = [], skipped = [], renamed = [], deferred = [], written = [];
   const now = Date.now();
   const items = incoming.filter(t => t && typeof t === 'object' && ticketUid(t));
   const storedMap = await bulkGet(env, items.map(t => TK + ticketUid(t)));
@@ -632,7 +670,9 @@ async function upsertTickets(env, incoming, legacyByUid) {
     await env.PO_STORE.put(TK + uid, JSON.stringify(t));
     puts++;
     saved.push(uid);
+    written.push(uid);
   }
+  await addToIndex(env, written);
   return { saved, skipped, renamed, deferred };
 }
 

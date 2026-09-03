@@ -675,7 +675,11 @@ async function initCloud(){
     var rt=await apiGet('/tickets');
     if(rt.headers.get('X-Tickets-Store')==='v2')window._rxStoreV2=true;
     var dataT=await rt.json();
-    if(Array.isArray(dataT)){window.TICKETS=rxEnsureUids(dataT);window._rxLoadOK=true;}
+    if(Array.isArray(dataT)){
+      window.TICKETS=rxEnsureUids(dataT);window._rxLoadOK=true;
+      var _unsaved=rxStashMerge(window.TICKETS);
+      if(_unsaved.length){window._rxPendingSave=Array.from(new Set((window._rxPendingSave||[]).concat(_unsaved)));setTimeout(function(){rxShowUnsaved();rxScheduleRetry();},1500);}
+    }
     else window.TICKETS=window.TICKETS||[];
   }catch(e){window.TICKETS=window.TICKETS||[];}})(),
 
@@ -6800,6 +6804,7 @@ async function rxSaveAll(touchedIds){
     // one tab until that tab closed. Now the uids stay queued, a banner says so,
     // and the retry loop keeps going until the server has them.
     window._rxPendingSave=Array.from(new Set((window._rxPendingSave||[]).concat(touchedList.map(function(t){return t.uid;}))));
+    rxStashPut(touchedList,false);
     rxShowUnsaved();rxScheduleRetry();
     showToast('⚠ Save failed — '+(res.error||'server error')+'. Will keep retrying.');
     return false;
@@ -6808,6 +6813,8 @@ async function rxSaveAll(touchedIds){
   // tab last read it -- pull the newer copy rather than pretend ours landed.
   var savedSet={};(res.saved||[]).forEach(function(u){savedSet[u]=true;});
   window._rxPendingSave=(window._rxPendingSave||[]).filter(function(u){return !savedSet[u];});
+  rxStashPut(touchedList.filter(function(t){return savedSet[t.uid];}),true);
+  rxStashPut(touchedList.filter(function(t){return !savedSet[t.uid];}),false);
   // The Worker caps writes per request; anything past the cap comes back as
   // deferred and is simply queued for the next save -- never dropped.
   if(res.deferred&&res.deferred.length){
@@ -6824,6 +6831,43 @@ async function rxSaveAll(touchedIds){
   }
   rxShowUnsaved();
   return true;
+}
+// ── LOCAL STASH: what THIS browser touched recently ──
+// The server's listing can lag a fresh write by up to a minute (KV is
+// eventually consistent), so a ticket raised and then F5'd could vanish from
+// view and come back later. Worse, anything still unsaved when the tab reloaded
+// was simply gone. So every ticket this tab saves -- or fails to save -- is
+// also kept in localStorage for a while. On load, anything the server did not
+// return is put back into the list, and anything never confirmed saved goes
+// straight back into the retry queue. Pruned as soon as the server has it.
+var RX_STASH_KEY='sbm_rx_stash',RX_STASH_TTL=6*60*60*1000;
+function rxStashRead(){try{var a=JSON.parse(localStorage.getItem(RX_STASH_KEY)||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}}
+function rxStashWrite(a){try{localStorage.setItem(RX_STASH_KEY,JSON.stringify(a));}catch(e){}}
+function rxStashPut(tickets,saved){
+  var now=Date.now(),cur=rxStashRead().filter(function(e){return e&&e.t&&now-(e.at||0)<RX_STASH_TTL;});
+  var by={};cur.forEach(function(e){by[e.t.uid]=e;});
+  (tickets||[]).forEach(function(t){if(t&&t.uid)by[t.uid]={t:t,at:now,saved:!!saved};});
+  var out=Object.keys(by).map(function(k){return by[k];}).sort(function(a,b){return b.at-a.at;}).slice(0,40);
+  rxStashWrite(out);
+}
+function rxStashDrop(uids){
+  var d={};(uids||[]).forEach(function(u){d[u]=true;});
+  rxStashWrite(rxStashRead().filter(function(e){return e&&e.t&&!d[e.t.uid];}));
+}
+// Fold stashed tickets into a freshly loaded list. Returns uids that were never
+// confirmed saved, so the caller can queue them.
+function rxStashMerge(list){
+  var now=Date.now(),have={},unsaved=[];
+  (list||[]).forEach(function(t){if(t&&t.uid)have[t.uid]=true;});
+  var keep=[];
+  rxStashRead().forEach(function(e){
+    if(!e||!e.t||!e.t.uid||now-(e.at||0)>=RX_STASH_TTL)return;
+    if(have[e.t.uid]){return;}                  // server has it: stash entry is done
+    list.push(e.t);keep.push(e);
+    if(!e.saved)unsaved.push(e.t.uid);
+  });
+  rxStashWrite(keep);
+  return unsaved;
 }
 // POST tickets and report the outcome honestly. Never throws; never swallows.
 async function rxPostTickets(list){
@@ -6900,6 +6944,8 @@ async function rxRefresh(){
       // knocks this tab's unsaved one out of the list.
       var localOnly=(window.TICKETS||[]).filter(function(t){return !serverUids[t.uid]&&!window._rxDeletedIds[t.uid];});
       window.TICKETS=server.filter(function(t){return !window._rxDeletedIds[t.uid];}).concat(localOnly);
+      var _unsaved2=rxStashMerge(window.TICKETS);
+      if(_unsaved2.length){window._rxPendingSave=Array.from(new Set((window._rxPendingSave||[]).concat(_unsaved2)));rxShowUnsaved();rxScheduleRetry();}
       rxDedupeIds();
       rxSortTickets();
       window._rxLoadOK=true;
@@ -7627,6 +7673,7 @@ function rxDelete(id){
   // Tombstone the uid: ticket numbers get reused, uids never do, so this can no
   // longer suppress a different ticket that happens to share the number.
   window._rxDeletedIds[(doomed&&doomed.uid)||id]=true;
+  if(doomed&&doomed.uid)rxStashDrop([doomed.uid]);
   if(window._rxStoreV2&&doomed&&doomed.uid){
     fetch(CLOUD_API+'/tickets/delete',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({uids:[doomed.uid]})})
       .then(function(r){handleAuthFail(r);if(!r.ok)showToast('⚠ Delete did not reach the server — it will come back on refresh.');})
