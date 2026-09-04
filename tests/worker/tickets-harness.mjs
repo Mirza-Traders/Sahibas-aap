@@ -165,6 +165,25 @@ async function main() {
     const protectedOK = rb.body.skipped.length === 1 && fin.status === 'paid';
     console.log('  ' + label.padEnd(46) + ' -> B skipped=' + JSON.stringify(rb.body.skipped) + ' · final: ' + fin.status + (protectedOK ? '  ✓ protected' : '  ✗ B overwrote (KV cache served the Worker a stale _rev)'));
   }
+  {
+    // The SAME user edits twice in a row, and the second save is routed to an
+    // edge whose cache still holds the older revision. The client is ahead of
+    // that edge, not stale: it must not be rejected as a conflict.
+    const kv = new FakeKV();
+    kv.global.set('tickets', JSON.stringify([T('RX-011', 'u11', 'Rao', { status: 'initiated' })]));
+    const tok = await login(NEW, kv, 'e1');
+    const a1 = client(NEW, kv, 'e1', tok), a2 = client(NEW, kv, 'e2', tok);
+    kv.now = 0;
+    const copy = (await a1.get()).body[0];
+    await a2.get();                                                   // e2 now caches the rev-1 copy
+    kv.now = 1000; copy.status = 'received'; const r1 = await a1.post([copy]);
+    copy._rev = r1.body.revs && r1.body.revs.u11;                     // client carries the stamped revision
+    kv.now = 5000; copy.status = 'approved'; const r2 = await a2.post([copy]);
+    kv.now = 500_000;
+    const fin = (await client(NEW, kv, 'e9', tok).get()).body[0];
+    const ok = r2.body.skipped.length === 0 && fin.status === 'approved';
+    console.log('  same user, next edit lands on a stale edge     -> revs=' + JSON.stringify(r1.body.revs) + ' · skipped=' + JSON.stringify(r2.body.skipped) + ' · final: ' + fin.status + (ok ? '  ✓ not a false conflict' : '  ✗ own edit rejected'));
+  }
 
   console.log('\n=== 4. An old-code tab saving the whole array cannot delete ===');
   {

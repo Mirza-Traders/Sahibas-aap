@@ -639,7 +639,7 @@ async function loadAllTickets(env) {
 // old-code tabs picked the same number, and which were deferred by the write
 // cap (the client keeps them queued and retries).
 async function upsertTickets(env, incoming, legacyByUid) {
-  const saved = [], skipped = [], renamed = [], deferred = [], written = [];
+  const saved = [], skipped = [], renamed = [], deferred = [], written = [], revs = {};
   const now = Date.now();
   const items = incoming.filter(t => t && typeof t === 'object' && ticketUid(t));
   const storedMap = await bulkGet(env, items.map(t => TK + ticketUid(t)));
@@ -651,11 +651,16 @@ async function upsertTickets(env, incoming, legacyByUid) {
     if (storedRaw) { try { stored = JSON.parse(storedRaw); } catch (e) { stored = null; } }
     if (stored) {
       // _rev is the revision the client READ. If the stored revision has moved
-      // on, someone wrote in between and this copy is stale: not applied, and
-      // the client is told so it can reload. A revision counter, not a time
-      // stamp -- two writes in the same millisecond would tie on time.
-      if (t._rev != null && stored._rev != null && Number(stored._rev) !== Number(t._rev)) { skipped.push(uid); continue; }
-      if (ticketSig(stored) === ticketSig(t)) { saved.push(uid); continue; }   // unchanged echo: nothing to write
+      // PAST it, someone wrote in between and this copy is stale: not applied,
+      // and the client is told so it can reload. A revision counter, not a
+      // time stamp -- two writes in the same millisecond would tie on time.
+      // Only "stored is newer" counts as a conflict. A client AHEAD of what
+      // this edge holds is not stale -- this edge's cache is (KV serves reads
+      // from a per-location cache for up to a minute). Revisions only ever
+      // come from this Worker, so the client cannot have invented one.
+      const sr = Number(stored._rev) || 0, cr = Number(t._rev) || 0;
+      if (t._rev != null && stored._rev != null && sr > cr) { skipped.push(uid); continue; }
+      if (ticketSig(stored) === ticketSig(t)) { saved.push(uid); revs[uid] = Math.max(sr, cr); continue; }   // unchanged echo: nothing to write
       if (t._rev == null && (stored.createdAt !== t.createdAt || stored.createdBy !== t.createdBy)) {
         // A ticket claiming to be brand-new landing on a key that already holds
         // a DIFFERENT ticket: two old-code tabs picked the same RX number. Keep
@@ -670,14 +675,15 @@ async function upsertTickets(env, incoming, legacyByUid) {
     if (puts >= PUT_CAP) { deferred.push(uid); continue; }
     if (!t.uid) t.uid = uid;
     t._srv = now;
-    t._rev = (stored && Number(stored._rev) || 0) + 1;
+    t._rev = Math.max(stored && Number(stored._rev) || 0, Number(t._rev) || 0) + 1;
     await env.PO_STORE.put(TK + uid, JSON.stringify(t));
     puts++;
     saved.push(uid);
+    revs[uid] = t._rev;   // so the client can carry the right revision into its next edit
     written.push(uid);
   }
   await addToIndex(env, written);
-  return { saved, skipped, renamed, deferred };
+  return { saved, skipped, renamed, deferred, revs };
 }
 
 // Writes JSON text to a path in the GitHub repo via the Contents API. Requires

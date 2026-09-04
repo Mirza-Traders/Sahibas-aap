@@ -6765,6 +6765,16 @@ async function rxSaveAll(touchedIds){
   // count as touched here too -- otherwise this save would take the server's
   // older copy of those tickets and quietly discard the work.
   (window._rxPendingSave||[]).forEach(function(id){touched[id]=true;});
+  // Stash and queue BEFORE the network round trip, not after. A reload while
+  // the GET+POST is still in flight aborts it; until now nothing had been
+  // stashed yet and the pending list was empty, so the browser didn't even
+  // warn -- the ticket was simply gone. That is the "raised it, pressed F5,
+  // vanished" report. Now it survives the reload and is retried from the stash.
+  var inflight=(window.TICKETS||[]).filter(function(t){return t&&t.uid&&(touched[t.uid]||touched[t.id]);});
+  if(inflight.length){
+    rxStashPut(inflight,false);
+    window._rxPendingSave=Array.from(new Set((window._rxPendingSave||[]).concat(inflight.map(function(t){return t.uid;}))));
+  }
   var merged=false;
   try{
     var r=await apiGet('/tickets');
@@ -6797,8 +6807,8 @@ async function rxSaveAll(touchedIds){
   // tickets. Refuse to write instead, and say so out loud. The ticket stays on
   // screen, so nothing typed is lost and the next save retries.
   if(!merged){
-    window._rxPendingSave=(window._rxPendingSave||[]).concat(
-      (window.TICKETS||[]).filter(function(t){return touched[t.uid]||touched[t.id];}).map(function(t){return t.uid;}));
+    window._rxPendingSave=Array.from(new Set((window._rxPendingSave||[]).concat(
+      (window.TICKETS||[]).filter(function(t){return touched[t.uid]||touched[t.id];}).map(function(t){return t.uid;}))));
     showToast('⚠ Could not reach the server — nothing was saved. Check your connection, then try again.');
     return false;
   }
@@ -6829,6 +6839,12 @@ async function rxSaveAll(touchedIds){
   window._rxPendingSave=(window._rxPendingSave||[]).filter(function(u){return !savedSet[u];});
   rxStashPut(touchedList.filter(function(t){return savedSet[t.uid];}),true);
   rxStashPut(touchedList.filter(function(t){return !savedSet[t.uid];}),false);
+  // Take the revision the Worker just stamped. Without this the local copy kept
+  // the revision it was READ at, so the very next edit of the same ticket in
+  // this tab was rejected as "changed by someone else" and reverted. A Worker
+  // that doesn't report revisions gets null, which it treats as "no claim".
+  var revs=(res.revs&&typeof res.revs==='object')?res.revs:{};
+  touchedList.forEach(function(t){if(savedSet[t.uid])t._rev=(typeof revs[t.uid]==='number')?revs[t.uid]:null;});
   // The Worker caps writes per request; anything past the cap comes back as
   // deferred and is simply queued for the next save -- never dropped.
   if(res.deferred&&res.deferred.length){
@@ -6839,6 +6855,12 @@ async function rxSaveAll(touchedIds){
     res.renamed.forEach(function(r){var t=(window.TICKETS||[]).find(function(x){return x.uid===r.from;});if(t)t.uid=r.to;});
   }
   if(res.skipped&&res.skipped.length){
+    // The server's copy wins: this edit is dropped, not retried. Leaving it
+    // queued would keep the stale copy on screen (the refresh below trusts
+    // queued tickets) and resend it forever.
+    var skipSet={};res.skipped.forEach(function(u){skipSet[u]=true;});
+    window._rxPendingSave=(window._rxPendingSave||[]).filter(function(u){return !skipSet[u];});
+    rxStashDrop(res.skipped);
     var names=res.skipped.map(function(u){var t=(window.TICKETS||[]).find(function(x){return x.uid===u;});return t?t.id:u;});
     showToast('⚠ '+names.join(', ')+' was changed by someone else first — reloading their version.');
     window._rxSyncing=false;rxRefresh();
@@ -6855,8 +6877,22 @@ async function rxSaveAll(touchedIds){
 // return is put back into the list, and anything never confirmed saved goes
 // straight back into the retry queue. Pruned as soon as the server has it.
 var RX_STASH_KEY='sbm_rx_stash',RX_STASH_TTL=6*60*60*1000;
+// A SAVED entry is kept for a while even after the server has echoed it once:
+// the next read may come from a different edge whose listing still lags, and
+// the ticket would blink out of view until it caught up. Ten minutes covers
+// that window many times over.
+var RX_STASH_SEEN_TTL=10*60*1000;
 function rxStashRead(){try{var a=JSON.parse(localStorage.getItem(RX_STASH_KEY)||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}}
-function rxStashWrite(a){try{localStorage.setItem(RX_STASH_KEY,JSON.stringify(a));}catch(e){}}
+// localStorage is ~5 MB and tickets carry photos. If the whole stash won't
+// fit, keep the newest entries that do (the list is newest-first) -- never
+// silently keep nothing.
+function rxStashWrite(a){
+  var list=(a||[]).slice();
+  while(list.length){
+    try{localStorage.setItem(RX_STASH_KEY,JSON.stringify(list));return;}catch(e){list.pop();}
+  }
+  try{localStorage.removeItem(RX_STASH_KEY);}catch(e){}
+}
 function rxStashPut(tickets,saved){
   var now=Date.now(),cur=rxStashRead().filter(function(e){return e&&e.t&&now-(e.at||0)<RX_STASH_TTL;});
   var by={};cur.forEach(function(e){by[e.t.uid]=e;});
@@ -6876,7 +6912,10 @@ function rxStashMerge(list){
   var keep=[];
   rxStashRead().forEach(function(e){
     if(!e||!e.t||!e.t.uid||now-(e.at||0)>=RX_STASH_TTL)return;
-    if(have[e.t.uid]){return;}                  // server has it: stash entry is done
+    if(have[e.t.uid]){                          // server has it: nothing to put back...
+      if(e.saved&&now-(e.at||0)<RX_STASH_SEEN_TTL)keep.push(e);   // ...but keep a saved entry a little longer
+      return;
+    }
     list.push(e.t);keep.push(e);
     if(!e.saved)unsaved.push(e.t.uid);
   });
@@ -6957,7 +6996,14 @@ async function rxRefresh(){
       // means a ticket someone else raised under the same number no longer
       // knocks this tab's unsaved one out of the list.
       var localOnly=(window.TICKETS||[]).filter(function(t){return !serverUids[t.uid]&&!window._rxDeletedIds[t.uid];});
-      window.TICKETS=server.filter(function(t){return !window._rxDeletedIds[t.uid];}).concat(localOnly);
+      // A ticket whose save is still in flight (or failed and is queued) keeps
+      // THIS tab's copy: the server's is older by definition. Otherwise the
+      // refresh that every redraw triggers could race the save and put the
+      // pre-edit copy back on screen for a moment.
+      var pend={};(window._rxPendingSave||[]).forEach(function(u){pend[u]=true;});
+      var localByUid={};(window.TICKETS||[]).forEach(function(t){if(t&&t.uid)localByUid[t.uid]=t;});
+      window.TICKETS=server.filter(function(t){return !window._rxDeletedIds[t.uid];})
+        .map(function(st){return (pend[st.uid]&&localByUid[st.uid])?localByUid[st.uid]:st;}).concat(localOnly);
       var _unsaved2=rxStashMerge(window.TICKETS);
       if(_unsaved2.length){window._rxPendingSave=Array.from(new Set((window._rxPendingSave||[]).concat(_unsaved2)));rxShowUnsaved();rxScheduleRetry();}
       rxDedupeIds();
