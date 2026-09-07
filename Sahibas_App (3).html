@@ -373,6 +373,7 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
       <div class="sb-item" data-id="fs" onclick="doST('fs')"><span class="sb-ico">⚡</span>Flash Sale Planner</div>
       <div class="sb-item" data-id="ml" onclick="doST('ml')"><span class="sb-ico">📋</span>Manage Lists</div>
     </div>
+    <div id="sb-build" title="App build. If yours is older than the one announced, press Ctrl+Shift+R." style="padding:12px 14px 8px;font-size:9px;color:#8a8a8a;letter-spacing:.3px"></div>
   </nav>
   <div id="main-area">
     <div class="fbar">
@@ -578,6 +579,10 @@ var USERS=[
 var CLOUD_API='https://sahibas-po-api.junaidsarwar82.workers.dev';
 // Session token issued by the Worker at login. Kept in localStorage so a
 // refresh doesn't force re-login. Attached to every Worker request.
+// Bump on every deploy. Shown at the foot of the sidebar so anyone can tell
+// at a glance whether their tab is running the current build or a cached one.
+var APP_BUILD='2026-09-07a';window.APP_BUILD=APP_BUILD;
+try{document.getElementById('sb-build').textContent='build '+APP_BUILD;}catch(e){}
 var AUTH_TOKEN='';try{AUTH_TOKEN=localStorage.getItem('sbm_tok')||'';}catch(e){}
 function authHeaders(extra){var h=extra?Object.assign({},extra):{};if(AUTH_TOKEN)h['Authorization']='Bearer '+AUTH_TOKEN;return h;}
 // Which ticket store is the Worker running? The per-ticket store ("v2")
@@ -6844,7 +6849,11 @@ async function rxSaveAll(touchedIds){
   // this tab was rejected as "changed by someone else" and reverted. A Worker
   // that doesn't report revisions gets null, which it treats as "no claim".
   var revs=(res.revs&&typeof res.revs==='object')?res.revs:{};
-  touchedList.forEach(function(t){if(savedSet[t.uid])t._rev=(typeof revs[t.uid]==='number')?revs[t.uid]:null;});
+  touchedList.forEach(function(t){
+    if(!savedSet[t.uid])return;
+    t._rev=(typeof revs[t.uid]==='number')?revs[t.uid]:null;
+    if(typeof res.srv==='number')t._srv=res.srv;   // the write stamp too, for the same reason
+  });
   // The Worker caps writes per request; anything past the cap comes back as
   // deferred and is simply queued for the next save -- never dropped.
   if(res.deferred&&res.deferred.length){
@@ -6959,6 +6968,18 @@ async function rxRetryNow(){
 // them, so the browser asks first.
 if(!window._rxUnloadBound){
   window._rxUnloadBound=true;
+  // Re-read the cloud every minute while the tickets panel is open and the
+  // tab is visible. Until now the list was only re-read when the panel was
+  // OPENED, so a tab left sitting on it all day held copies that only got
+  // older -- and a ticket the tab itself had raised carried no revision claim,
+  // so an edit made from that stale copy silently put the whole ticket back
+  // to how this tab last saw it, undoing everyone else's steps.
+  setInterval(function(){
+    try{
+      var panel=document.getElementById('prx');
+      if(panel&&panel.classList.contains('on')&&document.visibilityState==='visible'&&typeof rxRefresh==='function')rxRefresh();
+    }catch(e){}
+  },60000);
   window.addEventListener('beforeunload',function(e){
     if((window._rxPendingSave||[]).length){e.preventDefault();e.returnValue='Tickets are still being saved.';return e.returnValue;}
   });

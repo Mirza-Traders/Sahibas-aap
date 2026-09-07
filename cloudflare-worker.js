@@ -107,6 +107,9 @@ export default {
   },
   async fetch(request, env) {
     const url = new URL(request.url);
+    // Bump on every deploy; /ping reports it so "which Worker is live?" is a
+    // one-line check in any browser.
+    const WORKER_BUILD = '2026-09-07a';
     const cors = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -483,7 +486,7 @@ export default {
       if (path === '/' || path === '/ping') {
         // `store` lets anyone confirm which ticket store is live by opening
         // /ping in a browser -- no login needed, no headers to inspect.
-        return new Response(JSON.stringify({ status: 'ok', store: 'v2', time: new Date().toISOString() }), {
+        return new Response(JSON.stringify({ status: 'ok', store: 'v2', build: WORKER_BUILD, time: new Date().toISOString() }), {
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
       }
@@ -660,6 +663,14 @@ async function upsertTickets(env, incoming, legacyByUid) {
       // come from this Worker, so the client cannot have invented one.
       const sr = Number(stored._rev) || 0, cr = Number(t._rev) || 0;
       if (t._rev != null && stored._rev != null && sr > cr) { skipped.push(uid); continue; }
+      // A copy with NO revision claim (an older app build, or a ticket the tab
+      // raised itself and never learned the revision of) still carries the
+      // _srv write stamp of the copy it read. If the stored copy was written
+      // after that, someone else moved the ticket on in between -- this copy
+      // must not put it back. This is the "ticket went back to its previous
+      // status by itself" report: a tab parked on the panel all day saving a
+      // note onto its own stale copy.
+      if (t._rev == null && t._srv != null && stored._srv != null && Number(stored._srv) > Number(t._srv)) { skipped.push(uid); continue; }
       if (ticketSig(stored) === ticketSig(t)) { saved.push(uid); revs[uid] = Math.max(sr, cr); continue; }   // unchanged echo: nothing to write
       if (t._rev == null && (stored.createdAt !== t.createdAt || stored.createdBy !== t.createdBy)) {
         // A ticket claiming to be brand-new landing on a key that already holds
@@ -683,7 +694,7 @@ async function upsertTickets(env, incoming, legacyByUid) {
     written.push(uid);
   }
   await addToIndex(env, written);
-  return { saved, skipped, renamed, deferred, revs };
+  return { saved, skipped, renamed, deferred, revs, srv: now };
 }
 
 // Writes JSON text to a path in the GitHub repo via the Contents API. Requires

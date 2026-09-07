@@ -184,6 +184,31 @@ async function main() {
     const ok = r2.body.skipped.length === 0 && fin.status === 'approved';
     console.log('  same user, next edit lands on a stale edge     -> revs=' + JSON.stringify(r1.body.revs) + ' · skipped=' + JSON.stringify(r2.body.skipped) + ' · final: ' + fin.status + (ok ? '  ✓ not a false conflict' : '  ✗ own edit rejected'));
   }
+  {
+    // The raiser's tab: parked on the panel all day, holding its own ticket
+    // with NO revision claim (older build, or saved before it learned the
+    // revision). Meanwhile the warehouse moved the ticket on. The raiser adds a
+    // note from the stale copy -- that must not put the status back.
+    const kv = new FakeKV();
+    kv.global.set('tickets', JSON.stringify([T('RX-012', 'u12', 'Sana Raised', { status: 'initiated' })]));
+    const tok = await login(NEW, kv, 'e1');
+    const raiser = client(NEW, kv, 'e1', tok), warehouse = client(NEW, kv, 'e1', tok);
+    kv.now = 0;
+    const stale = (await raiser.get()).body[0]; delete stale._rev;          // no claim, but _srv stays as read
+    const fresh = (await warehouse.get()).body[0];
+    kv.now = 60_000; fresh.status = 'received'; await warehouse.post([fresh]);
+    kv.now = 120_000; stale.notes = 'customer called'; const rs = await raiser.post([stale]);
+    kv.now = 500_000;
+    const fin = (await client(NEW, kv, 'e9', tok).get()).body[0];
+    const ok = rs.body.skipped.length === 1 && fin.status === 'received';
+    console.log('  raiser\'s stale copy, no revision claim         -> skipped=' + JSON.stringify(rs.body.skipped) + ' · final: ' + fin.status + (ok ? '  ✓ could not put it back' : '  ✗ status went back'));
+    // Same, but the copy carries neither _rev nor _srv: a ticket an OLD build
+    // raised and never re-read. Nothing to compare against -- documented limit,
+    // closed only by that tab reloading once (the periodic refresh does that).
+    const bare = Object.assign({}, fin); delete bare._rev; delete bare._srv; bare.status = 'initiated';
+    kv.now = 600_000; const rb = await raiser.post([bare]);
+    console.log('  (limit) copy with no _rev and no _srv at all    -> skipped=' + JSON.stringify(rb.body.skipped) + ' -- only an old build can send this; a reload fixes it');
+  }
 
   console.log('\n=== 4. An old-code tab saving the whole array cannot delete ===');
   {
