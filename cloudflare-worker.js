@@ -5,6 +5,8 @@ const ORDERS_PATH = 'data/orders.json';
 const CUSTOMERS_PATH = 'data/customers.json';
 const FABRICS_PATH = 'data/fabrics.json';
 const BRIEF_PATH = 'data/daily-brief.json';
+const ADS_PATH = 'data/ads-summary.json';
+const ADS_HISTORY_DAYS = 60; // ~2 months of Day-wise / Campaign x Day history
 const SALES_SNAPSHOT_PATH = 'data/sales-snapshot.json';
 const SHOPIFY_SNAPSHOT_PATH = 'data/shopify-snapshot.json';
 const COSTS_BRANCH = 'main';
@@ -189,7 +191,14 @@ export default {
       // data) and the sync links are triggered by pasting a URL in a browser,
       // where an Authorization header can't be added.
       const OPEN = (path === '/' || path === '/ping' || path === '/sync-now' || path === '/sync-shopify-now');
-      if (!OPEN) {
+      // The Ads Daily Summary Routine has no browser to log in from, so its
+      // POST authenticates with a separate secret instead of a user token --
+      // same idea as GITHUB_TOKEN: configured only on the Worker, never seen
+      // by the app or committed to the repo. A real user token still works
+      // too, so testing this by hand from a logged-in tab needs nothing extra.
+      const isAutomatedAdsPost = path === '/ads-summary' && request.method === 'POST'
+        && env.AUTOMATION_KEY && request.headers.get('X-Automation-Key') === env.AUTOMATION_KEY;
+      if (!OPEN && !isAutomatedAdsPost) {
         const auth = await verifyToken(env.AUTH_SECRET, (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
         if (!auth) {
           return new Response(JSON.stringify({ error: 'Not authenticated' }), {
@@ -435,6 +444,52 @@ export default {
           });
         }
         return new Response(JSON.stringify({ ok: true, githubMirror: 'ok' }), {
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // GET /ads-summary — the rolling window of daily ad/website summaries
+      // the app's Ads panel reads. Oldest first, so Day-wise ROAS and
+      // Campaign x Day can render straight off the array.
+      if (path === '/ads-summary' && request.method === 'GET') {
+        const v = await env.PO_STORE.get('ads_history');
+        return new Response(v || '[]', { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+
+      // POST /ads-summary — one day's worth of ad + website numbers from the
+      // Ads Daily Summary Routine. Upserted by date (a re-run for a day that
+      // already landed replaces it rather than duplicating), capped to
+      // ADS_HISTORY_DAYS so the value can't grow without bound.
+      if (path === '/ads-summary' && request.method === 'POST') {
+        const body = await request.text();
+        let incoming;
+        try { incoming = JSON.parse(body); } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: 'Invalid JSON' }), {
+            status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
+          });
+        }
+        if (!incoming || typeof incoming.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(incoming.date)) {
+          return new Response(JSON.stringify({ ok: false, error: 'Payload needs a "date" field (YYYY-MM-DD)' }), {
+            status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
+          });
+        }
+        const existingRaw = await env.PO_STORE.get('ads_history');
+        let history = [];
+        try { history = JSON.parse(existingRaw || '[]'); if (!Array.isArray(history)) history = []; } catch (e) { history = []; }
+        history = history.filter(d => d && d.date !== incoming.date);
+        history.push(incoming);
+        history.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+        if (history.length > ADS_HISTORY_DAYS) history = history.slice(history.length - ADS_HISTORY_DAYS);
+        const out = JSON.stringify(history);
+        await env.PO_STORE.put('ads_history', out);
+        try {
+          await mirrorJsonToGitHub(env, ADS_PATH, out, 'Auto-sync ads summary from Routine');
+        } catch (mirrorErr) {
+          return new Response(JSON.stringify({ ok: true, days: history.length, githubMirror: 'failed', detail: mirrorErr.message }), {
+            headers: { ...cors, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true, days: history.length, githubMirror: 'ok' }), {
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
       }

@@ -158,6 +158,66 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
 .tc2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:700px){.tc2{grid-template-columns:1fr}}
 .spin{text-align:center;padding:28px;color:#ccc;font-family:monospace;font-size:11px}
+
+/* Ads panel */
+.reality{background:#fdf8ee;border:1px solid #ecdfc0;border-radius:8px;padding:10px 15px;display:flex;gap:26px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.rl-item{font-size:11px;color:#7a6a45}
+.rl-item b{display:block;font-size:14px;color:var(--dk);font-variant-numeric:tabular-nums;margin-top:1px}
+.rl-verdict{margin-left:auto;font-size:11px;color:#7a6a45;text-align:right}
+.rl-verdict b{color:var(--gold2);font-size:15px}
+.rl-verdict .claimed{color:#b8ac8e;font-weight:400;font-size:10.5px}
+.tabbar{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;border-bottom:1px solid #e8e4dc}
+.tabbtn{background:none;border:none;border-bottom:2px solid transparent;color:#999;font-size:11.5px;font-weight:700;padding:8px 4px;margin-right:14px;cursor:pointer;font-family:inherit}
+.tabbtn.on{color:var(--gold2);border-bottom-color:var(--gold)}
+.tabview{display:none}
+.tabview.on{display:block}
+.plat{display:inline-block;padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700}
+.plat.meta{background:#e8f0fb;color:var(--blue);border:1px solid #b8d0f0}
+.plat.google{background:#fef5e4;color:var(--orange);border:1px solid #f0d8a0}
+.dec{display:inline-block;padding:2px 8px;border-radius:3px;font-size:9px;font-weight:800;letter-spacing:.03em;color:#fff;white-space:nowrap}
+.dec.scale{background:var(--green)}.dec.watch{background:var(--orange)}.dec.kill{background:var(--red)}
+.dec.paused{background:#9a9690}.dec.retest{background:var(--blue)}.dec.revive{background:#6b5b95}.dec.check{background:#8e7440}
+.attn{background:#fff;border:1px solid #f0d0d0;border-left:4px solid var(--red);border-radius:8px;padding:12px 14px}
+.attn-row{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #f6ecec;font-size:11.5px;line-height:1.5}
+.attn-row:last-child{border-bottom:none}
+.attn-row b{color:var(--dk)}
+.callout{background:#fff;border:1px solid #f0e2c4;border-left:4px solid var(--gold);border-radius:8px;padding:11px 14px;margin-top:10px;font-size:11.5px;line-height:1.55}
+.callout.good{border-color:#c8e4d0;border-left-color:var(--green)}
+.callout h4{margin:0 0 3px;font-size:12px;color:var(--gold2)}
+.callout.good h4{color:var(--green)}
+.rangebar{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;font-size:11px;color:#888}
+.mtw{border:1px solid #e8e4dc;border-radius:6px;overflow:auto}
+.mtx{border-collapse:collapse;font-size:10.5px;min-width:760px}
+.mtx th{background:#f8f6f2;padding:6px 8px;text-align:center;font-size:8.5px;color:#aaa;text-transform:uppercase;border-bottom:2px solid #e8e4dc;white-space:nowrap}
+.mtx th.mcamp{text-align:left;position:sticky;left:0;background:#f8f6f2;z-index:2;min-width:170px}
+.mtx td{padding:5px 7px;text-align:center;border-bottom:1px solid #f2efe9;font-variant-numeric:tabular-nums}
+.mtx td.mcamp{text-align:left;position:sticky;left:0;background:#fff;font-weight:700;white-space:nowrap;border-right:1px solid #e8e4dc}
+.mtx tr:nth-child(even) td.mcamp{background:#fafaf8}
+.mcell{display:flex;flex-direction:column;align-items:center;line-height:1.25;border-radius:4px;padding:2px 0}
+.mcell b{font-size:10.5px}
+.mcell span{font-size:8px;color:#8a8a8a}
+.mcell.hi{background:#e8f8ee}.mcell.hi b{color:var(--green)}
+.mcell.mid{background:#fdf6e6}.mcell.mid b{color:var(--gold2)}
+.mcell.lo{background:#fdeeee}.mcell.lo b{color:var(--red)}
+.mcell.none{color:#ccc}
+.mxlegend{display:flex;align-items:center;gap:14px;font-size:10px;color:#999;margin-top:8px;flex-wrap:wrap}
+.mxdot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.funnel-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:11.5px}
+.funnel-label{width:120px;flex-shrink:0;color:#666}
+.funnel-bar-track{flex:1;background:#f2efe9;border-radius:3px;height:9px;overflow:hidden}
+.funnel-bar-fill{background:linear-gradient(90deg,var(--gold),var(--gold2));height:100%;border-radius:3px}
+.funnel-count{width:150px;text-align:right;font-variant-numeric:tabular-nums;flex-shrink:0}
+.funnel-count b{color:var(--dk)}
+.funnel-count span{color:#bbb;font-size:10px}
+.hcbox{background:#fff;border:1px solid #e8e4dc;border-radius:8px;overflow:hidden}
+.hcrow{display:flex;gap:10px;padding:10px 13px;border-bottom:1px solid #f2efe9;align-items:flex-start}
+.hcrow:last-child{border-bottom:none}
+.hcrow p{margin:2px 0 0;font-size:11px;color:#777;line-height:1.5}
+.hcrow h5{margin:0;font-size:11.5px;color:var(--dk)}
+.hcpill{margin-left:auto;flex-shrink:0;font-size:8.5px;font-weight:800;letter-spacing:.03em;padding:2px 7px;border-radius:9px;white-space:nowrap}
+.hcpill.fail{background:#fdeaea;color:var(--red)}
+.hcpill.check{background:#fef5e4;color:var(--gold2)}
+.hcpill.pass{background:#e8f8ee;color:var(--green)}
 .bar-row{display:flex;align-items:center;gap:8px;margin:4px 0}
 .bar-lbl{font-size:10px;color:#888;width:22px;text-align:right}
 .bar-fill{height:13px;border-radius:2px}
@@ -349,6 +409,11 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
     </div>
     <div class="sb-divider"></div>
     <div class="sb-section">
+      <div class="sb-head">Marketing</div>
+      <div class="sb-item" data-id="ad" onclick="doST('ad')"><span class="sb-ico">📈</span>Ads</div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-section">
       <div class="sb-head">Production</div>
       <div class="sb-item" data-id="po" onclick="doST('po')"><span class="sb-ico">📦</span>Orders</div>
       <div class="sb-item" data-id="pb" onclick="doST('pb')"><span class="sb-ico">⏳</span>Pre-Booked</div>
@@ -415,6 +480,7 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaf8}tr:
     <div id="pml" class="pnl"></div>
     <div id="pac" class="pnl"></div>
     <div id="prx" class="pnl"></div>
+    <div id="pad" class="pnl"></div>
     <div id="pin" class="pnl"></div>
     <div id="ppr" class="pnl"></div>
     <div id="ppp" class="pnl"></div>
@@ -1319,8 +1385,12 @@ function doST(id){
   // off opening rather than off rendering: a panel renders once and is then
   // cached, so the second visit would otherwise never ask the server again.
   if(id==='rx'&&typeof rxRefresh==='function')rxRefresh();
+  // First open fetches inside rAD() itself (see window._adData null-check there);
+  // this only covers re-opening a tab that's already loaded, so the numbers
+  // don't go stale if the tab is left open past the next morning's pull.
+  if(id==='ad'&&typeof adFetch==='function'&&window._adData!==null)adFetch();
 }
-function doR(id){var M={ov:rOV,pl:rPL,sz:rSZ,vl:rVL,st:rST,sk:rSK,dp:rDP,cs:rCS,ec:rEC,al:rAL,dr:rDR,us:rUS,in:rIN,pr:rPR,pp:rPP,rf:rRF,po:rPO,co:rCO,dc:rDC,fs:rFS,ml:rML,ac:rAC,rx:rRX,pb:rPB};M[id]&&M[id]();}
+function doR(id){var M={ov:rOV,pl:rPL,sz:rSZ,vl:rVL,st:rST,sk:rSK,dp:rDP,cs:rCS,ec:rEC,al:rAL,dr:rDR,us:rUS,in:rIN,pr:rPR,pp:rPP,rf:rRF,po:rPO,co:rCO,dc:rDC,fs:rFS,ml:rML,ac:rAC,rx:rRX,pb:rPB,ad:rAD};M[id]&&M[id]();}
 
 // ═══════════════════════════════════════════════════════════════════
 // TAB RENDERERS
@@ -7803,6 +7873,256 @@ function rxDelete(id){
   var d=document.getElementById('rx-detail');if(d)d.remove();
   rendered.rx=false;doR('rx');
   showToast(label+' deleted.');
+}
+
+// ── ADS: daily Meta/Google/website summary, pulled by the Ads Daily Summary
+// Routine and posted to /ads-summary. This tab has exactly one writer (the
+// Routine, once a day) so none of the multi-tab conflict handling tickets
+// need applies here -- it's a plain fetch-and-render.
+window._adData=null; // null = not loaded yet; [] = loaded, genuinely empty
+function adFmtDate(iso){
+  var p=String(iso||'').split('-');if(p.length<3)return iso||'';
+  var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
+  var wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()];
+  var mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()];
+  return wd+', '+String(d.getUTCDate()).padStart(2,'0')+' '+mo;
+}
+function adDecBadge(dec){
+  var key=String(dec||'').toLowerCase();
+  var labels={scale:'SCALE',watch:'WATCH',kill:'KILL',paused:'PAUSED',retest:'RE-TEST',revive:'REVIVE',check:'CHECK TRACKING'};
+  if(!labels[key])return '';
+  return '<span class="dec '+key+'">'+labels[key]+'</span>';
+}
+function adPlatBadge(p){
+  var key=String(p||'').toLowerCase();
+  if(key==='meta')return '<span class="plat meta">Meta</span>';
+  if(key==='google')return '<span class="plat google">Google</span>';
+  return key?rxEsc(p):'';
+}
+function adRoasColor(r){return r>=4?'var(--green)':r>=2?'var(--orange)':'var(--red)';}
+async function adFetch(){
+  try{
+    var r=await apiGet('/ads-summary');
+    var data=await r.json();
+    window._adData=Array.isArray(data)?data:[];
+  }catch(e){
+    window._adData=window._adData||[]; // keep whatever we had rather than blanking the panel
+  }
+  rendered.ad=false;doR('ad');
+}
+function adTab(ev,key){
+  var root=document.getElementById('pad');if(!root)return;
+  root.querySelectorAll('.tabbtn').forEach(function(b){b.classList.remove('on');});
+  ev.currentTarget.classList.add('on');
+  root.querySelectorAll('.tabview').forEach(function(v){v.classList.remove('on');});
+  var v=document.getElementById('tv-ad-'+key);if(v)v.classList.add('on');
+}
+function rAD(){
+  var el=document.getElementById('pad');if(!el)return;
+  if(window._adData===null){
+    el.innerHTML='<div class="spin">Loading ad performance…</div>';
+    adFetch();return;
+  }
+  var days=window._adData;
+  if(!days.length){
+    el.innerHTML='<div style="padding:40px;text-align:center;color:#aaa;font-size:12px">No ad data yet.'
+      +'<div style="color:#888;font-size:11px;margin-top:8px">The daily pull from Windsor runs automatically each morning. Check back after it has run once.</div>'
+      +'<button class="fbtn sec" style="margin-top:14px" onclick="adFetch()">Check again</button></div>';
+    return;
+  }
+  var latest=days[days.length-1];
+  var camp=latest.campaigns||[];
+  var tSpend=camp.reduce(function(a,c){return a+(c.spend||0);},0);
+  var tRev=camp.reduce(function(a,c){return a+(c.revenue||0);},0);
+  var tPur=camp.reduce(function(a,c){return a+(c.purchases||0);},0);
+  var tRoas=tSpend?tRev/tSpend:0;
+  var mer=latest.shopifyTotalSales?tRev/latest.shopifyTotalSales*100:null;
+  var attn=latest.needsAttention||[];
+
+  var h='<div class="ph-row"><div class="ph-title" style="font-size:15px;font-weight:700">Ads</div>'
+    +'<div class="ph-sub" style="font-size:11px;color:#999">Meta + Google &middot; yesterday, '+adFmtDate(latest.date)+'</div></div>';
+
+  // Reality Check: what the platforms claim vs what the website itself confirmed.
+  if(latest.metaClaims!=null||latest.googleClaims!=null||latest.websiteConfirmed!=null){
+    var claimedTotal=(latest.metaClaims||0)+(latest.googleClaims||0);
+    var claimedRoas=tSpend?claimedTotal/tSpend:0;
+    var realRoas=tSpend&&latest.websiteConfirmed!=null?latest.websiteConfirmed/tSpend:null;
+    h+='<div class="reality">'
+      +(latest.metaClaims!=null?'<div class="rl-item">Meta claims<b>Rs '+NF(latest.metaClaims)+'</b></div>':'')
+      +(latest.googleClaims!=null?'<div class="rl-item">Google claims<b>Rs '+NF(latest.googleClaims)+'</b></div>':'')
+      +(latest.websiteConfirmed!=null?'<div class="rl-item">Website confirmed (GA4)<b>Rs '+NF(latest.websiteConfirmed)+'</b></div>':'')
+      +(realRoas!=null?'<div class="rl-verdict">Real blended return <b>'+realRoas.toFixed(1)+'x</b> <span class="claimed">platforms claim '+claimedRoas.toFixed(1)+'x</span></div>':'')
+      +'</div>';
+  }
+
+  h+='<div class="tabbar">'
+    +'<button class="tabbtn on" onclick="adTab(event,\'ads\')">All Ads</button>'
+    +'<button class="tabbtn" onclick="adTab(event,\'day\')">Day-wise ROAS</button>'
+    +'<button class="tabbtn" onclick="adTab(event,\'camp\')">Campaign &times; Day ROAS</button>'
+    +'<button class="tabbtn" onclick="adTab(event,\'google\')">Google Ads</button>'
+    +'<button class="tabbtn" onclick="adTab(event,\'web\')">Website</button>'
+    +'</div>';
+
+  h+='<div class="tabview on" id="tv-ad-ads">'+adViewAllAds(days,latest,tSpend,tRev,tRoas,mer,attn)+'</div>';
+  h+='<div class="tabview" id="tv-ad-day">'+adViewDayWise(days)+'</div>';
+  h+='<div class="tabview" id="tv-ad-camp">'+adViewCampDay(days)+'</div>';
+  h+='<div class="tabview" id="tv-ad-google">'+adViewGoogle(latest)+'</div>';
+  h+='<div class="tabview" id="tv-ad-web">'+adViewWebsite(latest)+'</div>';
+
+  h+='<div class="foot"><span>Windsor.ai (Meta + Google Ads) &middot; GA4 on sahibas.com &middot; cross-checked against Shopify\'s own sales for the day</span>'
+    +'<span><span class="live">●</span> Refreshes automatically every morning &middot; last pulled '+rxEsc(latest.date)+(latest.pulledAt?' '+rxEsc(latest.pulledAt):'')+'</span></div>';
+
+  el.innerHTML=h;
+}
+function adViewAllAds(days,latest,tSpend,tRev,tRoas,mer,attn){
+  var camp=latest.campaigns||[];
+  var s='<div class="krow">'
+    +'<div class="kpi g"><div class="kl">Ad Spend</div><div class="kv">Rs '+NF(tSpend)+'</div><div class="ks">both platforms</div></div>'
+    +'<div class="kpi e"><div class="kl">Ad Revenue (claimed)</div><div class="kv">Rs '+NF(tRev)+'</div><div class="ks">'+NF(camp.reduce(function(a,c){return a+(c.purchases||0);},0))+' purchases attributed</div></div>'
+    +'<div class="kpi e"><div class="kv" style="font-size:19px">'+tRoas.toFixed(1)+'x</div><div class="kl" style="margin-top:4px">Blended ROAS</div><div class="ks">&nbsp;</div></div>'
+    +'<div class="kpi b"><div class="kl">MER vs Shopify</div><div class="kv">'+(mer!=null?mer.toFixed(0)+'%':'—')+'</div><div class="ks">'+(latest.shopifyTotalSales!=null?'of Rs '+NF(latest.shopifyTotalSales)+' total sales':'Shopify total not available')+'</div></div>'
+    +'<div class="kpi r"><div class="kl">Needs Attention</div><div class="kv">'+attn.length+'</div><div class="ks">see below</div></div>'
+    +'</div>';
+
+  // 7-day spend/revenue trend, scaled to whatever the window actually holds.
+  var win=days.slice(Math.max(0,days.length-7));
+  if(win.length>=2){
+    var maxV=Math.max.apply(null,win.map(function(d){var c=d.campaigns||[];return Math.max(c.reduce(function(a,x){return a+(x.spend||0);},0),c.reduce(function(a,x){return a+(x.revenue||0);},0));}).concat([1]));
+    var x0=60,x1=540,y0=100,y1=10,n=win.length;
+    var pt=function(i,v){var x=n>1?x0+(x1-x0)*i/(n-1):x0;var y=y0-(y0-y1)*Math.min(v/maxV,1);return x.toFixed(1)+','+y.toFixed(1);};
+    var revPts=win.map(function(d,i){var c=d.campaigns||[];return pt(i,c.reduce(function(a,x){return a+(x.revenue||0);},0));}).join(' ');
+    var spPts=win.map(function(d,i){var c=d.campaigns||[];return pt(i,c.reduce(function(a,x){return a+(x.spend||0);},0));}).join(' ');
+    var lastRev=win[win.length-1].campaigns.reduce(function(a,x){return a+(x.revenue||0);},0);
+    var lastSp=win[win.length-1].campaigns.reduce(function(a,x){return a+(x.spend||0);},0);
+    var lastPt=pt(n-1,lastRev).split(','),lastPtSp=pt(n-1,lastSp).split(',');
+    var labels=win.map(function(d,i){var x=n>1?x0+(x1-x0)*i/(n-1):x0;return '<text x="'+(x-14)+'" y="120" font-size="9" fill="#aaa">'+adFmtDate(d.date).slice(0,3)+'</text>';}).join('');
+    s+='<div class="sec"><div class="stl">Spend &amp; Revenue, last '+n+' day'+(n>1?'s':'')+'</div><div class="trendbox">'
+      +'<div class="trend-legend"><span><i style="background:var(--gold2)"></i>Revenue</span><span><i style="background:#b9b4aa"></i>Spend</span></div>'
+      +'<svg viewBox="0 0 640 130" width="100%" height="130" style="display:block;overflow:visible">'
+      +'<line x1="40" y1="10" x2="630" y2="10" stroke="#f0ede8" stroke-width="1"/><line x1="40" y1="55" x2="630" y2="55" stroke="#f0ede8" stroke-width="1"/><line x1="40" y1="100" x2="630" y2="100" stroke="#e8e4dc" stroke-width="1"/>'
+      +'<text x="4" y="104" font-size="9" fill="#bbb">0</text><text x="0" y="14" font-size="9" fill="#bbb">'+N(maxV)+'</text>'
+      +labels
+      +'<polyline points="'+revPts+'" fill="none" stroke="var(--gold2)" stroke-width="2.2"/>'
+      +'<polyline points="'+spPts+'" fill="none" stroke="#b9b4aa" stroke-width="2"/>'
+      +'<circle cx="'+lastPt[0]+'" cy="'+lastPt[1]+'" r="3.5" fill="var(--gold2)"/><circle cx="'+lastPtSp[0]+'" cy="'+lastPtSp[1]+'" r="3" fill="#b9b4aa"/>'
+      +'</svg></div></div>';
+  }
+
+  var sortedCamp=camp.slice().sort(function(a,b){return (b.roas||0)-(a.roas||0);});
+  s+='<div class="sec"><div class="stl">Campaigns</div><div class="tw"><table>'
+    +'<thead><tr><th>Campaign</th><th>Platform</th><th class="nr">Spend</th><th class="nr">Revenue</th><th class="nr">ROAS</th><th class="nr">Purchases</th><th>Decision</th></tr></thead><tbody>'
+    +sortedCamp.map(function(c){
+      return '<tr><td>'+rxEsc(c.name)+'</td><td>'+adPlatBadge(c.platform)+'</td><td class="nr">Rs '+NF(c.spend)+'</td><td class="nr">Rs '+NF(c.revenue)+'</td>'
+        +'<td class="nr" style="color:'+adRoasColor(c.roas||0)+';font-weight:700">'+(c.roas||0).toFixed(1)+'x</td><td class="nr">'+NF(c.purchases||0)+'</td><td>'+adDecBadge(c.decision)+'</td></tr>';
+    }).join('')
+    +'<tr class="tr"><td>Total</td><td></td><td class="nr">Rs '+NF(tSpend)+'</td><td class="nr">Rs '+NF(tRev)+'</td><td class="nr">'+tRoas.toFixed(1)+'x</td><td class="nr">'+NF(camp.reduce(function(a,c){return a+(c.purchases||0);},0))+'</td><td></td></tr>'
+    +'</tbody></table></div></div>';
+
+  s+='<div class="sec"><div class="stl">Needs Attention</div>';
+  s+=attn.length?('<div class="attn">'+attn.map(function(t){return '<div class="attn-row"><span>🔴</span><div>'+rxEsc(t)+'</div></div>';}).join('')+'</div>')
+    :'<div style="color:#bbb;font-size:11px">Nothing flagged yesterday.</div>';
+  s+='</div>';
+  return s;
+}
+function adViewDayWise(days){
+  var s='<div class="sec"><div class="stl">Day by day &middot; most recent first</div><div class="tw"><table>'
+    +'<thead><tr><th>Day</th><th class="nr">Campaigns</th><th class="nr">Spend</th><th class="nr">ROAS</th><th class="nr">Revenue</th><th class="nr">Orders</th></tr></thead><tbody>';
+  days.slice().reverse().forEach(function(d){
+    var c=d.campaigns||[];
+    var sp=c.reduce(function(a,x){return a+(x.spend||0);},0),rv=c.reduce(function(a,x){return a+(x.revenue||0);},0),pu=c.reduce(function(a,x){return a+(x.purchases||0);},0);
+    var roas=sp?rv/sp:0;
+    s+='<tr><td>'+adFmtDate(d.date)+'</td><td class="nr">'+c.length+'</td><td class="nr">Rs '+NF(sp)+'</td><td class="nr" style="color:'+adRoasColor(roas)+'">'+roas.toFixed(1)+'x</td><td class="nr">Rs '+NF(rv)+'</td><td class="nr">'+NF(pu)+'</td></tr>';
+  });
+  s+='</tbody></table></div>';
+  s+='<div class="note" style="font-size:9.5px;color:#bbb;margin-top:6px">'+days.length+' day'+(days.length>1?'s':'')+' of history so far, back to '+adFmtDate(days[0].date)+'. History builds day by day from when this launched — no retroactive backfill unless asked for separately.</div></div>';
+  return s;
+}
+function adViewCampDay(days){
+  var win=days.slice(Math.max(0,days.length-7));
+  var names=[];var seen={};
+  win.forEach(function(d){(d.campaigns||[]).forEach(function(c){if(!seen[c.name]){seen[c.name]=true;names.push(c.name);}});});
+  var totals=names.map(function(nm){
+    var sp=0,rv=0;win.forEach(function(d){var c=(d.campaigns||[]).find(function(x){return x.name===nm;});if(c){sp+=c.spend||0;rv+=c.revenue||0;}});
+    return {name:nm,roas:sp?rv/sp:0};
+  }).sort(function(a,b){return b.roas-a.roas;});
+  var s='<div class="sec"><div class="stl">Last '+win.length+' day'+(win.length>1?'s':'')+' &middot; rows sorted by total ROAS, best first</div><div class="mtw"><table class="mtx"><thead><tr><th class="mcamp">Campaign</th>'
+    +win.map(function(d){return '<th>'+adFmtDate(d.date).slice(0,3)+' '+d.date.slice(8,10)+'</th>';}).join('')
+    +'<th>Total</th></tr></thead><tbody>';
+  totals.forEach(function(t){
+    s+='<tr><td class="mcamp">'+rxEsc(t.name)+'</td>';
+    win.forEach(function(d){
+      var c=(d.campaigns||[]).find(function(x){return x.name===t.name;});
+      if(!c||!c.spend){s+='<td><div class="mcell none">–</div></td>';return;}
+      var tier=c.roas>=4?'hi':c.roas>=2?'mid':'lo';
+      s+='<td><div class="mcell '+tier+'"><b>'+c.roas.toFixed(1)+'x</b><span>'+NF(c.spend)+' &middot; '+NF(c.revenue)+'</span></div></td>';
+    });
+    var tier2=t.roas>=4?'hi':t.roas>=2?'mid':'lo';
+    s+='<td><div class="mcell '+tier2+'"><b>'+t.roas.toFixed(1)+'x</b></div></td></tr>';
+  });
+  s+='</tbody></table></div>';
+  s+='<div class="mxlegend"><span><span class="mxdot" style="background:#e8f8ee"></span>ROAS &ge; 4 &middot; healthy</span>'
+    +'<span><span class="mxdot" style="background:#fdf6e6"></span>ROAS 2&ndash;4 &middot; watch</span>'
+    +'<span><span class="mxdot" style="background:#fdeeee"></span>ROAS &lt; 2 &middot; weak</span>'
+    +'<span><span style="color:#ccc">–</span>&nbsp;no spend that day</span></div></div>';
+  return s;
+}
+function adViewGoogle(latest){
+  var g=latest.google||{};
+  var camps=g.campaigns||[],places=g.placements||[],callouts=g.callouts||[];
+  if(!camps.length&&!places.length&&!callouts.length)return '<div style="color:#bbb;font-size:11px;padding:20px 0">No Google Ads detail for this day.</div>';
+  var s='';
+  if(camps.length){
+    s+='<div class="sec"><div class="stl">Google Ads &middot; counting website purchases, not video views</div><div class="tw"><table>'
+      +'<thead><tr><th>Campaign</th><th>Type</th><th class="nr">Spend</th><th class="nr">Revenue</th><th class="nr">ROAS</th><th class="nr">Avg Order</th><th class="nr">Cost / Order</th><th>Suggestion</th></tr></thead><tbody>'
+      +camps.map(function(c){
+        return '<tr><td>'+rxEsc(c.name)+'</td><td>'+rxEsc(c.type||'')+'</td><td class="nr">Rs '+NF(c.spend)+'</td><td class="nr">Rs '+NF(c.revenue)+'</td>'
+          +'<td class="nr" style="color:'+adRoasColor(c.roas||0)+';font-weight:700">'+(c.roas||0).toFixed(1)+'x</td><td class="nr">Rs '+NF(c.avgOrder||0)+'</td><td class="nr">Rs '+NF(c.costPerOrder||0)+'</td><td>'+adDecBadge(c.decision)+'</td></tr>';
+      }).join('')+'</tbody></table></div></div>';
+  }
+  callouts.forEach(function(co){
+    s+='<div class="callout'+(co.tone==='good'?' good':'')+'"><h4>'+(co.tone==='good'?'💡':'⚠')+' '+rxEsc(co.title)+'</h4><p>'+rxEsc(co.body)+'</p></div>';
+  });
+  if(places.length){
+    s+='<div class="sec" style="margin-top:14px"><div class="stl">Where the Google budget goes, by placement</div><div class="tw"><table>'
+      +'<thead><tr><th>Placement</th><th class="nr">Spend</th><th class="nr">Share</th><th class="nr">Revenue</th><th class="nr">ROAS</th></tr></thead><tbody>'
+      +places.map(function(p){return '<tr><td>'+rxEsc(p.name)+'</td><td class="nr">Rs '+NF(p.spend)+'</td><td class="nr">'+(p.share||0).toFixed(0)+'%</td><td class="nr">Rs '+NF(p.revenue)+'</td><td class="nr" style="color:'+adRoasColor(p.roas||0)+';font-weight:700">'+(p.roas||0).toFixed(1)+'x</td></tr>';}).join('')
+      +'</tbody></table></div></div>';
+  }
+  return s;
+}
+function adViewWebsite(latest){
+  var w=latest.website||{};
+  var hc=w.healthChecks||[],fn=w.funnel,ch=w.channels||[];
+  var s='';
+  if(hc.length){
+    s+='<div class="sec"><div class="stl">Health checks &middot; faults worth fixing once, not watched daily</div><div class="hcbox">'
+      +hc.map(function(x){return '<div class="hcrow"><div><h5>'+rxEsc(x.title)+'</h5><p>'+rxEsc(x.body)+'</p></div><span class="hcpill '+(x.status||'check')+'">'+(x.status||'check').toUpperCase()+'</span></div>';}).join('')
+      +'</div></div>';
+  }
+  s+='<div class="tc2">';
+  if(fn){
+    var steps=[['Viewed a product',fn.viewed,null],['Added to cart',fn.cart,fn.viewed],['Started checkout',fn.checkout,fn.cart],['Bought',fn.bought,fn.checkout]];
+    s+='<div class="sec"><div class="stl">The buying funnel, yesterday</div>';
+    steps.forEach(function(st,i){
+      var pct=i===0?100:(st[2]?st[1]/st[2]*100:0);
+      s+='<div class="funnel-row"><div class="funnel-label">'+st[0]+'</div><div class="funnel-bar-track"><div class="funnel-bar-fill" style="width:'+(i===0?100:Math.max(2,pct)).toFixed(0)+'%"></div></div>'
+        +'<div class="funnel-count"><b>'+NF(st[1])+'</b> '+(i===0?'<span>start</span>':'<span>'+pct.toFixed(1)+'% of previous</span>')+'</div></div>';
+    });
+    if(fn.checkout&&fn.bought!=null){
+      var lost=fn.checkout-fn.bought;
+      if(lost>0)s+='<div class="callout"><h4>💳 '+NF(lost)+' people abandoned at checkout</h4><p>Worth a look if this keeps climbing day over day.</p></div>';
+    }
+    s+='</div>';
+  }
+  if(ch.length){
+    s+='<div class="sec"><div class="stl">Where visitors came from</div><div class="tw"><table>'
+      +'<thead><tr><th>Channel</th><th class="nr">Visits</th><th class="nr">Orders</th><th class="nr">Revenue</th></tr></thead><tbody>'
+      +ch.map(function(c){return '<tr><td>'+rxEsc(c.name)+'</td><td class="nr">'+NF(c.visits||0)+'</td><td class="nr">'+NF(c.orders||0)+'</td><td class="nr">Rs '+NF(c.revenue||0)+'</td></tr>';}).join('')
+      +'</tbody></table></div></div>';
+  }
+  s+='</div>';
+  if(!hc.length&&!fn&&!ch.length)return '<div style="color:#bbb;font-size:11px;padding:20px 0">No website detail for this day.</div>';
+  return s;
 }
 
 // ── CHANGE PASSWORD (self-service) ──
