@@ -15,29 +15,14 @@ const COSTS_BRANCH = 'main';
 const TOKEN_TTL_DAYS = 30;
 
 // Seed credentials — used ONLY to first-populate the KV user store, and only
-// if it's empty. After that, KV ('auth_users') is the source of truth and
-// password changes/resets persist there. This file lives server-side in a
-// PRIVATE repo and is never served to browsers, so these are not publicly
-// exposed the way the old in-HTML passwords were. Rotate them post-launch to
-// remove plaintext from source entirely.
-const SEED_USERS = [
-  { name: 'Junaid Sarwar', email: 'junaidsarwar82@gmail.com', pass: '0000' },
-  { name: 'Bano Hussain', email: 'banohussain720@gmail.com', pass: 'Bano@2026' },
-  { name: 'Bilal MBA', email: 'bilalmba246@gmail.com', pass: 'Bilal@2026' },
-  { name: 'Ch Toseef Manzoor', email: 'am2066949@gmail.com', pass: 'Toseef@2026' },
-  { name: 'Elite Tech Services', email: 'infoelitetechservices@gmail.com', pass: 'Elite@2026' },
-  { name: 'Javeria Rehman', email: 'javeriarehman510@gmail.com', pass: 'Javeria@2026' },
-  { name: 'Kamran Maqsood', email: 'kamranmaqsood128@gmail.com', pass: 'Kamran@2026' },
-  { name: 'M. Shahbaz Alam', email: 'mshahbazalam.2000@gmail.com', pass: 'Shahbaz@2026' },
-  { name: 'Mubasher Iqbal', email: 'mubbasheriqbal32@gmail.com', pass: 'Mubasher@2026' },
-  { name: 'RZ', email: 'rz1753431@gmail.com', pass: 'Rz@2026' },
-  { name: 'Sahibas by Mirza', email: 'sahibasbymirza@gmail.com', pass: 'Sahibas@2026' },
-  { name: 'Sahibas US', email: 'sahibasus2211@gmail.com', pass: 'SahibasUS@2026' },
-  { name: 'Sana', email: 'sana28042002@gmail.com', pass: 'Sana@2026' },
-  { name: 'Zaid', email: 'zaid77870@gmail.com', pass: 'Zaid@2026' },
-  { name: 'Zee', email: 'zee4729291@gmail.com', pass: 'Zee@2026' },
-  { name: 'Zeeshan Shafayt', email: 'zeeshanshafaytex@gmail.com', pass: 'Zeeshan@2026' },
-];
+// if it's empty. Real logins have been served from KV ('auth_users') for a
+// long time now, so this array has not actually been read since the very
+// first deploy; it stayed in source only as a historical fallback. Removed
+// the plaintext passwords it no longer needs. If 'auth_users' is ever
+// somehow wiped, restore it from a KV backup/export rather than reseeding
+// real passwords back into the repo -- there is deliberately no "forgot
+// password" flow, only /change-password (self) and /admin-reset-pw (Owner).
+const SEED_USERS = [];
 
 // ── AUTH PRIMITIVES ──────────────────────────────────────────────────────
 const enc = new TextEncoder();
@@ -64,6 +49,9 @@ async function sha256Hex(str) {
   return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
 }
 function hashPassword(secret, pw) { return sha256Hex(pw + '::' + secret); }
+// Exported only so tests can seed a synthetic login without SEED_USERS (which
+// no longer carries real passwords) or a real user's credentials.
+export { hashPassword };
 
 async function makeToken(secret, payloadObj) {
   const payload = b64urlFromStr(JSON.stringify(payloadObj));

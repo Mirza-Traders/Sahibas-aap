@@ -16,6 +16,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const STALE_MS = 60_000;
+let hashPassword; // set in main(), once the Worker module is imported
 
 // One "global" store plus a per-edge view that lags it.
 class FakeKV {
@@ -71,10 +72,21 @@ class FakeKV {
   }
 }
 
+const TEST_EMAIL = 'test-owner@example.com', TEST_PASS = 'test-pw-only';
+// SEED_USERS in the real Worker no longer carries real passwords (removed once
+// KV became the actual source of truth), so tests seed their own synthetic
+// user straight into the fake KV rather than depending on it, or on anyone's
+// real credentials.
+async function seedTestUser(kv) {
+  if (kv.global.has('auth_users')) return;
+  const hashPw = await hashPassword('test-secret', TEST_PASS);
+  kv.global.set('auth_users', JSON.stringify({ [TEST_EMAIL]: { name: 'Test Owner', hash: hashPw } }));
+}
 async function login(worker, kv, edge) {
+  await seedTestUser(kv);
   const env = { AUTH_SECRET: 'test-secret', PO_STORE: kv.edge(edge) };
   const r = await worker.fetch(new Request('https://w/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'junaidsarwar82@gmail.com', password: '0000' }) }), env);
+    body: JSON.stringify({ email: TEST_EMAIL, password: TEST_PASS }) }), env);
   const j = await r.json();
   if (!j.token) throw new Error('login failed: ' + JSON.stringify(j));
   return j.token;
@@ -120,7 +132,9 @@ async function main() {
   const src = path.resolve(dir, '..', '..', 'cloudflare-worker.js');
   const shim = path.join(os.tmpdir(), 'sahibas-worker-' + process.pid + '.mjs');
   fs.copyFileSync(src, shim);
-  const NEW = (await import(pathToFileURL(shim).href)).default;
+  const mod = await import(pathToFileURL(shim).href);
+  const NEW = mod.default;
+  hashPassword = mod.hashPassword;
   const oldPath = path.join(dir, 'old-worker.mjs');
   const OLD = fs.existsSync(oldPath) ? (await import(pathToFileURL(oldPath).href)).default : null;
 

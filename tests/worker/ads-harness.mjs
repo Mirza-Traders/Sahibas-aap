@@ -23,9 +23,14 @@ async function main() {
   const src = path.resolve(dir, '..', '..', 'cloudflare-worker.js');
   const shim = path.join(os.tmpdir(), 'sahibas-worker-ads-' + process.pid + '.mjs');
   fs.copyFileSync(src, shim);
-  const worker = (await import(pathToFileURL(shim).href)).default;
+  const mod = await import(pathToFileURL(shim).href);
+  const worker = mod.default;
 
+  // SEED_USERS in the real Worker no longer carries real passwords, so tests
+  // seed their own synthetic user straight into the fake KV instead.
+  const TEST_EMAIL = 'test-owner@example.com', TEST_PASS = 'test-pw-only';
   const kv = new FakeKV();
+  await kv.put('auth_users', JSON.stringify({ [TEST_EMAIL]: { name: 'Test Owner', hash: await mod.hashPassword('test-secret', TEST_PASS) } }));
   const env = { AUTH_SECRET: 'test-secret', PO_STORE: kv, AUTOMATION_KEY: 'test-automation-key' };
   const day = (date, spend, revenue) => ({ date, campaigns: [{ name: 'Veil 1', platform: 'meta', spend, revenue, roas: spend ? revenue / spend : 0, purchases: 1, decision: 'scale' }] });
 
@@ -35,7 +40,7 @@ async function main() {
   let userTok;
   const get = async () => {
     if (!userTok) {
-      const lr = await worker.fetch(new Request('https://w/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'junaidsarwar82@gmail.com', password: '0000' }) }), env);
+      const lr = await worker.fetch(new Request('https://w/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: TEST_EMAIL, password: TEST_PASS }) }), env);
       userTok = (await lr.json()).token;
     }
     return worker.fetch(new Request('https://w/ads-summary', { headers: { Authorization: 'Bearer ' + userTok } }), env).then(r => r.json());
@@ -52,7 +57,7 @@ async function main() {
   console.log('  wrong key -> ' + rBad.status + (rBad.status === 401 ? '  ✓' : '  ✗') + ' · no key -> ' + rNone.status + (rNone.status === 401 ? '  ✓' : '  ✗'));
 
   console.log('\n=== 3. A real user token also works (manual testing from a logged-in tab) ===');
-  const loginR = await worker.fetch(new Request('https://w/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'junaidsarwar82@gmail.com', password: '0000' }) }), env);
+  const loginR = await worker.fetch(new Request('https://w/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: TEST_EMAIL, password: TEST_PASS }) }), env);
   const tok = (await loginR.json()).token;
   const rUser = await worker.fetch(new Request('https://w/ads-summary', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify(day('2026-09-02', 2000, 9000)) }), env);
   console.log('  user-token POST -> ' + rUser.status + (rUser.status === 200 ? '  ✓' : '  ✗'));
@@ -83,8 +88,9 @@ async function main() {
 
   console.log('\n=== 8. GET with no history yet returns an empty array, not null/error ===');
   const kv2 = new FakeKV();
+  await kv2.put('auth_users', JSON.stringify({ [TEST_EMAIL]: { name: 'Test Owner', hash: await mod.hashPassword('test-secret', TEST_PASS) } }));
   const env2 = { AUTH_SECRET: 'test-secret', PO_STORE: kv2, AUTOMATION_KEY: 'test-automation-key' };
-  const lr2 = await worker.fetch(new Request('https://w/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'junaidsarwar82@gmail.com', password: '0000' }) }), env2);
+  const lr2 = await worker.fetch(new Request('https://w/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: TEST_EMAIL, password: TEST_PASS }) }), env2);
   const tok2 = (await lr2.json()).token;
   const rEmpty = await worker.fetch(new Request('https://w/ads-summary', { headers: { Authorization: 'Bearer ' + tok2 } }), env2);
   const jEmpty = await rEmpty.json();
