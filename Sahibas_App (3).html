@@ -581,7 +581,7 @@ var CLOUD_API='https://sahibas-po-api.junaidsarwar82.workers.dev';
 // refresh doesn't force re-login. Attached to every Worker request.
 // Bump on every deploy. Shown at the foot of the sidebar so anyone can tell
 // at a glance whether their tab is running the current build or a cached one.
-var APP_BUILD='2026-09-07a';window.APP_BUILD=APP_BUILD;
+var APP_BUILD='2026-09-07b';window.APP_BUILD=APP_BUILD;
 try{document.getElementById('sb-build').textContent='build '+APP_BUILD;}catch(e){}
 var AUTH_TOKEN='';try{AUTH_TOKEN=localStorage.getItem('sbm_tok')||'';}catch(e){}
 function authHeaders(extra){var h=extra?Object.assign({},extra):{};if(AUTH_TOKEN)h['Authorization']='Bearer '+AUTH_TOKEN;return h;}
@@ -6730,6 +6730,36 @@ window._rxDeletedIds=window._rxDeletedIds||{};
 // so. Losing a ticket to a clash is now impossible; the worst case is a number
 // changing, which is visible and recorded.
 function rxUid(){return 'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
+// Every action used to look a ticket up by its NUMBER. Two people raising
+// tickets within the same minute can pick the same number (each tab counts
+// from its own copy of the list), and then whichever ticket came first in the
+// array answered for both: clicking one row opened the other, and one of the
+// two was unreachable -- "my ticket disappeared". Rows and buttons now pass
+// the uid, which is unique by construction; the number is display only. The
+// fallback keeps anything that still passes a number working.
+function rxFind(key){
+  var T=window.TICKETS||[];
+  return T.find(function(x){return x.uid===key;})||T.find(function(x){return x.id===key;});
+}
+// One-call health check for whoever is debugging: what this tab has, what the
+// server has, what is stashed or still unsaved, and any duplicate numbers.
+async function rxDiag(){
+  var out={build:window.APP_BUILD||null,local:(window.TICKETS||[]).length,pending:(window._rxPendingSave||[]).slice(),
+    stash:rxStashRead().map(function(e){return {id:e.t.id,uid:e.t.uid,saved:!!e.saved,ageMin:Math.round((Date.now()-(e.at||0))/60000)};})};
+  try{var p=await (await fetch(CLOUD_API+'/ping')).json();out.worker=p.build||p.store||'old';}catch(e){out.worker='unreachable';}
+  try{
+    var r=await apiGet('/tickets');var s=await r.json();
+    out.server=s.length;
+    var byId={};s.forEach(function(t){byId[t.id]=(byId[t.id]||[]).concat([t.uid]);});
+    out.duplicateNumbers=Object.keys(byId).filter(function(k){return byId[k].length>1;}).map(function(k){return k+': '+byId[k].join(', ');});
+    var su={};s.forEach(function(t){su[t.uid]=true;});
+    out.localOnly=(window.TICKETS||[]).filter(function(t){return !su[t.uid];}).map(function(t){return t.id+' ('+t.customer+')';});
+    out.newest=s.slice().sort(function(a,b){return String(b.createdAt||'').localeCompare(String(a.createdAt||''));}).slice(0,8)
+      .map(function(t){return t.id+' · '+t.customer+' · '+t.status+' · by '+t.createdBy+' · '+t.createdAt+' · rev '+t._rev;});
+  }catch(e){out.server='unreachable: '+e.message;}
+  console.log(JSON.stringify(out,null,2));
+  return out;
+}
 // Tickets raised before this change have no uid. Seeding it from the ticket
 // number is deterministic, so every tab and the server agree on the same value
 // without anyone having to migrate anything.
@@ -6738,7 +6768,7 @@ function rxTicketNo(t){var n=parseInt(String((t&&t.id)||'').replace(/\D/g,''),10
 // Guarantees every ticket has its own number. Oldest keeps the number it was
 // raised with; a later clash is pushed to the end of the range.
 function rxDedupeIds(){
-  var all=window.TICKETS||[],max=0,renamed=[];
+  var all=window.TICKETS||[],max=0,renamed=[],renumbered=[];
   all.forEach(function(t){var n=rxTicketNo(t);if(n>max)max=n;});
   var seen={};
   all.slice().sort(function(a,b){return String(a.createdAt||'').localeCompare(String(b.createdAt||''));})
@@ -6750,10 +6780,15 @@ function rxDedupeIds(){
         t.id='RX-'+String(++max).padStart(3,'0');
         t.history=(t.history||[]).concat([{stage:t.status,by:'system',at:rxNow(),noteOnly:true,
           note:'⚠ '+old+' was taken by another ticket raised at the same time. This one was renumbered to '+t.id+' — nothing was lost.'}]);
-        renamed.push(old+' → '+t.id);
+        renamed.push(old+' → '+t.id);renumbered.push(t.uid);
       }
       seen[t.id]=t.uid;
     });
+  // A renumbering only fixes the clash if it is SAVED. Callers pick these up:
+  // rxSaveAll folds them into the save in hand, rxRefresh saves them outright.
+  // Otherwise two tickets keep sharing one number on the server for good, and
+  // every tab renumbers a different one on its own.
+  window._rxRenumbered=renumbered;
   return renamed;
 }
 // Same class of bug as the earlier orders race fix (savePO): this used to
@@ -6804,6 +6839,7 @@ async function rxSaveAll(touchedIds){
   }catch(e){}
   var _renamed=rxDedupeIds();
   if(_renamed.length)showToast('Ticket number clash resolved: '+_renamed.join(', '));
+  (window._rxRenumbered||[]).forEach(function(u){touched[u]=true;});
   rxSortTickets();
   // The save is a whole-blob overwrite, so writing without a successful read
   // first replaces every ticket on the server with this tab's copy. If the
@@ -7027,7 +7063,8 @@ async function rxRefresh(){
         .map(function(st){return (pend[st.uid]&&localByUid[st.uid])?localByUid[st.uid]:st;}).concat(localOnly);
       var _unsaved2=rxStashMerge(window.TICKETS);
       if(_unsaved2.length){window._rxPendingSave=Array.from(new Set((window._rxPendingSave||[]).concat(_unsaved2)));rxShowUnsaved();rxScheduleRetry();}
-      rxDedupeIds();
+      var _ren=rxDedupeIds();
+      if(_ren.length){var _renUids=(window._rxRenumbered||[]).slice();showToast('Ticket number clash resolved: '+_ren.join(', '));setTimeout(function(){rxSaveAll(_renUids);},50);}
       rxSortTickets();
       window._rxLoadOK=true;
       var panel=document.getElementById('prx');
@@ -7128,7 +7165,7 @@ function rxDupLevel(t,all){
 // Mark one pair as checked-and-fine. Written to both sides' history so the
 // decision, and who made it, survives in the trail.
 function rxDupClear(id,otherUid){
-  var t=(window.TICKETS||[]).find(function(x){return x.id===id;});
+  var t=rxFind(id);
   var o=(window.TICKETS||[]).find(function(x){return x.uid===otherUid;});
   if(!t||!o)return;
   var r=rexRole(CU);
@@ -7297,7 +7334,7 @@ function rRX(){
     var img=findImg(String(first.product||'').toLowerCase().trim());
     var thumb=img?'<img src="'+img+(img.indexOf('?')>=0?'&':'?')+'width=60" loading="lazy" style="width:28px;height:36px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px" onerror="this.style.display=\'none\'">':'';
     var moreBadge=its.length>1?' <span title="'+its.slice(1).map(function(it){return (it.product||'')+(it.size?' ('+it.size+')':'');}).join(', ').replace(/"/g,'&quot;')+'" style="background:#eef0fb;color:#4a4ab0;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px;cursor:help;white-space:nowrap">+'+(its.length-1)+' more</span>':'';
-    return '<tr onclick="openRxDetail(\''+t.id+'\')" style="cursor:pointer" onmouseover="this.style.background=\'#faf8f3\'" onmouseout="this.style.background=\'\'">'
+    return '<tr onclick="openRxDetail(\''+t.uid+'\')" style="cursor:pointer" onmouseover="this.style.background=\'#faf8f3\'" onmouseout="this.style.background=\'\'">'
      +'<td style="'+TD2+'color:#888;white-space:nowrap">'+(t.createdAt||'').split(' ')[0]+'</td>'
      +'<td style="'+TD2+'font-weight:700;color:var(--gold2);white-space:nowrap">'+t.id+dupMark(t)+'</td>'
      +'<td style="'+TD2+'"><span style="'+(t.type==='refund'?'background:#fde8e8;color:#c0392b':'background:#e8f8ee;color:#0F6E56')+';padding:2px 8px;border-radius:3px;font-size:8px;font-weight:800">'+(t.type==='refund'?'REFUND':'EXCHANGE')+'</span></td>'
@@ -7513,7 +7550,7 @@ function submitRx(type){
   showToast('Ticket '+t.id+' created — assigned to '+t.assignedTo);
 }
 function openRxDetail(id){
-  var t=(window.TICKETS||[]).find(function(x){return x.id===id;});if(!t)return;
+  var t=rxFind(id);if(!t)return;
   var r=rexRole(CU),isAdm=r==='admin';
   var canBank=isAdm||r==='manager'||r==='accountant';
   var idx=RX_STAGES.indexOf(t.status);
@@ -7551,14 +7588,14 @@ function openRxDetail(id){
     if(RX_PHOTO_REQ[next]){
       // Photo mandatory for this step — the button opens the camera/file picker
       // rather than advancing directly.
-      btns+='<input type="file" id="rx-stage-photo" accept="image/*" capture="environment" style="display:none" onchange="rxStagePhoto(\''+t.id+'\',this,\''+next+'\')">'
+      btns+='<input type="file" id="rx-stage-photo" accept="image/*" capture="environment" style="display:none" onchange="rxStagePhoto(\''+t.uid+'\',this,\''+next+'\')">'
         +'<button onclick="document.getElementById(\'rx-stage-photo\').click()" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer">📷 Attach photo &amp; Mark '+rxStageLabel(next,t.type)+' →</button>';
     }else{
-      btns+='<button onclick="rxAdvance(\''+t.id+'\')" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer">Mark '+rxStageLabel(next,t.type)+' →</button>';
+      btns+='<button onclick="rxAdvance(\''+t.uid+'\')" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer">Mark '+rxStageLabel(next,t.type)+' →</button>';
     }
   }
-  if(isAdm&&idx>0)btns+='<button onclick="rxSendBack(\''+t.id+'\')" style="background:#fff;border:1px solid #c0392b;color:#c0392b;border-radius:6px;padding:9px 14px;font-size:12px;font-weight:600;cursor:pointer">↩ Send Back</button>';
-  if(isAdm)btns+='<button onclick="rxDelete(\''+t.id+'\')" style="background:none;border:1px solid #eee;color:#c0392b;border-radius:6px;padding:9px 12px;font-size:11px;cursor:pointer">Delete</button>';
+  if(isAdm&&idx>0)btns+='<button onclick="rxSendBack(\''+t.uid+'\')" style="background:#fff;border:1px solid #c0392b;color:#c0392b;border-radius:6px;padding:9px 14px;font-size:12px;font-weight:600;cursor:pointer">↩ Send Back</button>';
+  if(isAdm)btns+='<button onclick="rxDelete(\''+t.uid+'\')" style="background:none;border:1px solid #eee;color:#c0392b;border-radius:6px;padding:9px 12px;font-size:11px;cursor:pointer">Delete</button>';
   var html='<div id="rx-detail" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">'
    +'<div style="background:#fff;border-radius:14px;padding:22px;width:min(560px,95vw);max-height:92vh;overflow-y:auto">'
    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><b style="font-size:15px">'+t.id+' · <span style="'+(t.type==='refund'?'color:#c0392b':'color:#0F6E56')+'">'+t.type.toUpperCase()+'</span></b><button onclick="document.getElementById(\'rx-detail\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#999">✕</button></div>'
@@ -7596,7 +7633,7 @@ function openRxDetail(id){
    +rxDupPanel(t)
    +'<div style="display:flex;gap:8px;margin:16px 0;flex-wrap:wrap">'+btns+'</div>'
    +'<div style="font-size:9px;color:#999;font-weight:700;text-transform:uppercase;margin-bottom:6px">History</div>'+hist
-   +'<div style="display:flex;gap:6px;margin-top:10px"><input id="rx-note-inp" placeholder="Add a note…" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:11px" onkeydown="if(event.key===\'Enter\')rxAddNote(\''+t.id+'\')"><button onclick="rxAddNote(\''+t.id+'\')" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:8px 14px;font-size:11px;font-weight:700;cursor:pointer">Add</button></div>'
+   +'<div style="display:flex;gap:6px;margin-top:10px"><input id="rx-note-inp" placeholder="Add a note…" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:11px" onkeydown="if(event.key===\'Enter\')rxAddNote(\''+t.uid+'\')"><button onclick="rxAddNote(\''+t.uid+'\')" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:8px 14px;font-size:11px;font-weight:700;cursor:pointer">Add</button></div>'
    +'</div></div>';
   var old=document.getElementById('rx-detail');if(old)old.remove();
   document.body.insertAdjacentHTML('beforeend',html);
@@ -7609,7 +7646,7 @@ var RX_PHOTO_REQ={
   informed:{key:'informedPhoto',what:function(t){return 'the customer chat screenshot (proof the customer was informed)';},done:'Customer-informed screenshot attached'}
 };
 function rxAdvance(id){
-  var t=(window.TICKETS||[]).find(function(x){return x.id===id;});if(!t)return;
+  var t=rxFind(id);if(!t)return;
   var next=rxNextStage(t);
   if(!next||!rxCanAdvance(t,next)){showToast('You do not have permission for this step.');return;}
   var req=RX_PHOTO_REQ[next];
@@ -7659,8 +7696,8 @@ function rxDupPanel(t){
     return '<div style="display:flex;gap:9px;align-items:center;padding:6px 0;border-top:1px solid rgba(0,0,0,.05);flex-wrap:wrap">'
       +'<span style="color:'+lc+';font-weight:800;font-size:10px;min-width:52px">'+x.level.toUpperCase()+'</span>'
       +'<span style="flex:1;min-width:190px;font-size:11px">'+rxEsc(x.why)+'</span>'
-      +'<button onclick="document.getElementById(\'rx-detail\').remove();openRxDetail(\''+x.other.id+'\')" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:4px 10px;font-size:10px;cursor:pointer;font-weight:700">Open '+x.other.id+' →</button>'
-      +(canClear?'<button onclick="rxDupClear(\''+t.id+'\',\''+x.other.uid+'\')" style="background:none;border:1px solid #bbb;color:#666;border-radius:5px;padding:4px 9px;font-size:10px;cursor:pointer">Not a duplicate</button>':'')
+      +'<button onclick="document.getElementById(\'rx-detail\').remove();openRxDetail(\''+x.other.uid+'\')" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:4px 10px;font-size:10px;cursor:pointer;font-weight:700">Open '+x.other.id+' →</button>'
+      +(canClear?'<button onclick="rxDupClear(\''+t.uid+'\',\''+x.other.uid+'\')" style="background:none;border:1px solid #bbb;color:#666;border-radius:5px;padding:4px 9px;font-size:10px;cursor:pointer">Not a duplicate</button>':'')
       +'</div>';
   }).join('');
   return '<div style="background:'+C.bg+';border:1px solid '+C.bd+';border-radius:8px;padding:9px 12px;margin-top:10px;color:'+C.fg+'">'
@@ -7695,7 +7732,7 @@ function rxDupGate(t,next){
 // the image + who/when on the ticket, then advance in one step.
 function rxStagePhoto(id,input,stage){
   var file=input&&input.files&&input.files[0];if(!file)return;
-  var t=(window.TICKETS||[]).find(function(x){return x.id===id;});if(!t)return;
+  var t=rxFind(id);if(!t)return;
   var next=rxNextStage(t),req=RX_PHOTO_REQ[stage];
   if(next!==stage||!req||!rxCanAdvance(t,next)){showToast('You do not have permission for this step.');return;}
   // Gate BEFORE reading the file: a refusal here must not leave a photo behind
@@ -7723,7 +7760,7 @@ function rxViewPhoto(src){
 }
 function rxSendBack(id){
   if(rexRole(CU)!=='admin'){showToast('Only Admin can send back.');return;}
-  var t=(window.TICKETS||[]).find(function(x){return x.id===id;});if(!t)return;
+  var t=rxFind(id);if(!t)return;
   var idx=RX_STAGES.indexOf(t.status);if(idx<=0)return;
   var opts=RX_STAGES.slice(0,idx);
   var pick=prompt('Send back to which stage? Type one of: '+opts.map(function(s){return rxStageLabel(s,t.type);}).join(', '),rxStageLabel(opts[opts.length-1],t.type));
@@ -7741,16 +7778,17 @@ function rxSendBack(id){
 }
 function rxAddNote(id){
   var inp=document.getElementById('rx-note-inp');if(!inp||!inp.value.trim())return;
-  var t=(window.TICKETS||[]).find(function(x){return x.id===id;});if(!t)return;
+  var t=rxFind(id);if(!t)return;
   t.history=t.history||[];
   t.history.push({stage:t.status,by:CU?CU.name:'',at:rxNow(),note:inp.value.trim(),noteOnly:true});
   rxSaveAll([id]);openRxDetail(id);
 }
 function rxDelete(id){
   if(rexRole(CU)!=='admin'){showToast('Only Admin can delete tickets.');return;}
-  if(!confirm('Delete ticket '+id+'? This cannot be undone.'))return;
-  var doomed=(window.TICKETS||[]).find(function(x){return x.id===id;});
-  window.TICKETS=(window.TICKETS||[]).filter(function(x){return x.id!==id;});
+  var doomed=rxFind(id);if(!doomed)return;
+  var label=doomed.id||id;
+  if(!confirm('Delete ticket '+label+'? This cannot be undone.'))return;
+  window.TICKETS=(window.TICKETS||[]).filter(function(x){return x!==doomed;});
   // Tombstone the uid: ticket numbers get reused, uids never do, so this can no
   // longer suppress a different ticket that happens to share the number.
   window._rxDeletedIds[(doomed&&doomed.uid)||id]=true;
@@ -7764,7 +7802,7 @@ function rxDelete(id){
   }
   var d=document.getElementById('rx-detail');if(d)d.remove();
   rendered.rx=false;doR('rx');
-  showToast(id+' deleted.');
+  showToast(label+' deleted.');
 }
 
 // ── CHANGE PASSWORD (self-service) ──
