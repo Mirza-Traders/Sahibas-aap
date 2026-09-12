@@ -647,7 +647,7 @@ var CLOUD_API='https://sahibas-po-api.junaidsarwar82.workers.dev';
 // refresh doesn't force re-login. Attached to every Worker request.
 // Bump on every deploy. Shown at the foot of the sidebar so anyone can tell
 // at a glance whether their tab is running the current build or a cached one.
-var APP_BUILD='2026-09-07b';window.APP_BUILD=APP_BUILD;
+var APP_BUILD='2026-09-12a';window.APP_BUILD=APP_BUILD;
 try{document.getElementById('sb-build').textContent='build '+APP_BUILD;}catch(e){}
 var AUTH_TOKEN='';try{AUTH_TOKEN=localStorage.getItem('sbm_tok')||'';}catch(e){}
 function authHeaders(extra){var h=extra?Object.assign({},extra):{};if(AUTH_TOKEN)h['Authorization']='Bearer '+AUTH_TOKEN;return h;}
@@ -7042,11 +7042,28 @@ function rxStashDrop(uids){
 function rxStashMerge(list){
   var now=Date.now(),have={},unsaved=[];
   (list||[]).forEach(function(t){if(t&&t.uid)have[t.uid]=true;});
+  // Bug fix: build index so we can overwrite stale server copies in-place.
+  var listIdx={};
+  (list||[]).forEach(function(t,i){if(t&&t.uid)listIdx[t.uid]=i;});
   var keep=[];
   rxStashRead().forEach(function(e){
     if(!e||!e.t||!e.t.uid||now-(e.at||0)>=RX_STASH_TTL)return;
-    if(have[e.t.uid]){                          // server has it: nothing to put back...
-      if(e.saved&&now-(e.at||0)<RX_STASH_SEEN_TTL)keep.push(e);   // ...but keep a saved entry a little longer
+    if(have[e.t.uid]){
+      // Bug fix: KV is eventually consistent — after a refresh the server can
+      // return a copy up to ~60s older than what this browser just saved.
+      // If our stash entry was confirmed saved AND is newer (higher _rev),
+      // put our copy back in the list so the ticket does not visually revert.
+      // e.g. Bilal attaches payment SS → saved → refresh → server returns
+      // old "received" copy → without this fix ticket jumps back a stage.
+      if(e.saved&&now-(e.at||0)<RX_STASH_SEEN_TTL){
+        keep.push(e);
+        var idx=listIdx[e.t.uid];
+        if(idx!=null&&list[idx]){
+          var serverRev=Number((list[idx]._rev)||0);
+          var stashRev=Number((e.t._rev)||0);
+          if(stashRev>=serverRev)list[idx]=e.t;
+        }
+      }
       return;
     }
     list.push(e.t);keep.push(e);
