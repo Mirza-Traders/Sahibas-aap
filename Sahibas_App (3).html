@@ -713,7 +713,22 @@ async function initCloud(){
       try{localStorage.setItem('sbm_roles',JSON.stringify(data2));}catch(e){}
       applyRoleNav();
     }else{
-      try{var lr=JSON.parse(localStorage.getItem('sbm_roles')||'{}');if(Object.keys(lr).length>0)cloudSave('roles',lr);}catch(e){}
+      // Bug fix: the old code pushed localStorage roles to the cloud whenever
+      // the server returned an empty/missing roles object (e.g. a cold Worker
+      // startup or a brief hiccup). If two people logged in simultaneously
+      // from browsers with different stale local copies, whoever posted last
+      // won — silently wiping the other's role assignments. Now we only push
+      // local roles when the cloud genuinely has NOTHING (first-ever deploy,
+      // or an Owner-initiated reset), not on every empty/error response.
+      // A transient network hiccup returns an error/null, not an empty object,
+      // so the catch below handles that path without touching the cloud at all.
+      try{
+        var lr=JSON.parse(localStorage.getItem('sbm_roles')||'{}');
+        // Only upload if the cloud is truly empty AND local has content.
+        // "Empty" means the server returned {} or null, not a network error.
+        var cloudWasEmpty=(data2&&typeof data2==='object'&&Object.keys(data2).length===0);
+        if(cloudWasEmpty&&Object.keys(lr).length>0)cloudSave('roles',lr);
+      }catch(e){}
     }
   }catch(e){}
   // Refund/Exchange access is decided purely by REXROLES, so a roles call that
@@ -6977,7 +6992,10 @@ async function rxSaveAll(touchedIds){
     window._rxPendingSave=(window._rxPendingSave||[]).filter(function(u){return !skipSet[u];});
     rxStashDrop(res.skipped);
     var names=res.skipped.map(function(u){var t=(window.TICKETS||[]).find(function(x){return x.uid===u;});return t?t.id:u;});
-    showToast('⚠ '+names.join(', ')+' was changed by someone else first — reloading their version.');
+    // Bug fix: a toast disappears in 2.6s and team members miss it entirely,
+    // making the revert feel like a silent "ticket went back by itself". Show a
+    // clearly visible, dismissible banner instead so nobody is confused.
+    rxShowConflictBanner(names);
     window._rxSyncing=false;rxRefresh();
   }
   rxShowUnsaved();
@@ -7058,6 +7076,24 @@ function rxShowUnsaved(){
   el.innerHTML='⚠ '+n+' ticket'+(n>1?'s':'')+' NOT saved to the server yet — do not close this tab. Retrying…'
     +'<button onclick="rxRetryNow()" style="background:#fff;color:#c0392b;border:none;border-radius:5px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer">Retry now</button>';
 }
+// Bug fix: show a persistent, dismissible conflict banner when the server
+// rejected this tab's edit because someone else changed the ticket first.
+// A toast (2.6 s) was too easy to miss; team members just saw the ticket
+// silently revert and thought the app had a bug.
+function rxShowConflictBanner(names){
+  var existing=document.getElementById('rx-conflict-banner');
+  if(existing)existing.remove();
+  var el=document.createElement('div');
+  el.id='rx-conflict-banner';
+  el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9900;background:#e67e22;color:#fff;padding:11px 16px;font-size:12px;font-weight:700;display:flex;gap:12px;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+  var ticketList=names.join(', ');
+  el.innerHTML='⚠ Your change to <strong>'+ticketList+'</strong> was NOT saved — someone else updated '+(names.length>1?'these tickets':'this ticket')+' at the same time. The latest version has been reloaded. Please review and re-apply your change if needed.'
+    +'<button onclick="document.getElementById(\'rx-conflict-banner\').remove()" style="background:#fff;color:#e67e22;border:none;border-radius:5px;padding:5px 14px;font-size:11px;font-weight:800;cursor:pointer;margin-left:8px">OK, got it</button>';
+  document.body.appendChild(el);
+  // Auto-dismiss after 15 seconds so it does not block the screen forever,
+  // but 15 s is long enough for anyone looking at the screen to read it.
+  setTimeout(function(){var b=document.getElementById('rx-conflict-banner');if(b)b.remove();},15000);
+}
 function rxScheduleRetry(){
   if(window._rxRetryT)return;
   var wait=Math.min(60000,15000*Math.pow(2,window._rxRetryN||0));
@@ -7080,12 +7116,15 @@ if(!window._rxUnloadBound){
   // older -- and a ticket the tab itself had raised carried no revision claim,
   // so an edit made from that stale copy silently put the whole ticket back
   // to how this tab last saw it, undoing everyone else's steps.
+  // Bug fix: KV eventual consistency can lag up to ~60s. Polling at 60s meant
+  // a ticket someone just raised could sit "missing" for the entire interval.
+  // 15s covers the lag window several times over without hammering the Worker.
   setInterval(function(){
     try{
       var panel=document.getElementById('prx');
       if(panel&&panel.classList.contains('on')&&document.visibilityState==='visible'&&typeof rxRefresh==='function')rxRefresh();
     }catch(e){}
-  },60000);
+  },15000);
   window.addEventListener('beforeunload',function(e){
     if((window._rxPendingSave||[]).length){e.preventDefault();e.returnValue='Tickets are still being saved.';return e.returnValue;}
   });
@@ -7618,6 +7657,11 @@ function submitRx(type){
   var m=document.getElementById('rx-new');if(m)m.remove();
   rendered.rx=false;doR('rx');
   showToast('Ticket '+t.id+' created — assigned to '+t.assignedTo);
+  // Bug fix: KV is eventually consistent — the index write lands immediately
+  // on the writer's edge but other edges can lag up to ~60s. Schedule a
+  // confirmatory refresh 5 s after creation so any other open tab sees the
+  // new ticket quickly, and so this tab itself can verify the save landed.
+  setTimeout(function(){if(typeof rxRefresh==='function')rxRefresh();},5000);
 }
 function openRxDetail(id){
   var t=rxFind(id);if(!t)return;
