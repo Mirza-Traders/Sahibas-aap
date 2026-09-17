@@ -7961,11 +7961,40 @@ function adPlatBadge(p){
   return key?rxEsc(p):'';
 }
 function adRoasColor(r){return r>=4?'var(--green)':r>=2?'var(--orange)':'var(--red)';}
+// Some delivery paths (seen once from the Ads Daily Summary Routine's Zapier
+// webhook) stringify nested fields into Python's str() form -- single-quoted,
+// not valid JSON -- instead of leaving them as real arrays/objects. Rather
+// than trust the shape blindly and let one bad day crash the whole panel,
+// coerce what's safely coercible (numbers-as-strings) and drop what isn't
+// (an unparseable array/object field is treated the same as "omitted": that
+// day just shows less detail instead of an error).
+function adNormalizeDay(d){
+  if(!d||typeof d!=='object')return d;
+  ['metaClaims','googleClaims','websiteConfirmed','shopifyTotalSales'].forEach(function(k){
+    if(typeof d[k]==='string'&&d[k]!==''){var n=Number(d[k]);if(!isNaN(n))d[k]=n;}
+  });
+  ['campaigns','needsAttention'].forEach(function(k){
+    if(d[k]!=null&&!Array.isArray(d[k])){
+      if(typeof d[k]==='string'){try{var p=JSON.parse(d[k]);if(Array.isArray(p)){d[k]=p;return;}}catch(e){}}
+      d[k]=[];
+    }
+  });
+  ['google','website'].forEach(function(k){
+    if(d[k]!=null&&(typeof d[k]!=='object'||Array.isArray(d[k]))){
+      if(typeof d[k]==='string'){try{var p=JSON.parse(d[k]);if(p&&typeof p==='object'){d[k]=p;return;}}catch(e){}}
+      delete d[k];
+    }
+  });
+  if(d.campaigns)d.campaigns.forEach(function(c){
+    if(c&&typeof c==='object'){['spend','revenue','roas','purchases'].forEach(function(k){if(typeof c[k]==='string'){var n=Number(c[k]);if(!isNaN(n))c[k]=n;}});}
+  });
+  return d;
+}
 async function adFetch(){
   try{
     var r=await apiGet('/ads-summary');
     var data=await r.json();
-    window._adData=Array.isArray(data)?data:[];
+    window._adData=Array.isArray(data)?data.map(adNormalizeDay):[];
   }catch(e){
     window._adData=window._adData||[]; // keep whatever we had rather than blanking the panel
   }

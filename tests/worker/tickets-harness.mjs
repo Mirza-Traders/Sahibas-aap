@@ -210,7 +210,16 @@ async function main() {
     kv.now = 0;
     const stale = (await raiser.get()).body[0]; delete stale._rev;          // no claim, but _srv stays as read
     const fresh = (await warehouse.get()).body[0];
-    kv.now = 60_000; fresh.status = 'received'; await warehouse.post([fresh]);
+    // _srv comes from the Worker's own real Date.now(), not the simulated
+    // kv.now above. The FIRST get() just migrated this ticket from the legacy
+    // blob, stamping _srv at that instant -- if the warehouse's write below
+    // lands in the same real millisecond (easily happens when the suite runs
+    // fast), its _srv ties stale._srv instead of exceeding it, and the later
+    // "> " comparison silently fails. A short real delay guarantees the clock
+    // has actually moved before the write that must out-date it.
+    await new Promise(r => setTimeout(r, 5));
+    kv.now = 60_000; fresh.status = 'received'; const p1 = await warehouse.post([fresh]);
+    await new Promise(r => setTimeout(r, 5));
     kv.now = 120_000; stale.notes = 'customer called'; const rs = await raiser.post([stale]);
     kv.now = 500_000;
     const fin = (await client(NEW, kv, 'e9', tok).get()).body[0];
