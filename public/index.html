@@ -630,6 +630,7 @@ var USERS=[
   {name:'Bilal MBA',email:'bilalmba246@gmail.com',role:'—'},
   {name:'Ch Toseef Manzoor',email:'am2066949@gmail.com',role:'—'},
   {name:'Elite Tech Services',email:'infoelitetechservices@gmail.com',role:'Viewer'},
+  {name:'Irsa Haider',email:'irsahaider02@gmail.com',role:'Editor'},
   {name:'Javeria Rehman',email:'javeriarehman510@gmail.com',role:'—'},
   {name:'Kamran Maqsood',email:'kamranmaqsood128@gmail.com',role:'—'},
   {name:'M. Shahbaz Alam',email:'mshahbazalam.2000@gmail.com',role:'Production'},
@@ -3335,6 +3336,7 @@ function rUS(){
     +'<div><div style="font-size:14px;font-weight:700;color:var(--dk)">Team Members</div>'
     +'<div style="font-size:10px;color:#aaa;margin-top:2px">'+USERS.length+' users &nbsp;·&nbsp; Click 🔑 to reset a password</div></div>'
     +adminNote
+    +(isAdmin?'<button onclick="adminCreateUser()" style="background:var(--gold);color:#111;border:none;border-radius:5px;padding:6px 13px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">+ Add User</button>':'')
     +'</div>'
     +'<div style="border:1px solid #e8e4dc;border-radius:8px;overflow:hidden;background:#fff">'
     +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
@@ -8279,6 +8281,28 @@ async function adminResetPW(idx){
     var j=await r.json();
     if(r.ok&&j.ok)showToast('Password reset for '+u.name+' ✓');
     else showToast(j.error||'Reset failed.');
+  }catch(e){showToast('Cannot reach the server.');}
+}
+// Creates the login only (email/password in the Worker's auth_users store).
+// USERS above is a hardcoded directory, not fetched from anywhere, so a
+// brand-new person won't appear in this panel -- or get anything past the
+// lowest, no-special-access role -- until they're added to that array in the
+// source and redeployed. Tell whoever you just added to log in once so you
+// can see their name here, then add them to USERS yourself for real access.
+async function adminCreateUser(){
+  if(!CU||CU.role!=='Owner')return;
+  var name=prompt('Name for the new user:');if(name===null)return;name=name.trim();
+  if(!name){alert('Enter a name.');return;}
+  var email=prompt('Email for '+name+':');if(email===null)return;email=email.trim().toLowerCase();
+  if(!email||email.indexOf('@')<0){alert('Enter a valid email.');return;}
+  var np=prompt('Set an initial password for '+name+' (they can change it later):');
+  if(np===null)return;np=np.trim();
+  if(np.length<6){alert('Password must be at least 6 characters.');return;}
+  try{
+    var r=await fetch(CLOUD_API+'/admin-create-user',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({name:name,email:email,password:np})});
+    var j=await r.json();
+    if(r.ok&&j.ok)showToast(name+' can now log in ✓ — add them to USERS in the source for real access & to see them here.');
+    else showToast(j.error||'Could not create the login.');
   }catch(e){showToast('Cannot reach the server.');}
 }
 

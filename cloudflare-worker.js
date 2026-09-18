@@ -158,6 +158,28 @@ export default {
         return new Response(JSON.stringify({ ok: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       }
 
+      // POST /admin-create-user — Owner adds a brand-new login. SEED_USERS no
+      // longer carries real passwords (see the comment above it), so this is
+      // the only way a new person gets a login now.
+      if (path === '/admin-create-user' && request.method === 'POST') {
+        const auth = await verifyToken(env.AUTH_SECRET, (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
+        if (!auth || auth.email !== 'junaidsarwar82@gmail.com') {
+          return new Response(JSON.stringify({ ok: false, error: 'Only the Owner can add users.' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
+        let body; try { body = await request.json(); } catch (e) { body = {}; }
+        const target = String(body.email || '').toLowerCase().trim();
+        const name = String(body.name || '').trim();
+        const np = String(body.password || '');
+        if (!target || !target.includes('@')) return new Response(JSON.stringify({ ok: false, error: 'Enter a valid email.' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+        if (!name) return new Response(JSON.stringify({ ok: false, error: 'Enter a name.' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+        if (np.length < 6) return new Response(JSON.stringify({ ok: false, error: 'Password must be at least 6 characters.' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+        const users = await loadAuthUsers(env);
+        if (users[target]) return new Response(JSON.stringify({ ok: false, error: 'That email already has a login.' }), { status: 409, headers: { ...cors, 'Content-Type': 'application/json' } });
+        users[target] = { name, hash: await hashPassword(env.AUTH_SECRET, np) };
+        await env.PO_STORE.put('auth_users', JSON.stringify(users));
+        return new Response(JSON.stringify({ ok: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+
       // POST /admin-reset-pw — Owner resets someone else's password.
       if (path === '/admin-reset-pw' && request.method === 'POST') {
         const auth = await verifyToken(env.AUTH_SECRET, (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
