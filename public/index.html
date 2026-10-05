@@ -567,6 +567,14 @@ var SHOP_HANDLE={};
 // the Laam file), and a split that doesn't match the Stock beside it is worse
 // than no split at all.
 var SHOP_SIZES={};
+// Season / No. of Pieces — Shopify metafields shown on the product page's specs
+// table (e.g. "Summer Wear" / "3-Piece"), not Shopify's built-in product
+// fields. Only populated when the uploaded Shopify export includes those
+// metafield columns (the merchant must tick them when exporting); a product
+// with neither column present or empty stays out of these maps entirely, so
+// the Summary Sheet can tell "no data" apart from a real value.
+var SHOP_SEASON={};
+var SHOP_PCS={};
 var SHOP_STORE='sahiba-clothing'; // <store>.myshopify.com — the admin URL still needs this
 // The storefront's real domain. The .myshopify.com address does redirect here,
 // but it bounces through Shopify first and flashes the wrong brand in the
@@ -811,6 +819,8 @@ async function initCloud(){
       if(data5.sizes)SHOP_SIZES=data5.sizes;
       if(data5.status)SHOP_STATUS=data5.status;
       if(data5.handle)SHOP_HANDLE=data5.handle;
+      if(data5.season)SHOP_SEASON=data5.season;
+      if(data5.pcs)SHOP_PCS=data5.pcs;
       if(data5.img){
         SHOP_IMG=data5.img;
         // Shopify's photo is authoritative — OVERWRITE, don't just fill gaps,
@@ -869,8 +879,18 @@ async function generate(){
       setProg(11,'Loading Shopify products...');
       var shTxt=await readFile(shopFile);
       var shRows=Papa.parse(shTxt,{header:true,skipEmptyLines:true}).data;
-      SHOP_STOCK={};SHOP_PRICE={};SHOP_COMPARE={};SHOP_IMG={};SHOP_HANDLE={};SHOP_SIZES={};
+      SHOP_STOCK={};SHOP_PRICE={};SHOP_COMPARE={};SHOP_IMG={};SHOP_HANDLE={};SHOP_SIZES={};SHOP_SEASON={};SHOP_PCS={};
       var lastTitle='';
+      // Metafield column names vary by store/export settings (Shopify prints
+      // them as e.g. "Season (product.metafields.custom.season)" or
+      // "Metafield: custom.season [single_line_text_field]") -- detect them
+      // once from the header row instead of hardcoding one exact name.
+      var _seasonCol=null,_pcsCol=null;
+      if(shRows.length){
+        var _shHdrs=Object.keys(shRows[0]);
+        _seasonCol=_shHdrs.find(function(h){return /season/i.test(h);})||null;
+        _pcsCol=_shHdrs.find(function(h){return /number\s*of\s*pieces|piece\s*count|no\.?\s*of\s*pieces/i.test(h);})||null;
+      }
       // Which Option column holds the size varies by product (Size is usually
       // Option1, but a product with a colour option can push it to 2 or 3), and
       // Shopify only prints the Option *names* on a product's first row -- the
@@ -929,6 +949,8 @@ async function generate(){
         // export through the app used to WIPE all photos from the cloud.
         var im=(r['Image Src']||r['image src']||r['Variant Image']||'').trim();
         if(key&&im&&im.indexOf('http')===0&&!SHOP_IMG[key])SHOP_IMG[key]=im;
+        if(key&&_seasonCol){var sea=String(r[_seasonCol]||'').trim();if(sea)SHOP_SEASON[key]=sea;}
+        if(key&&_pcsCol){var pcN=parseInt(String(r[_pcsCol]||'').replace(/[^0-9]/g,''),10)||0;if(pcN>0)SHOP_PCS[key]=pcN;}
       });
       // A fresh export is the authoritative current photo set — overwrite, so
       // photo CHANGES on Shopify propagate instead of being kept stale.
@@ -1717,7 +1739,7 @@ function rST(){
 
 // ── PRODUCT SUMMARY — built from sales data ──
 var _csSortCol='total10',_csSortAsc=false,_csSelProds=new Set(),_csActiveRow=-1;
-var _csFilters={search:'',status:'',shopSt:'',stDiff:'',min10d:0,minStk:0,minRate:0};
+var _csFilters={search:'',status:'',shopSt:'',stDiff:'',min10d:0,minStk:0,minRate:0,season:'',pcs:''};
 // Discontinued products (inactive/draft on BOTH platforms, zero stock
 // everywhere, can never sell again) clutter the default view with dead SKUs
 // that still show up because they have historical orders. Hidden by default;
@@ -1819,6 +1841,7 @@ function csApplyFilter(el){var k=el.getAttribute('data-k'),v=el.value;if(k==='mi
 // actually shown in the Summary Sheet table, in the same order.
 function csExpRows(rows,fname){csvDL(rows.map(function(p){return[
     p.createdAt||'',p.name,p.rating||'',p.ratingN||'',
+    p.season||'',p.pcs!=null?p.pcs:'',
     p.grossPrice||'',p.discountAmt||'',p.discountPct||'',
     p.retailPrice||'',p.shopPrice||'',p.priceDiff!=null?p.priceDiff:'',
     p.cost||'',p.gpUnit||'',p.gpPct||'',p.commission||'',
@@ -1835,6 +1858,7 @@ function csExpRows(rows,fname){csvDL(rows.map(function(p){return[
     p.img||''
   ];}),[
     'Created','Product','Rating','RatingCount',
+    'Season','Pcs',
     'GrossPrice','Discount','Disc%',
     'RetailPrice(Laam)','RetailPrice(Shopify)','PriceDiff',
     'Cost','GP','GP%','Commission',
@@ -1920,8 +1944,15 @@ function rCS(){
       avgRet:avgRet,gpUnit:gpUnit,gpPct:gpPct,discountPct:discountPct,discountAmt:discountAmt,
       commission:commission,netPat:netPat,netPatPct:netPatPct,
       szTotal:p.szS+p.szM+p.szL+p.szXL,
+      season:SHOP_SEASON[k]||'',pcs:SHOP_PCS[k]!=null?SHOP_PCS[k]:null,
     });
-  }).filter(function(p){
+  });
+  // Distinct Season/Pcs values across ALL products, computed before the filter
+  // below narrows `arr` -- so picking one option in the dropdown doesn't also
+  // shrink the dropdown's own choices out from under it.
+  var _seasonOpts=Array.from(new Set(arr.map(function(p){return p.season;}).filter(Boolean))).sort();
+  var _pcsOpts=Array.from(new Set(arr.map(function(p){return p.pcs;}).filter(function(v){return v!=null;}))).sort(function(a,b){return a-b;});
+  arr=arr.filter(function(p){
     var cf=_csFilters;
     if(cf.search&&p.name.toLowerCase().indexOf(cf.search.toLowerCase())<0)return false;
     if(cf.status&&p.stockStatus!==cf.status)return false;
@@ -1931,6 +1962,8 @@ function rCS(){
     if(cf.min10d&&p.total10<cf.min10d)return false;
     if(cf.minStk&&(p.laamTotal===null||p.laamTotal<cf.minStk))return false;
     if(cf.minRate&&p.daily<cf.minRate)return false;
+    if(cf.season&&p.season!==cf.season)return false;
+    if(cf.pcs&&String(p.pcs)!==cf.pcs)return false;
     return true;
   });
   var isDiscontinued=function(p){return p.stockStatus!=='ACTIVE'&&p.shopStatus!=='ACTIVE'&&(p.laamTotal||0)===0&&(p.shopStock||0)===0&&(p.saTotal||0)===0;};
@@ -2022,6 +2055,8 @@ function rCS(){
    +sel('stDiff',[['MISMATCH','Mismatch Only'],['SAME','Matching Only']],'Status Diff: All')
    +sel('min10d',[['1','>1'],['5','>5'],['10','>10'],['20','>20'],['30','>30']],'10d Sales: All')
    +(hasStock?sel('minStk',[['1','In Stock'],['10','>10'],['20','>20'],['50','>50']],'Laam Stock: All'):'')
+   +(_seasonOpts.length?sel('season',_seasonOpts.map(function(s){return[s,s];}),'Season: All'):'')
+   +(_pcsOpts.length?sel('pcs',_pcsOpts.map(function(p){return[String(p),p+'-Pc'];}),'Pcs: All'):'')
    +sel('minRate',[['0.5','>0.5/d'],['1','>1/d'],['2','>2/d'],['5','>5/d']],'Daily Rate: All')
    +(discontinuedCount>0?'<button onclick="csToggleDiscontinued()" title="Discontinued = inactive/draft on both Laam and Shopify, zero stock everywhere" style="border:1px solid '+(_csHideDiscontinued?'#ccc':'#c0392b')+';background:'+(_csHideDiscontinued?'#fff':'#fdf0f0')+';color:'+(_csHideDiscontinued?'#888':'#c0392b')+';border-radius:4px;padding:5px 10px;font-size:10px;cursor:pointer;font-weight:600">'+(_csHideDiscontinued?'Show discontinued ('+discontinuedCount+' hidden)':'Hide discontinued ('+discontinuedCount+')')+'</button>':'')
    +'<span style="color:#ccc;margin:0 2px">|</span>'
@@ -2079,6 +2114,8 @@ function rCS(){
   cRow+='<th data-fl="1" data-c="name" onclick="csSort(this)" style="padding:6px 8px;background:'+hbg+';border-bottom:2px solid #e8e4dc;text-align:left;min-width:140px;white-space:nowrap;cursor:pointer;user-select:none">Product'+((_csSortCol==='name'&&_csSortAsc)?' ↑':(_csSortCol==='name'&&!_csSortAsc)?' ↓':'')+'</th>';
   cRow+='<th data-fl="1" style="padding:6px 6px;background:'+hbg+';border-bottom:2px solid #e8e4dc;width:64px;min-width:64px">IMG</th>';
   cRow+='<th data-fl="1" data-c="rating" onclick="csSort(this)" style="padding:6px 8px;background:'+hbg+';border-bottom:2px solid #e8e4dc;text-align:center;min-width:78px;white-space:nowrap;cursor:pointer;user-select:none" title="Laam customer rating — click to sort">★ Rating'+((_csSortCol==='rating'&&_csSortAsc)?' ↑':(_csSortCol==='rating'&&!_csSortAsc)?' ↓':'')+'</th>';
+  cRow+=mkTH('Season','season','#fffaf0','left',110,null,'color:#a07030');
+  cRow+=mkTH('Pcs','pcs','#fffaf0','center',50,null,'color:#a07030');
   if(hasStock&&G.pricing){
     cRow+='<th data-fl="1" data-c="grossPrice" onclick="csSort(this)" style="padding:6px 8px;background:#fdf8f0;border-bottom:2px solid #e8e4dc;text-align:right;min-width:80px;white-space:nowrap;cursor:pointer;user-select:none">Gross Price'+((_csSortCol==='grossPrice'&&_csSortAsc)?' ↑':(_csSortCol==='grossPrice'&&!_csSortAsc)?' ↓':'')+'</th>';
     cRow+='<th data-fl="1" data-c="discountAmt" onclick="csSort(this)" style="padding:6px 8px;background:#fdf8f0;border-bottom:2px solid #e8e4dc;text-align:right;min-width:75px;white-space:nowrap;cursor:pointer;user-select:none">Discount'+((_csSortCol==='discountAmt'&&_csSortAsc)?' ↑':(_csSortCol==='discountAmt'&&!_csSortAsc)?' ↓':'')+'</th>';
@@ -2207,6 +2244,8 @@ function rCS(){
      +'<td data-fl="1" style="padding:6px 8px;background:'+bg+';font-weight:700;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">'+nameCell+'</td>'
      +'<td data-fl="1" style="padding:4px 6px;background:'+bg+';width:64px;min-width:64px;max-width:64px">'+imgHtml+'</td>'
      +'<td data-fl="1" style="padding:4px 6px;background:'+bg+';text-align:center;white-space:nowrap">'+(ratingChip(p.name)||'<span style="color:#ccc;font-size:9px">—</span>')+'</td>'
+     +'<td style="padding:4px 8px;background:'+bg+'">'+(p.season?'<span style="border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;'+(/summer/i.test(p.season)?'background:#eef3fb;color:#2980b9':/winter/i.test(p.season)?'background:#f0eefb;color:#6a4fb0':'background:#f4f2ec;color:#777')+'">'+p.season+'</span>':'<span style="color:#ccc;font-size:9px">—</span>')+'</td>'
+     +'<td style="padding:4px 8px;background:'+bg+';text-align:center;font-weight:700;color:#555">'+(p.pcs!=null?p.pcs+'-Pc':'<span style="color:#ccc;font-weight:400;font-size:9px">—</span>')+'</td>'
      +(hasStock&&G.pricing?'<td data-fl="1" class="cs-c cs-bg1 cs-gd cs-fw6">'+(p.grossPrice>0?NF(p.grossPrice):'-')+'</td>':'')
      +(hasStock&&G.pricing?'<td data-fl="1" class="cs-c cs-bg1 cs-fw6" style="color:'+(p.discountAmt>0?'#e74c3c':'#bbb')+'">'+(p.discountAmt>0?NF(p.discountAmt):'-')+'</td>':'')
      +(hasStock&&G.pricing?'<td data-fl="1" class="cs-c cs-bg1 cs-fw6" style="color:'+(p.discountPct>0?'#e74c3c':'#bbb')+'">'+(p.discountPct>0?p.discountPct+'%':'-')+'</td>':'')
@@ -3699,7 +3738,7 @@ async function publishSnapshot(){
     if(window._shopFresh){
       try{
         var r2=await fetch(CLOUD_API+'/shopify-data',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),
-          body:JSON.stringify({stock:SHOP_STOCK,price:SHOP_PRICE,compare:SHOP_COMPARE,status:SHOP_STATUS,img:SHOP_IMG,handle:SHOP_HANDLE,sizes:SHOP_SIZES,gen:new Date().toISOString()})});
+          body:JSON.stringify({stock:SHOP_STOCK,price:SHOP_PRICE,compare:SHOP_COMPARE,status:SHOP_STATUS,img:SHOP_IMG,handle:SHOP_HANDLE,sizes:SHOP_SIZES,season:SHOP_SEASON,pcs:SHOP_PCS,gen:new Date().toISOString()})});
         var j2=await r2.json();
         if(r2.ok&&j2.ok)msg+=' + Shopify snapshot ✓';
       }catch(e2){}
