@@ -3346,6 +3346,7 @@ function rUS(){
       +'</select>':'';
     var actions=isAdmin
       ?roleDropdown+'<button onclick="adminResetPW('+i+')" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#666;font-weight:600" title="Reset this user\'s password">🔑 Reset PW</button>'
+        +(CU&&CU.email!==u.email?'<button onclick="adminDeleteUser('+i+')" style="background:#fff0f0;border:1px solid #f0c0c0;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#c0392b;font-weight:600;margin-left:6px" title="Revoke this user\'s login — they can no longer sign in">✕ Remove</button>':'')
       :(CU&&CU.email===u.email?'<button onclick="openCPW()" style="background:#f5f5f5;border:1px solid #e0dcd4;border-radius:4px;padding:3px 10px;font-size:9px;cursor:pointer;color:#666;font-weight:600">🔑 Change PW</button>':'');
     return '<tr style="border-bottom:1px solid #f0ede8">'
       +'<td style="padding:9px 10px;text-align:center;color:#ccc;font-size:10px">'+(i+1)+'</td>'
@@ -8342,6 +8343,25 @@ async function adminCreateUser(){
     var j=await r.json();
     if(r.ok&&j.ok)showToast(name+' can now log in ✓ — add them to USERS in the source for real access & to see them here.');
     else showToast(j.error||'Could not create the login.');
+  }catch(e){showToast('Cannot reach the server.');}
+}
+// Revokes a login (Worker-side auth_users entry deleted). This is "can't
+// sign in again from here on", not an instant kick -- a token they already
+// hold keeps working on every other endpoint until it expires on its own
+// (30 days from when they last logged in; see TOKEN_TTL_DAYS on the Worker),
+// since verifyToken checks only the token's own signature/expiry, never
+// this list. Does NOT touch USERS here -- that's still a separate, hardcoded
+// directory; removing their row from the Users panel is a source change.
+async function adminDeleteUser(idx){
+  if(!CU||CU.role!=='Owner')return;
+  var u=USERS[idx];
+  if(u.email===CU.email){alert('Cannot remove your own Owner account.');return;}
+  if(!confirm('Revoke '+u.name+'\'s login ('+u.email+')?\n\nThey will not be able to sign in again. If they\'re already logged in somewhere, that session keeps working until it naturally expires (up to 30 days) -- this does not kick them out instantly.'))return;
+  try{
+    var r=await fetch(CLOUD_API+'/admin-delete-user',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({email:u.email})});
+    var j=await r.json();
+    if(r.ok&&j.ok)showToast(u.name+'\'s login revoked ✓ — they can no longer sign in.');
+    else showToast(j.error||'Could not revoke the login.');
   }catch(e){showToast('Cannot reach the server.');}
 }
 

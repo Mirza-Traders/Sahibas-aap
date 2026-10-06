@@ -1,10 +1,13 @@
-// /admin-create-user harness for cloudflare-worker.js.
+// /admin-create-user and /admin-delete-user harness for cloudflare-worker.js.
 //
 //   node tests/worker/auth-harness.mjs
 //
-// SEED_USERS no longer carries real passwords, so this is the only path that
-// creates a login. Owner-only, must reject a weak password, must not clobber
-// an existing email, and the created login must actually work afterward.
+// SEED_USERS no longer carries real passwords, so /admin-create-user is the
+// only path that creates a login. Owner-only, must reject a weak password,
+// must not clobber an existing email, and the created login must actually
+// work afterward. /admin-delete-user is the only path that revokes one --
+// Owner-only, must reject deleting the Owner account, and once deleted the
+// same credentials must stop working at /login.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -35,6 +38,7 @@ async function main() {
   };
   const ownerTok = (await login(OWNER_EMAIL, OWNER_PASS)).body.token;
   const createUser = (body, tok) => worker.fetch(new Request('https://w/admin-create-user', { method: 'POST', headers: { Authorization: 'Bearer ' + (tok || ownerTok), 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), env).then(async r => ({ status: r.status, body: await r.json() }));
+  const deleteUser = (body, tok) => worker.fetch(new Request('https://w/admin-delete-user', { method: 'POST', headers: { Authorization: 'Bearer ' + (tok || ownerTok), 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), env).then(async r => ({ status: r.status, body: await r.json() }));
 
   console.log('=== 1. Owner creates a new user ===');
   const r1 = await createUser({ name: 'Irsa Haider', email: 'irsahaider02@gmail.com', password: 'XiuyaQdXQHv' });
@@ -61,5 +65,26 @@ async function main() {
   const r6a = await createUser({ email: 'noname@example.com', password: 'longenough1' });
   const r6b = await createUser({ name: 'Bad Email', email: 'not-an-email', password: 'longenough1' });
   console.log('  no name -> ' + r6a.status + (r6a.status === 400 ? '  ✓' : '  ✗') + ' · bad email -> ' + r6b.status + (r6b.status === 400 ? '  ✓' : '  ✗'));
+
+  console.log('\n=== 7. Owner revokes a login, and it actually stops working ===');
+  await createUser({ name: 'Zain RZ', email: 'rz-test@example.com', password: 'zain-pw-only' });
+  const r7 = await deleteUser({ email: 'rz-test@example.com' });
+  const r7login = await login('rz-test@example.com', 'zain-pw-only');
+  console.log('  delete -> status ' + r7.status + ' ' + JSON.stringify(r7.body) + (r7.status === 200 && r7.body.ok ? '  ✓' : '  ✗') + ' · login after delete -> status ' + r7login.status + (r7login.status === 401 ? '  ✓ rejected' : '  ✗'));
+
+  console.log('\n=== 8. Deleting an unknown user is rejected ===');
+  const r8 = await deleteUser({ email: 'nobody-here@example.com' });
+  console.log('  status ' + r8.status + ' -> ' + JSON.stringify(r8.body) + (r8.status === 404 ? '  ✓ rejected' : '  ✗'));
+
+  console.log('\n=== 9. Cannot delete the Owner account ===');
+  const r9 = await deleteUser({ email: OWNER_EMAIL });
+  const r9login = await login(OWNER_EMAIL, OWNER_PASS);
+  console.log('  status ' + r9.status + ' -> ' + JSON.stringify(r9.body) + (r9.status === 400 ? '  ✓ rejected' : '  ✗') + ' · Owner can still log in: ' + !!r9login.body.token);
+
+  console.log('\n=== 10. Non-Owner cannot delete users ===');
+  const r10 = await createUser({ name: 'Target', email: 'target@example.com', password: 'longenough1' });
+  const r10login = await login('irsahaider02@gmail.com', 'XiuyaQdXQHv');
+  const r10del = await deleteUser({ email: 'target@example.com' }, r10login.body.token);
+  console.log('  status ' + r10del.status + ' -> ' + JSON.stringify(r10del.body) + (r10del.status === 403 ? '  ✓ blocked' : '  ✗'));
 }
 main().catch(e => { console.error(e); process.exit(1); });

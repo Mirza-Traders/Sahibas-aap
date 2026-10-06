@@ -197,6 +197,29 @@ export default {
         return new Response(JSON.stringify({ ok: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       }
 
+      // POST /admin-delete-user — Owner revokes someone's login. Deletes their
+      // auth_users entry, so /login and /change-password reject them from
+      // here on. NOTE: verifyToken() is stateless (HMAC + exp only, never
+      // re-checks this map), so a token they already hold keeps working on
+      // every OTHER endpoint until its own TOKEN_TTL_DAYS expiry -- this is
+      // "can't sign in again", not "kicked out right now".
+      if (path === '/admin-delete-user' && request.method === 'POST') {
+        const auth = await verifyToken(env.AUTH_SECRET, (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
+        if (!auth || auth.email !== 'junaidsarwar82@gmail.com') {
+          return new Response(JSON.stringify({ ok: false, error: 'Only the Owner can remove users.' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
+        let body; try { body = await request.json(); } catch (e) { body = {}; }
+        const target = String(body.email || '').toLowerCase().trim();
+        if (target === 'junaidsarwar82@gmail.com') {
+          return new Response(JSON.stringify({ ok: false, error: 'Cannot remove the Owner account.' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
+        const users = await loadAuthUsers(env);
+        if (!users[target]) return new Response(JSON.stringify({ ok: false, error: 'Unknown user.' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
+        delete users[target];
+        await env.PO_STORE.put('auth_users', JSON.stringify(users));
+        return new Response(JSON.stringify({ ok: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+
       // Health + sync endpoints stay open: they return only status (no business
       // data) and the sync links are triggered by pasting a URL in a browser,
       // where an Authorization header can't be added.
