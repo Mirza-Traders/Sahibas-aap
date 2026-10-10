@@ -2079,7 +2079,7 @@ function rCS(){
 
   // Row 1: Group label row — no per-cell top sticky; <thead> handles vertical freeze
   var gRow='<tr style="font-size:9px;font-weight:700">';
-  gRow+='<th colspan="5" style="background:#f0ede8;padding:3px 9px;position:sticky;left:0;z-index:9;border-bottom:1px solid #e0dcd4;text-align:left;color:var(--gold2);font-size:10px">Summary Sheet</th>';
+  gRow+='<th colspan="7" style="background:#f0ede8;padding:3px 9px;position:sticky;left:0;z-index:9;border-bottom:1px solid #e0dcd4;text-align:left;color:var(--gold2);font-size:10px">Summary Sheet</th>';
   if(hasStock&&G.pricing){gRow+='<th colspan="3" style="background:#fdf3e8;color:#c8a96e;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8">Gross Price &amp; Disc%</th>';}
   if(hasStock){gRow+='<th colspan="3" style="background:#fdf3e8;color:#2980b9;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8;border-right:2px solid #c8a96e">Retail Price</th>';}
   if(G.gp){
@@ -2178,6 +2178,8 @@ function rCS(){
    +'<td data-fl="1" style="padding:5px 8px;background:'+totBg+';font-weight:800;white-space:nowrap;color:var(--gold2)">SUBTOTAL — '+arr.length+' products</td>'
    +'<td data-fl="1" style="padding:5px 8px;background:'+totBg+'"></td>'
    +'<td data-fl="1" style="padding:5px 8px;background:'+totBg+';text-align:center;color:#bbb">—</td>'
+   +'<td style="padding:5px 8px;background:'+totBg+';color:#bbb">—</td>'
+   +'<td style="padding:5px 8px;background:'+totBg+';text-align:center;color:#bbb">—</td>'
    +(hasStock&&G.pricing?'<td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td>':'')
    +(hasStock?'<td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td><td data-fl="1" style="padding:5px 8px;text-align:right;background:'+totBg+';color:#bbb">—</td>':'')
    +(G.gp?tdc('—','color:#bbb')+tdc('—','background:#ecfaec;color:#bbb')+tdc('—','background:#ecfaec;color:#bbb')+tdc('—','background:#f9f5ff;color:#bbb'):'')
@@ -4756,15 +4758,19 @@ function acChBtn(){
     +(acChOpen()?'\u2212':'+')+'</span>';
 }
 // The four headers sit immediately before the total they add up to.
+// Collapsing used to hide the toggle button along with the columns -- a
+// dead end with no way back to the open state short of clearing
+// localStorage by hand. Collapsed now keeps one narrow header cell just
+// for the button, so it's always reachable.
 function acChTh(TH){
-  if(!acChOpen())return '';
+  if(!acChOpen())return '<th style="'+TH+'width:20px;padding:4px 2px;text-align:center">'+acChBtn()+'</th>';
   return AC_CH.map(function(k,i){
     return '<th style="'+TH+AC_CHBG[k]+(k==='mktL'?'border-left:2px solid #e0c890;':k==='octL'?'border-left:2px solid #cfe0d9;':'')
       +'color:'+(k.indexOf('mkt')===0?'#8a6a24':'#2c6152')+'">'+AC_CHLBL[k]+(i===0?acChBtn():'')+'</th>';
   }).join('');
 }
 function acChTd(ch,TD){
-  if(!acChOpen())return '';
+  if(!acChOpen())return '<td style="'+TD+'"></td>';
   var c=ch||acChZero();
   return AC_CH.map(function(k){
     return '<td style="'+TD+AC_CHBG[k]+(k==='mktL'?'border-left:2px solid #e0c890;':k==='octL'?'border-left:2px solid #cfe0d9;':'')+'">'
