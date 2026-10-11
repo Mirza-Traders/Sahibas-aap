@@ -2079,7 +2079,8 @@ function rCS(){
 
   // Row 1: Group label row — no per-cell top sticky; <thead> handles vertical freeze
   var gRow='<tr style="font-size:9px;font-weight:700">';
-  gRow+='<th colspan="7" style="background:#f0ede8;padding:3px 9px;position:sticky;left:0;z-index:9;border-bottom:1px solid #e0dcd4;text-align:left;color:var(--gold2);font-size:10px">Summary Sheet</th>';
+  gRow+='<th colspan="5" style="background:#f0ede8;padding:3px 9px;position:sticky;left:0;z-index:9;border-bottom:1px solid #e0dcd4;text-align:left;color:var(--gold2);font-size:10px">Summary Sheet</th>';
+  gRow+='<th colspan="2" style="background:#fffaf0;padding:3px;text-align:center;color:#a07030;border-bottom:1px solid #f0e2c4">Product Info</th>';
   if(hasStock&&G.pricing){gRow+='<th colspan="3" style="background:#fdf3e8;color:#c8a96e;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8">Gross Price &amp; Disc%</th>';}
   if(hasStock){gRow+='<th colspan="3" style="background:#fdf3e8;color:#2980b9;text-align:center;padding:3px;border-bottom:1px solid #e8d8a8;border-right:2px solid #c8a96e">Retail Price</th>';}
   if(G.gp){
@@ -2340,9 +2341,12 @@ function csFixFreeze(){
   // Batch-read all widths at once (one layout pass, no thrashing)
   var widths=hCells.map(function(th){return th.offsetWidth;});
   var flCols={},leftAcc=0,lastFrozenLeft=0;
+  // Only FROZEN columns add to the running offset. Counting every column left
+  // a hole wherever a scrolling column (Season/Pcs) sits between two frozen
+  // ones: the later frozen block stayed pinned that far from the first, and
+  // everything else slid through the gap.
   for(var i=0;i<hCells.length;i++){
-    if(hCells[i].hasAttribute('data-fl')){flCols[i]=leftAcc;lastFrozenLeft=leftAcc;}
-    leftAcc+=widths[i];
+    if(hCells[i].hasAttribute('data-fl')){flCols[i]=leftAcc;lastFrozenLeft=leftAcc;leftAcc+=widths[i];}
   }
   if(!Object.keys(flCols).length)return;
   // Style header rows individually — only 3 rows × ~20 cells, negligible cost
