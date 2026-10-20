@@ -4821,11 +4821,41 @@ function acSzBtn(){
     +'" style="display:inline-block;margin-left:5px;border:1px solid var(--gold);border-radius:4px;width:15px;height:15px;line-height:12px;text-align:center;font-size:11px;font-weight:800;color:var(--gold2);background:#fff;cursor:pointer;vertical-align:middle">'
     +(acSzOpen()?'−':'+')+'</span>';
 }
-function acSzTh(TH,label){
-  var h=TH+AC_SZB;
+// Click-to-sort headers for an Insights table. The chosen column lives per
+// section in window._acSort, so the +/- toggles (which redraw the whole panel)
+// keep it. A section registers window._acReSort[sec] to redraw only itself.
+var AC_SORT_DEF={age:{col:'days',dir:'desc'}};
+function acSortCur(sec){return (window._acSort&&window._acSort[sec])||AC_SORT_DEF[sec]||null;}
+function acSortClick(sec,col){
+  var cur=acSortCur(sec)||{};
+  window._acSort=window._acSort||{};
+  window._acSort[sec]=cur.col===col?{col:col,dir:cur.dir==='desc'?'asc':'desc'}:{col:col,dir:'desc'};
+  var f=window._acReSort&&window._acReSort[sec];
+  if(f)f();else{rendered.ac=false;doR('ac');}
+}
+function acSortTh(st,label,sec,col,cur,extra){
+  var on=!!cur&&cur.col===col;
+  return '<th onclick="acSortClick(\''+sec+'\',\''+col+'\')" title="Click to sort — click again to reverse" style="'+st+'cursor:pointer;user-select:none;'+(on?'color:#7a4f10;':'')+'">'
+    +label+(on?(cur.dir==='asc'?' ↑':' ↓'):'')+(extra||'')+'</th>';
+}
+// Rows with no data for the chosen column (a product missing from the stock
+// file has no size split) always sink to the bottom, whichever way it is sorted.
+function acSortRows(rows,cur,keyFn,tieFn){
+  var sgn=cur.dir==='asc'?1:-1;
+  rows.sort(function(a,b){
+    var x=keyFn(a,cur.col),y=keyFn(b,cur.col);
+    if(x===null||y===null){if(x===y)return tieFn(a,b);return x===null?1:-1;}
+    return (x-y)*sgn||tieFn(a,b);
+  });
+}
+// `sort` ({sec,cur}) makes the size columns and the total clickable. The folded
+// "S / M / L / XL" cell can't name a size, so only the total sorts there.
+function acSzTh(TH,label,sort){
+  var h=TH+AC_SZB,tl=label||'Grand Total';
+  function cell(col,txt,extra){return sort?acSortTh(h,txt,sort.sec,col,sort.cur,extra):'<th style="'+h+'">'+txt+(extra||'')+'</th>';}
   return acSzOpen()
-    ? '<th style="'+h+'">S'+acSzBtn()+'</th><th style="'+h+'">M</th><th style="'+h+'">L</th><th style="'+h+'">XL</th><th style="'+h+'">'+(label||'Grand Total')+'</th>'
-    : '<th style="'+h+'">S / M / L / XL'+acSzBtn()+'</th><th style="'+h+'">'+(label||'Grand Total')+'</th>';
+    ? cell('S','S',acSzBtn())+cell('M','M')+cell('L','L')+cell('XL','XL')+cell('tot',tl)
+    : '<th style="'+h+'"'+(sort?' title="Expand into S, M, L and XL (the +) to sort by size"':'')+'>S / M / L / XL'+acSzBtn()+'</th>'+cell('tot',tl);
 }
 // The size cells plus the total. `extra` rides on the total cell (the "+SA n"
 // suffix New Arrivals carries). A product absent from the stock file shows "—",
@@ -5179,18 +5209,33 @@ function rAC(){
   var sec3=box(secHead('🏭','Reorder Now — will stock out within lead time',reorderRows.length,'#8e44ad','Cover = (stock + incoming PO) ÷ daily rate. Alert below '+(cfg.lead+cfg.safety)+' days; suggestion refills to '+(cfg.lead+cfg.cover)+' days','acExpReorder')
    +(reorderRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Sold 30d</th><th style="'+TH+'">Rate</th>'+acSzTh(TH)+'<th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Days Cover</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'">Suggested Order</th></tr></thead><tbody>'+h3rows+'</tbody></table>'):empty('Nothing needs reordering — all fast movers have enough cover')),'ac-sec-reorder');
 
-  // Section 4 — Ageing
-  var h4rows=ageRows.map(function(r){
-    var bucket=r.days===null?'Never sold':r.days>=90?'90+ days':r.days>=60?'60–90 days':r.days>=30?'30–60 days':r.days+' days';
-    var bColor=r.days===null||r.days>=90?'#c0392b':r.days>=60?'#d4780a':r.days>=30?'#d4944a':'#888';
-    return '<tr><td style="'+TDP+'width:40px">'+thumb(r)+'</td><td style="'+TDN+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
-     +'<td style="'+TD+'">'+(r.lastSale?fmtDMY(r.lastSale):'<span style="color:#c0392b;font-weight:700">never</span>')+'</td>'
-     +'<td style="'+TD+'font-weight:800;color:'+bColor+'">'+(r.days===null?'∞':r.days)+'</td>'
-     +'<td style="'+TD+'text-align:center"><span style="background:'+bColor+'18;color:'+bColor+';padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700">'+bucket+'</span></td>'
-     +acSzTd(r,TD)+'<td style="'+TD+'font-weight:700;color:'+(r.val>0?'#c0392b':'#bbb')+'">'+(r.cost>0?'PKR '+NF(r.val):'<span style="color:#d4944a" title="No cost saved for this product">no cost</span>')+'</td></tr>';
-  }).join('');
-  var sec4=box(secHead('🐌','Stock Ageing — sitting unsold',ageRows.length,'#2980b9','Stock on hand with no sale in the last '+cfg.ageDays+'+ days · <b style="color:#c0392b">PKR '+NF(stuckVal)+' stuck at cost</b>','acExpAge')
-   +(ageRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Last Sale</th><th style="'+TH+'">Days Since</th><th style="'+TH+'text-align:center">Bucket</th>'+acSzTh(TH)+'<th style="'+TH+'">Value at Cost</th></tr></thead><tbody>'+h4rows+'</tbody></table>'):empty('Everything with stock has sold within '+cfg.ageDays+' days')),'ac-sec-age');
+  // Section 4 — Ageing. Built by a function so a header click can redraw just
+  // this table; ageRows is sorted in place, so the CSV follows what is on screen.
+  function acAgeKey(r,col){
+    if(col==='days')return r.days===null?99999:r.days;
+    if(col==='tot')return r.stk;
+    if(col==='val')return r.val;
+    var z=acSizes(r.name);return z?z[col]:null;
+  }
+  function acAgeTie(a,b){return (b.days===null?99999:b.days)-(a.days===null?99999:a.days)||b.val-a.val;}
+  function ageSectionHtml(){
+    var cur=acSortCur('age');
+    acSortRows(ageRows,cur,acAgeKey,acAgeTie);
+    var h4rows=ageRows.map(function(r){
+      var bucket=r.days===null?'Never sold':r.days>=90?'90+ days':r.days>=60?'60–90 days':r.days>=30?'30–60 days':r.days+' days';
+      var bColor=r.days===null||r.days>=90?'#c0392b':r.days>=60?'#d4780a':r.days>=30?'#d4944a':'#888';
+      return '<tr><td style="'+TDP+'width:40px">'+thumb(r)+'</td><td style="'+TDN+'font-weight:600">'+acName(r)+(r.laamStatus&&r.laamStatus!=='ACTIVE'?' <span style="font-size:8px;color:#c0392b">('+r.laamStatus+')</span>':'')+'</td>'
+       +'<td style="'+TD+'">'+(r.lastSale?fmtDMY(r.lastSale):'<span style="color:#c0392b;font-weight:700">never</span>')+'</td>'
+       +'<td style="'+TD+'font-weight:800;color:'+bColor+'">'+(r.days===null?'∞':r.days)+'</td>'
+       +'<td style="'+TD+'text-align:center"><span style="background:'+bColor+'18;color:'+bColor+';padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700">'+bucket+'</span></td>'
+       +acSzTd(r,TD)+'<td style="'+TD+'font-weight:700;color:'+(r.val>0?'#c0392b':'#bbb')+'">'+(r.cost>0?'PKR '+NF(r.val):'<span style="color:#d4944a" title="No cost saved for this product">no cost</span>')+'</td></tr>';
+    }).join('');
+    return secHead('🐌','Stock Ageing — sitting unsold',ageRows.length,'#2980b9','Stock on hand with no sale in the last '+cfg.ageDays+'+ days · <b style="color:#c0392b">PKR '+NF(stuckVal)+' stuck at cost</b>','acExpAge')
+     +(ageRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Last Sale</th>'+acSortTh(TH,'Days Since','age','days',cur)+'<th style="'+TH+'text-align:center">Bucket</th>'+acSzTh(TH,null,{sec:'age',cur:cur})+acSortTh(TH,'Value at Cost','age','val',cur)+'</tr></thead><tbody>'+h4rows+'</tbody></table>'):empty('Everything with stock has sold within '+cfg.ageDays+' days'));
+  }
+  var sec4=box(ageSectionHtml(),'ac-sec-age');
+  window._acReSort=window._acReSort||{};
+  window._acReSort.age=function(){var el=document.getElementById('ac-sec-age');if(el)el.innerHTML=ageSectionHtml();};
 
   // Section 5 — Selling at a loss
   var h5rows=lossRows.map(function(r){
