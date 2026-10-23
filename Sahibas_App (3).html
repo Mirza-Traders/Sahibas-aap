@@ -4766,11 +4766,14 @@ function acChBtn(){
 // dead end with no way back to the open state short of clearing
 // localStorage by hand. Collapsed now keeps one narrow header cell just
 // for the button, so it's always reachable.
-function acChTh(TH){
+// `sort` ({sec,cur}) makes the four headers clickable (column id 'ch_'+key).
+function acChTh(TH,sort){
   if(!acChOpen())return '<th style="'+TH+'width:20px;padding:4px 2px;text-align:center">'+acChBtn()+'</th>';
   return AC_CH.map(function(k,i){
-    return '<th style="'+TH+AC_CHBG[k]+(k==='mktL'?'border-left:2px solid #e0c890;':k==='octL'?'border-left:2px solid #cfe0d9;':'')
-      +'color:'+(k.indexOf('mkt')===0?'#8a6a24':'#2c6152')+'">'+AC_CHLBL[k]+(i===0?acChBtn():'')+'</th>';
+    var st=TH+AC_CHBG[k]+(k==='mktL'?'border-left:2px solid #e0c890;':k==='octL'?'border-left:2px solid #cfe0d9;':'')
+      +'color:'+(k.indexOf('mkt')===0?'#8a6a24':'#2c6152')+';';
+    return sort?acSortTh(st,AC_CHLBL[k],sort.sec,'ch_'+k,sort.cur,i===0?acChBtn():'')
+      :'<th style="'+st+'">'+AC_CHLBL[k]+(i===0?acChBtn():'')+'</th>';
   }).join('');
 }
 function acChTd(ch,TD){
@@ -4824,14 +4827,27 @@ function acSzBtn(){
 // Click-to-sort headers for an Insights table. The chosen column lives per
 // section in window._acSort, so the +/- toggles (which redraw the whole panel)
 // keep it. A section registers window._acReSort[sec] to redraw only itself.
-var AC_SORT_DEF={age:{col:'days',dir:'desc'}};
+var AC_SORT_DEF={age:{col:'days',dir:'desc'},'new':{col:'rate',dir:'desc'}};
+// Text columns read A→Z on the first click; every number starts biggest-first.
+var AC_SORT_TXT={'new:name':1};
 function acSortCur(sec){return (window._acSort&&window._acSort[sec])||AC_SORT_DEF[sec]||null;}
 function acSortClick(sec,col){
   var cur=acSortCur(sec)||{};
   window._acSort=window._acSort||{};
-  window._acSort[sec]=cur.col===col?{col:col,dir:cur.dir==='desc'?'asc':'desc'}:{col:col,dir:'desc'};
+  window._acSort[sec]=cur.col===col?{col:col,dir:cur.dir==='desc'?'asc':'desc'}:{col:col,dir:AC_SORT_TXT[sec+':'+col]?'asc':'desc'};
   var f=window._acReSort&&window._acReSort[sec];
   if(f)f();else{rendered.ac=false;doR('ac');}
+}
+// Redraw one section in place. A new ranking should start at the top, but the
+// header just clicked is often far to the right, so the sideways scroll stays;
+// the pinned Product column is re-measured because its offset is set after render.
+function acReSection(id,htmlFn){
+  var el=document.getElementById(id);if(!el)return;
+  var q='.ac-scroll',sc=el.querySelector(q),l=sc?sc.scrollLeft:0;
+  el.innerHTML=htmlFn();
+  sc=el.querySelector(q);
+  if(sc)sc.scrollLeft=l;
+  acPinOffsets();
 }
 function acSortTh(st,label,sec,col,cur,extra){
   var on=!!cur&&cur.col===col;
@@ -4845,7 +4861,8 @@ function acSortRows(rows,cur,keyFn,tieFn){
   rows.sort(function(a,b){
     var x=keyFn(a,cur.col),y=keyFn(b,cur.col);
     if(x===null||y===null){if(x===y)return tieFn(a,b);return x===null?1:-1;}
-    return (x-y)*sgn||tieFn(a,b);
+    var c=typeof x==='string'?x.localeCompare(y,undefined,{sensitivity:'base'}):x-y;
+    return c*sgn||tieFn(a,b);
   });
 }
 // `sort` ({sec,cur}) makes the size columns and the total clickable. The folded
@@ -5165,7 +5182,7 @@ function rAC(){
      +'</div>';
   }
   function box(inner,id){return '<div id="'+id+'" style="background:#fff;border:1px solid #e8e4dc;border-radius:10px;overflow:hidden;margin-bottom:18px">'+inner+'</div>';}
-  function scrollWrap(tbl){return '<div style="max-height:46vh;overflow-y:auto;overflow-x:auto">'+tbl+'</div>';}
+  function scrollWrap(tbl){return '<div class="ac-scroll" style="max-height:46vh;overflow-y:auto;overflow-x:auto">'+tbl+'</div>';}
   function empty(msg){return '<div style="padding:22px;text-align:center;color:#27ae60;font-size:12px">✓ '+msg+'</div>';}
 
   // Section 1 — Price mismatches
@@ -5235,7 +5252,7 @@ function rAC(){
   }
   var sec4=box(ageSectionHtml(),'ac-sec-age');
   window._acReSort=window._acReSort||{};
-  window._acReSort.age=function(){var el=document.getElementById('ac-sec-age');if(el)el.innerHTML=ageSectionHtml();};
+  window._acReSort.age=function(){acReSection('ac-sec-age',ageSectionHtml);};
 
   // Section 5 — Selling at a loss
   var h5rows=lossRows.map(function(r){
@@ -5307,24 +5324,60 @@ function rAC(){
 
   // Section 7 — New arrivals scorecard
   var NV={BEST:{bg:'#e8f8ee',fg:'#1e8449',lbl:'🌟 BESTSELLER'},SELLOUT:{bg:'#fde8e8',fg:'#c0392b',lbl:'🔥 SELLING OUT — reorder now'},THIN:{bg:'#fff3e0',fg:'#b06000',lbl:'⚠ FAST BUT THIN — raise price'},THINOUT:{bg:'#fff3e0',fg:'#b06000',lbl:'⚠ FIX PRICE BEFORE REORDER'},NOCOST:{bg:'#f5f5f5',fg:'#888',lbl:'ADD COST TO JUDGE'},OK:{bg:'#f8f6f2',fg:'#888',lbl:'⚖ OK'},SLOW:{bg:'#eef2f8',fg:'#5070a0',lbl:'💤 SLOW'}};
-  var h7rows=newRows.map(function(r){
-    var v=NV[r.verdict];
-    return '<tr'+(r.verdict==='SELLOUT'?' style="background:#fff8f0"':'')+'><td style="'+TDP+'width:40px">'+thumb(r)+'</td>'
-     +'<td style="'+TDN+'font-weight:600">'+acName(r)+'</td>'
-     +'<td style="'+TD+'white-space:nowrap">'+fmtDMY(r.launch.toISOString().split('T')[0])+' <span style="color:#aaa;font-size:9px">('+r.daysLive+'d)</span></td>'
-     +'<td style="'+TD+'">'+(r.first14||'-')+'</td>'
-     +acChTd(r.ch,TD)+'<td style="'+TD+'font-weight:700">'+r.sold+acChOther(r.ch)+'</td>'
-     +'<td style="'+TD+'font-weight:700;color:'+(r.rate>=1?'#27ae60':r.rate<0.15?'#c0392b':'#333')+'">'+(Math.round(r.rate*10)/10)+'/day</td>'
-     +'<td style="'+TD+'">'+Math.round(r.sellThrough*100)+'%</td>'
-     +acSzTd(r,TD,(r.sa>0?' <span style="color:#5050b0;font-size:9px">+SA '+r.sa+'</span>':''))
-     +'<td style="'+TD+'">'+(r.inc>0?NF(r.inc)+(r.eta?' <span style="color:#888;font-size:9px">('+fmtDMY(r.eta)+')</span>':''):'—')+'</td>'
-     +'<td style="'+TD+'font-weight:600">'+(r.price>0?NF(r.price):'—')+'</td>'
-     +'<td style="'+TD+'">'+N(r.rev)+'</td>'
-     +'<td style="'+TD+'font-weight:700;color:'+(r.net===null?'#bbb':r.net<0?'#c0392b':r.net<cfg.minNet?'#b06000':'#27ae60')+'">'+(r.net===null?'—':NF(r.net))+'</td>'
-     +'<td style="'+TD+'text-align:center"><span style="background:'+v.bg+';color:'+v.fg+';padding:2px 8px;border-radius:3px;font-size:8px;font-weight:800;white-space:nowrap">'+v.lbl+'</span></td></tr>';
-  }).join('');
-  var sec7=box(secHead('🚀','New Arrivals Scorecard — launched in the last '+cfg.newDays+' days',newRows.length,'#c8a96e',nBest+' bestseller'+(nBest===1?'':'s')+' · '+nSlow+' slow · Bestseller = ≥1/day AND nets ≥PKR '+cfg.minNet+'/pc after the 25% load','acExpNew')
-   +(newRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th><th style="'+THN+'">Product</th><th style="'+TH+'">Launched</th><th style="'+TH+'">First 14d</th>'+acChTh(TH)+'<th style="'+TH+'">Sold</th><th style="'+TH+'">Rate</th><th style="'+TH+'">Sell-Through</th>'+acSzTh(TH)+'<th style="'+TH+'">Incoming PO</th><th style="'+TH+'">Retail</th><th style="'+TH+'">Revenue</th><th style="'+TH+'">Net/pc</th><th style="'+TH+'text-align:center">Verdict</th></tr></thead><tbody>'+h7rows+'</tbody></table>')+acChLegend():empty('No new arrivals in the last '+cfg.newDays+' days')),'ac-sec-new');
+  // Built by a function so a header click can redraw just this table; newRows
+  // is sorted in place, so the CSV follows what is on screen. A column with no
+  // value for a row (no cost -> no Net/pc, no price -> no Retail, not in the
+  // stock file -> no size split) sinks to the bottom either way.
+  var NV_RANK={SELLOUT:6,BEST:5,THINOUT:4,THIN:3,NOCOST:2,OK:1,SLOW:0};
+  function acNewKey(r,col){
+    switch(col){
+      case 'name':return String(r.name||'');
+      case 'launch':return r.launch.getTime();
+      case 'first14':return r.first14;
+      case 'sold':return r.sold;
+      case 'rate':return r.rate;
+      case 'st':return r.sellThrough;
+      case 'tot':return r.stk;
+      case 'inc':return r.inc;
+      case 'price':return r.price>0?r.price:null;
+      case 'rev':return r.rev;
+      case 'net':return r.net;
+      case 'verdict':return NV_RANK[r.verdict];
+      case 'S':case 'M':case 'L':case 'XL':var z=acSizes(r.name);return z?z[col]:null;
+    }
+    return col.indexOf('ch_')===0?((r.ch&&r.ch[col.slice(3)])||0):0;
+  }
+  function acNewTie(a,b){return b.rate-a.rate||b.sold-a.sold||(a.name<b.name?-1:a.name>b.name?1:0);}
+  function newSectionHtml(){
+    var cur=acSortCur('new'),srt={sec:'new',cur:cur};
+    acSortRows(newRows,cur,acNewKey,acNewTie);
+    var h7rows=newRows.map(function(r){
+      var v=NV[r.verdict];
+      return '<tr'+(r.verdict==='SELLOUT'?' style="background:#fff8f0"':'')+'><td style="'+TDP+'width:40px">'+thumb(r)+'</td>'
+       +'<td style="'+TDN+'font-weight:600">'+acName(r)+'</td>'
+       +'<td style="'+TD+'white-space:nowrap">'+fmtDMY(r.launch.toISOString().split('T')[0])+' <span style="color:#aaa;font-size:9px">('+r.daysLive+'d)</span></td>'
+       +'<td style="'+TD+'">'+(r.first14||'-')+'</td>'
+       +acChTd(r.ch,TD)+'<td style="'+TD+'font-weight:700">'+r.sold+acChOther(r.ch)+'</td>'
+       +'<td style="'+TD+'font-weight:700;color:'+(r.rate>=1?'#27ae60':r.rate<0.15?'#c0392b':'#333')+'">'+(Math.round(r.rate*10)/10)+'/day</td>'
+       +'<td style="'+TD+'">'+Math.round(r.sellThrough*100)+'%</td>'
+       +acSzTd(r,TD,(r.sa>0?' <span style="color:#5050b0;font-size:9px">+SA '+r.sa+'</span>':''))
+       +'<td style="'+TD+'">'+(r.inc>0?NF(r.inc)+(r.eta?' <span style="color:#888;font-size:9px">('+fmtDMY(r.eta)+')</span>':''):'—')+'</td>'
+       +'<td style="'+TD+'font-weight:600">'+(r.price>0?NF(r.price):'—')+'</td>'
+       +'<td style="'+TD+'">'+N(r.rev)+'</td>'
+       +'<td style="'+TD+'font-weight:700;color:'+(r.net===null?'#bbb':r.net<0?'#c0392b':r.net<cfg.minNet?'#b06000':'#27ae60')+'">'+(r.net===null?'—':NF(r.net))+'</td>'
+       +'<td style="'+TD+'text-align:center"><span style="background:'+v.bg+';color:'+v.fg+';padding:2px 8px;border-radius:3px;font-size:8px;font-weight:800;white-space:nowrap">'+v.lbl+'</span></td></tr>';
+    }).join('');
+    return secHead('🚀','New Arrivals Scorecard — launched in the last '+cfg.newDays+' days',newRows.length,'#c8a96e',nBest+' bestseller'+(nBest===1?'':'s')+' · '+nSlow+' slow · Bestseller = ≥1/day AND nets ≥PKR '+cfg.minNet+'/pc after the 25% load','acExpNew')
+     +(newRows.length?scrollWrap('<table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+THP+'"></th>'
+       +acSortTh(THN,'Product','new','name',cur)+acSortTh(TH,'Launched','new','launch',cur)+acSortTh(TH,'First 14d','new','first14',cur)
+       +acChTh(TH,srt)+acSortTh(TH,'Sold','new','sold',cur)+acSortTh(TH,'Rate','new','rate',cur)+acSortTh(TH,'Sell-Through','new','st',cur)
+       +acSzTh(TH,null,srt)
+       +acSortTh(TH,'Incoming PO','new','inc',cur)+acSortTh(TH,'Retail','new','price',cur)+acSortTh(TH,'Revenue','new','rev',cur)+acSortTh(TH,'Net/pc','new','net',cur)
+       +acSortTh(TH+'text-align:center;','Verdict','new','verdict',cur)
+       +'</tr></thead><tbody>'+h7rows+'</tbody></table>')+acChLegend():empty('No new arrivals in the last '+cfg.newDays+' days'));
+  }
+  var sec7=box(newSectionHtml(),'ac-sec-new');
+  window._acReSort.new=function(){acReSection('ac-sec-new',newSectionHtml);};
 
   // Section 6 — Broken size runs
   var VC={BROKEN:{bg:'#fdeaea',bd:'#e74c3c',fg:'#c0392b',lbl:'BROKEN'},SELLAHEAD:{bg:'#fff3e0',bd:'#e8a030',fg:'#b06000',lbl:'SELL-AHEAD'},COVERED:{bg:'#e8f8ee',bd:'#27ae60',fg:'#1e8449',lbl:'PO INCOMING'},UNKNOWN:{bg:'#fff8e0',bd:'#d4b040',fg:'#8a6800',lbl:'CHECK PO'},OK:{bg:'#fafaf8',bd:'transparent',fg:'#999',lbl:''}};
