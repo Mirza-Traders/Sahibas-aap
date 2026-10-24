@@ -7741,6 +7741,8 @@ function rRX(){
    +rxColBtn('verif','Customer Profile','#2471a3')
    +rxColBtn('bank','Bank','#a07030')
    +'<div style="margin-left:auto;display:flex;gap:6px">'
+   +((rexRole(CU)==='admin'||rexRole(CU)==='manager'||rexRole(CU)==='accountant')
+     ?'<button onclick="rxBackup()" title="Save every ticket with its notes and photos as one file you can keep" style="background:#fff;border:1px solid #a07030;color:#7a4f10;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer">💾 Full backup</button>':'')
    +'<button onclick="rxExport()" style="background:#fff;border:1px solid #27ae60;color:#27ae60;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer">⬇ CSV</button>'
    +'<button onclick="openRxNew(\'exchange\')" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">⇄ New Exchange</button>'
    +'<button onclick="openRxNew(\'refund\')" style="background:var(--gold);color:#111;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">+ New Refund</button>'
@@ -7829,6 +7831,7 @@ function rRX(){
    +'<tbody>'+(body||'<tr><td colspan="'+(9+(showV?1:0)+(showB?3:1))+'" style="padding:36px;text-align:center;color:#bbb;font-size:12px">No tickets yet — create the first one with + New Refund or ⇄ New Exchange</td></tr>')+'</tbody></table>'
    +'</div></div></div>';
 }
+var RX_PHOTO_KEYS=['chatScreenshot','receivedPhoto','paidPhoto','informedPhoto'];
 function rxExport(){
   csvDL((window.TICKETS||[]).map(function(t){
     var its=rxItems(t);
@@ -7839,9 +7842,134 @@ function rxExport(){
       its.map(function(it){return it.sizeToSend||'';}).join('; '),
       t.amount||0,t.platform||'',t.reason||'',t.assignedTo||'',rxStageLabel(t.status,t.type),t.createdBy||'',t.bankName||'',t.accountTitle||'',t.accountNumber||'',
       (rxDupLevel(t)||'').toUpperCase(),rxDupFindings(t).map(function(x){return x.level.toUpperCase()+': '+x.why;}).join(' | '),
-      (t.history||[]).map(function(h){return h.stage+' by '+h.by+' at '+h.at;}).join(' | ')];
+      (t.history||[]).map(function(h){return h.stage+' by '+h.by+' at '+h.at+(h.note?' — '+h.note:'');}).join(' | '),
+      t.customerAddress||'',t.instagramProfile||'',t.facebookProfile||'',t.whatsappProfile||'',
+      RX_PHOTO_KEYS.filter(function(k){return t[k];}).join(', ')];
   }),
-  ['Ticket','Type','Created','Order#','Customer','Mobile','Product(s)','Size(s)','Product(s) To Send','Size(s) To Send','Amount','Platform','Reason','Assigned To','Stage','Created By','Bank','Account Title','IBAN','Duplicate Risk','Duplicate Detail','History'],'refund_exchange_tickets.csv');
+  ['Ticket','Type','Created','Order#','Customer','Mobile','Product(s)','Size(s)','Product(s) To Send','Size(s) To Send','Amount','Platform','Reason','Assigned To','Stage','Created By','Bank','Account Title','IBAN','Duplicate Risk','Duplicate Detail','History','Address','Instagram','Facebook','WhatsApp','Photos Attached'],'refund_exchange_tickets.csv');
+}
+// ── FULL BACKUP ──
+// The CSV above is text only. This saves everything on the sheet -- every field,
+// every note and every photo -- as ONE html file: a readable archive (search,
+// filters, photos) with the raw tickets embedded in it, so it opens in any browser
+// and needs neither this app nor the server afterwards.
+var RX_ARCHIVE_CSS=[
+  '*{box-sizing:border-box}body{margin:0;background:#f4f1ea;color:#2b2b2b;font:14px/1.45 system-ui,Segoe UI,Arial,sans-serif}',
+  '#app{max-width:1100px;margin:0 auto;padding:22px 16px 60px}h1{font-size:22px;margin:0 0 4px}.sub{color:#777;margin:0 0 8px}',
+  '.warn{background:#fff3e0;border:1px solid #f0d9b0;color:#8a5a10;border-radius:8px;padding:7px 12px;font-size:13px;margin:0 0 14px}',
+  '.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;top:0;background:#f4f1ea;padding:8px 0 10px;z-index:5}',
+  '.bar input,.bar select{border:1px solid #d8d3c6;border-radius:6px;padding:8px 10px;font-size:13px;background:#fff}.bar input{flex:1;min-width:240px}',
+  '#cnt{color:#777;font-size:13px}button{border:1px solid #c8a96e;background:#fff;color:#7a4f10;border-radius:6px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer}',
+  '.card{background:#fff;border:1px solid #e8e4dc;border-radius:10px;margin:0 0 12px;padding:14px 16px;break-inside:avoid}',
+  '.card header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.id{font-weight:800;font-size:16px}',
+  '.tag{font-size:11px;font-weight:800;border-radius:4px;padding:2px 8px;color:#fff}.tag.refund{background:#c0392b}.tag.exchange{background:#0F6E56}',
+  '.stage{font-size:12px;background:#efece4;border-radius:10px;padding:2px 10px;color:#555}.amt{margin-left:auto;font-weight:800;color:#a07030}',
+  '.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}@media(max-width:700px){.cols{grid-template-columns:1fr}}',
+  '.f{padding:3px 0;word-break:break-word}.f span{display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:#999;letter-spacing:.04em}',
+  '.items{margin:8px 0}.it{background:#f8f6f2;border-radius:6px;padding:6px 10px;margin-bottom:4px;display:flex;justify-content:space-between;gap:10px}.it span{color:#a07030;font-weight:700;white-space:nowrap}',
+  '.photos{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0}figure{margin:0}figure img{width:130px;height:165px;object-fit:cover;border-radius:8px;border:1px solid #e5e2db;cursor:zoom-in;display:block}',
+  'figcaption{font-size:11px;color:#777;max-width:160px;margin-top:3px}figcaption b{display:block;color:#555;text-transform:uppercase;font-size:10px}',
+  '.hist{list-style:none;margin:8px 0 0;padding:0}.hist li{background:#f8f6f2;border-left:3px solid #0F6E56;border-radius:6px;padding:6px 10px;margin-bottom:4px;font-size:13px}',
+  '.hist li.back{border-left-color:#c0392b;background:#fde8e8}.hist i{color:#aaa;font-size:11px}.hist div{color:#555;margin-top:2px;white-space:pre-wrap}',
+  '.none{text-align:center;color:#999;padding:40px}#more{text-align:center;margin-top:14px}',
+  '.ov{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;cursor:zoom-out;z-index:50}.ov img{max-width:95vw;max-height:95vh;border-radius:8px}'
+].join('\n');
+// Runs INSIDE the downloaded file, not in the app: it is serialised with
+// toString(), so it may only use its own variables.
+function rxArchiveViewer(){
+  var raw=JSON.parse(document.getElementById('raw').textContent);
+  var T=raw.tickets||[],L=raw.stages||{},PAGE=25,shown=PAGE,list=T;
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function nf(n){return Math.round(+n||0).toLocaleString('en-US');}
+  function items(t){return t.items&&t.items.length?t.items:[{product:t.product||'',size:t.size||'',productToSend:t.productToSend||'',sizeToSend:t.sizeToSend||'',amount:t.amount||0}];}
+  function stageName(t){return (L[t.type]||{})[t.status]||t.status||'';}
+  function f(l,v){return v?'<div class="f"><span>'+esc(l)+'</span>'+esc(v)+'</div>':'';}
+  function hay(t){
+    var a=[t.id,t.type,stageName(t),t.order,t.customer,t.customerMobile,t.customerAddress,t.platform,t.reason,t.assignedTo,t.createdBy,t.bankName,t.accountTitle,t.accountNumber,t.instagramProfile,t.facebookProfile,t.whatsappProfile];
+    items(t).forEach(function(it){a.push(it.product,it.productToSend);});
+    (t.history||[]).forEach(function(h){a.push(h.note,h.by);});
+    return a.filter(Boolean).join(' ').toLowerCase();
+  }
+  var H=T.map(hay);
+  var PH=[['chatScreenshot','Customer chat (at creation)'],['receivedPhoto','Received article'],['paidPhoto',''],['informedPhoto','Customer informed (chat)']];
+  function card(t){
+    var its=items(t);
+    var photos=PH.filter(function(p){return t[p[0]];}).map(function(p){
+      var lbl=p[1]||(t.type==='refund'?'Payment voucher':'Dispatch proof');
+      var who=t[p[0]+'By']?t[p[0]+'By']+(t[p[0]+'At']?' · '+t[p[0]+'At']:''):'';
+      return '<figure><img class="ph" loading="lazy" src="'+esc(t[p[0]])+'" alt=""><figcaption><b>'+esc(lbl)+'</b>'+esc(who)+'</figcaption></figure>';
+    }).join('');
+    var hist=(t.history||[]).map(function(h){
+      var name=h.noteOnly?'Note':(h.sendBack?'Sent back to ':'')+((L[t.type]||{})[h.stage]||h.stage||'');
+      return '<li'+(h.sendBack?' class="back"':'')+'><b>'+esc(name)+'</b> <i>by '+esc(h.by||'—')+' · '+esc(h.at||'')+'</i>'+(h.note?'<div>'+esc(h.note)+'</div>':'')+'</li>';
+    }).join('');
+    return '<article class="card"><header><span class="id">'+esc(t.id)+'</span><span class="tag '+esc(t.type)+'">'+esc(String(t.type||'').toUpperCase())+'</span><span class="stage">'+esc(stageName(t))+'</span><span class="amt">'+(t.amount?'PKR '+nf(t.amount):'')+'</span></header>'
+     +'<div class="cols"><div>'+f('Order #',t.order?(String(t.order).charAt(0)==='#'?'':'#')+t.order:'')+f('Customer',t.customer)+f('Mobile',t.customerMobile)+f('Address',t.customerAddress)+f('Platform',t.platform)+f('Reason',t.reason)+'</div>'
+     +'<div>'+f('Created',(t.createdAt||'')+(t.createdBy?' by '+t.createdBy:''))+f('Assigned to',t.assignedTo)+f('Bank',t.bankName)+f('Account title',t.accountTitle)+f('IBAN / account',t.accountNumber)+f('Instagram',t.instagramProfile)+f('Facebook',t.facebookProfile)+f('WhatsApp',t.whatsappProfile)+'</div></div>'
+     +'<div class="items">'+its.map(function(it,i){return '<div class="it"><div>'+(its.length>1?(i+1)+'. ':'')+'<b>'+esc(it.product)+'</b>'+(it.size?' ('+esc(it.size)+')':'')+(it.productToSend?' → <b>'+esc(it.productToSend)+'</b>'+(it.sizeToSend?' ('+esc(it.sizeToSend)+')':''):'')+'</div>'+(it.amount?'<span>PKR '+nf(it.amount)+'</span>':'')+'</div>';}).join('')+'</div>'
+     +(photos?'<div class="photos">'+photos+'</div>':'')
+     +(hist?'<ul class="hist">'+hist+'</ul>':'')+'</article>';
+  }
+  var by={},stages=[];
+  T.forEach(function(t){by[t.type]=(by[t.type]||0)+1;if(stages.indexOf(t.status)<0)stages.push(t.status);});
+  document.getElementById('app').innerHTML='<h1>Refunds &amp; Exchange — archive</h1>'
+   +'<p class="sub">Saved '+esc(raw.exportedAt||'')+(raw.exportedBy?' by '+esc(raw.exportedBy):'')+' · '+T.length+' tickets ('+(by.refund||0)+' refunds, '+(by.exchange||0)+' exchanges) · '+(raw.photos||0)+' photos</p>'
+   +'<p class="warn">⚠ Contains customers’ phone numbers, addresses and bank details — keep this file private.</p>'
+   +'<div class="bar"><input id="q" type="search" placeholder="Search ticket, order, customer, mobile, product, bank, note…"><select id="ty"><option value="">All types</option><option value="refund">Refunds</option><option value="exchange">Exchanges</option></select>'
+   +'<select id="st"><option value="">All stages</option>'+stages.map(function(s){return '<option value="'+esc(s)+'">'+esc(s==='paid'?'Paid / Dispatched':s.charAt(0).toUpperCase()+s.slice(1))+'</option>';}).join('')+'</select>'
+   +'<span id="cnt"></span><button id="rawdl" type="button" title="The complete tickets as data, for keeping or re-importing later">Save raw data (.json)</button></div><div id="list"></div><div id="more"></div>';
+  var listEl=document.getElementById('list'),moreEl=document.getElementById('more');
+  function more(){
+    var left=list.length-shown;
+    moreEl.innerHTML=left>0?'<button id="morebtn" type="button">Show '+Math.min(PAGE,left)+' more ('+left+' left)</button>':'';
+  }
+  function draw(){
+    var q=document.getElementById('q').value.trim().toLowerCase(),ty=document.getElementById('ty').value,st=document.getElementById('st').value;
+    list=[];
+    T.forEach(function(t,i){if((!ty||t.type===ty)&&(!st||t.status===st)&&(!q||H[i].indexOf(q)>=0))list.push(t);});
+    shown=Math.min(PAGE,list.length);
+    document.getElementById('cnt').textContent=list.length+' of '+T.length+' tickets';
+    listEl.innerHTML=list.slice(0,shown).map(card).join('')||'<p class="none">No tickets match.</p>';
+    more();
+  }
+  ['q','ty','st'].forEach(function(id){document.getElementById(id).addEventListener(id==='q'?'input':'change',draw);});
+  document.addEventListener('click',function(e){
+    var el=e.target;
+    if(el.id==='morebtn'){listEl.insertAdjacentHTML('beforeend',list.slice(shown,shown+PAGE).map(card).join(''));shown+=PAGE;more();}
+    else if(el.id==='rawdl'){
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([document.getElementById('raw').textContent],{type:'application/json'}));
+      a.download='refund_exchange_raw_data.json';document.body.appendChild(a);a.click();a.remove();
+    }else if(el.className==='ph'){
+      var ov=document.createElement('div');ov.className='ov';ov.innerHTML='<img src="'+el.src+'" alt="">';
+      ov.onclick=function(){ov.remove();};document.body.appendChild(ov);
+    }
+  });
+  draw();
+}
+async function rxBackup(){
+  var r=rexRole(CU);
+  if(r!=='admin'&&r!=='manager'&&r!=='accountant'){showToast('Only Admin, Manager or Accountant can take the full backup.');return;}
+  showToast('Preparing backup — fetching the latest tickets…');
+  await rxRefresh();
+  if(!window._rxLoadOK){showToast('Could not load the tickets — nothing was saved. Reload the page and try again.');return;}
+  var T=(window.TICKETS||[]).slice();
+  if(!T.length){showToast('There are no tickets to back up.');return;}
+  var stages={refund:{},exchange:{}},photos=0;
+  RX_STAGES.forEach(function(st){stages.refund[st]=rxStageLabel(st,'refund');stages.exchange[st]=rxStageLabel(st,'exchange');});
+  T.forEach(function(t){RX_PHOTO_KEYS.forEach(function(k){if(t[k])photos++;});});
+  var payload={kind:'sahibas-refund-exchange-backup',version:1,exportedAt:rxNow(),exportedBy:CU?CU.name:'',count:T.length,photos:photos,stages:stages,tickets:T};
+  // "<" is escaped so no ticket text can close the data block early.
+  var json=JSON.stringify(payload).replace(/</g,'\\u003c');
+  var day=new Date().toISOString().split('T')[0];
+  var html='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sahibas — Refunds &amp; Exchange archive ('+day+')</title><style>'+RX_ARCHIVE_CSS+'</style></head><body><div id="app"></div>'
+    +'<script type="application/json" id="raw">'+json+'<'+'/script><script>('+rxArchiveViewer.toString()+')();<'+'/script></body></html>';
+  var blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='Sahibas_Refunds_Exchange_Backup_'+day+'.html';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},60000);
+  showToast('✅ Backup saved — '+T.length+' tickets, '+photos+' photos ('+(blob.size/1048576).toFixed(1)+' MB). Keep this file somewhere safe.');
 }
 function rxProductOptions(){
   var names={};
